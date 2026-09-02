@@ -33,6 +33,26 @@ export function createExpressApp(): express.Application {
     next();
   }
 
+  // Helper to handle API errors and consistently return 401 on Google auth failures
+  function handleApiError(res: Response, error: any, fallbackMessage: string) {
+    console.error(fallbackMessage, error);
+    const is401 =
+      error?.status === 401 ||
+      (error?.message &&
+        (error.message.includes('401') ||
+          error.message.includes('Invalid Credentials') ||
+          error.message.includes('Unauthenticated') ||
+          error.message.includes('invalid_token') ||
+          error.message.includes('invalid_grant')));
+
+    const statusCode = is401 ? 401 : 500;
+    const errorMessage = is401
+      ? 'Unauthorized: Expired or invalid Google access token. Please sign in with Google again.'
+      : error?.message || fallbackMessage;
+
+    return res.status(statusCode).json({ error: errorMessage });
+  }
+
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', service: 'SpendTrack API', timestamp: new Date().toISOString() });
@@ -51,8 +71,7 @@ export function createExpressApp(): express.Application {
         driveFolders,
       });
     } catch (error: any) {
-      console.error('Error verifying Workspace status:', error);
-      res.status(500).json({ error: error.message || 'Failed to initialize Google Workspace resources.' });
+      handleApiError(res, error, 'Failed to initialize Google Workspace resources.');
     }
   });
 
@@ -66,8 +85,7 @@ export function createExpressApp(): express.Application {
       const expenses = await sheetsService.getExpenses(token);
       res.json(expenses);
     } catch (error: any) {
-      console.error('Error fetching expenses:', error);
-      res.status(500).json({ error: error.message || 'Failed to fetch expenses from Google Sheets' });
+      handleApiError(res, error, 'Failed to fetch expenses from Google Sheets.');
     }
   });
 
@@ -77,8 +95,7 @@ export function createExpressApp(): express.Application {
       const newExpense = await sheetsService.createExpense(token, req.body);
       res.status(201).json(newExpense);
     } catch (error: any) {
-      console.error('Error creating expense:', error);
-      res.status(500).json({ error: error.message || 'Failed to save expense in Google Sheets' });
+      handleApiError(res, error, 'Failed to save expense in Google Sheets.');
     }
   });
 
@@ -89,8 +106,7 @@ export function createExpressApp(): express.Application {
       const updated = await sheetsService.updateExpense(token, id, req.body);
       res.json(updated);
     } catch (error: any) {
-      console.error('Error updating expense:', error);
-      res.status(500).json({ error: error.message || 'Failed to update expense in Google Sheets' });
+      handleApiError(res, error, 'Failed to update expense in Google Sheets.');
     }
   });
 
@@ -101,8 +117,7 @@ export function createExpressApp(): express.Application {
       const success = await sheetsService.deleteExpense(token, id);
       res.json({ success });
     } catch (error: any) {
-      console.error('Error deleting expense:', error);
-      res.status(500).json({ error: error.message || 'Failed to delete expense from Google Sheets' });
+      handleApiError(res, error, 'Failed to delete expense from Google Sheets.');
     }
   });
 
@@ -116,8 +131,7 @@ export function createExpressApp(): express.Application {
       const categories = await sheetsService.getCategories(token);
       res.json(categories);
     } catch (error: any) {
-      console.error('Error fetching categories:', error);
-      res.status(500).json({ error: error.message || 'Failed to fetch categories' });
+      handleApiError(res, error, 'Failed to fetch categories.');
     }
   });
 
@@ -127,8 +141,7 @@ export function createExpressApp(): express.Application {
       const categories = await sheetsService.saveCategories(token, req.body);
       res.json(categories);
     } catch (error: any) {
-      console.error('Error saving categories:', error);
-      res.status(500).json({ error: error.message || 'Failed to save categories' });
+      handleApiError(res, error, 'Failed to save categories.');
     }
   });
 
@@ -142,8 +155,7 @@ export function createExpressApp(): express.Application {
       const recurring = await sheetsService.getRecurringExpenses(token);
       res.json(recurring);
     } catch (error: any) {
-      console.error('Error fetching recurring expenses:', error);
-      res.status(500).json({ error: error.message || 'Failed to fetch recurring expenses' });
+      handleApiError(res, error, 'Failed to fetch recurring expenses.');
     }
   });
 
@@ -173,8 +185,7 @@ export function createExpressApp(): express.Application {
       });
       res.status(201).json(newRecurring);
     } catch (error: any) {
-      console.error('Error creating recurring expense:', error);
-      res.status(500).json({ error: error.message || 'Failed to save recurring expense' });
+      handleApiError(res, error, 'Failed to save recurring expense.');
     }
   });
 
@@ -226,8 +237,7 @@ export function createExpressApp(): express.Application {
       });
       res.json(updated);
     } catch (error: any) {
-      console.error('Error updating recurring expense:', error);
-      res.status(500).json({ error: error.message || 'Failed to update recurring expense' });
+      handleApiError(res, error, 'Failed to update recurring expense.');
     }
   });
 
@@ -248,8 +258,7 @@ export function createExpressApp(): express.Application {
       const success = await sheetsService.deleteRecurringExpense(token, id);
       res.json({ success });
     } catch (error: any) {
-      console.error('Error deleting recurring expense:', error);
-      res.status(500).json({ error: error.message || 'Failed to delete recurring expense' });
+      handleApiError(res, error, 'Failed to delete recurring expense.');
     }
   });
 
@@ -263,8 +272,7 @@ export function createExpressApp(): express.Application {
       const items = await sheetsService.getMonthlyItems(token);
       res.json(items);
     } catch (error: any) {
-      console.error('Error fetching monthly items:', error);
-      res.status(500).json({ error: error.message || 'Failed to fetch monthly items' });
+      handleApiError(res, error, 'Failed to fetch monthly items.');
     }
   });
 
@@ -274,8 +282,7 @@ export function createExpressApp(): express.Application {
       const item = await sheetsService.createMonthlyItem(token, req.body);
       res.json(item);
     } catch (error: any) {
-      console.error('Error creating monthly item:', error);
-      res.status(500).json({ error: error.message || 'Failed to create monthly item' });
+      handleApiError(res, error, 'Failed to create monthly item.');
     }
   });
 
@@ -286,8 +293,7 @@ export function createExpressApp(): express.Application {
       const updated = await sheetsService.updateMonthlyItem(token, id, req.body);
       res.json(updated);
     } catch (error: any) {
-      console.error('Error updating monthly item:', error);
-      res.status(500).json({ error: error.message || 'Failed to update monthly item' });
+      handleApiError(res, error, 'Failed to update monthly item.');
     }
   });
 
@@ -298,8 +304,7 @@ export function createExpressApp(): express.Application {
       const success = await sheetsService.deleteMonthlyItem(token, id);
       res.json({ success });
     } catch (error: any) {
-      console.error('Error deleting monthly item:', error);
-      res.status(500).json({ error: error.message || 'Failed to delete monthly item' });
+      handleApiError(res, error, 'Failed to delete monthly item.');
     }
   });
 
@@ -323,8 +328,7 @@ export function createExpressApp(): express.Application {
 
       res.json(file);
     } catch (error: any) {
-      console.error('Error uploading receipt to Drive:', error);
-      res.status(500).json({ error: error.message || 'Failed to upload receipt to Google Drive' });
+      handleApiError(res, error, 'Failed to upload receipt to Google Drive.');
     }
   });
 
@@ -335,8 +339,7 @@ export function createExpressApp(): express.Application {
       const file = await driveService.getReceiptFile(token, fileId);
       res.json(file);
     } catch (error: any) {
-      console.error('Error fetching file info:', error);
-      res.status(500).json({ error: error.message || 'Failed to fetch Google Drive file info' });
+      handleApiError(res, error, 'Failed to fetch Google Drive file info.');
     }
   });
 
@@ -384,9 +387,7 @@ export function createExpressApp(): express.Application {
 
       res.json({ reply });
     } catch (error: any) {
-      console.error('Error handling AI chat request:', error);
-      const errorMessage = error.message || 'SpendTrack AI is temporarily unavailable.';
-      res.status(500).json({ error: errorMessage });
+      handleApiError(res, error, 'SpendTrack AI is temporarily unavailable.');
     }
   });
 

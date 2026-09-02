@@ -20,7 +20,9 @@ export class GoogleDriveService implements DriveStorageRepository {
         const parsed = JSON.parse(errText);
         msg = parsed.error?.message || msg;
       } catch {}
-      throw new Error(msg);
+      const err: any = new Error(msg);
+      err.status = res.status;
+      throw err;
     }
 
     return res.json();
@@ -130,7 +132,9 @@ export class GoogleDriveService implements DriveStorageRepository {
         const parsed = JSON.parse(errText);
         msg = parsed.error?.message || msg;
       } catch {}
-      throw new Error(msg);
+      const err: any = new Error(msg);
+      err.status = res.status;
+      throw err;
     }
 
     const data = await res.json();

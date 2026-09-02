@@ -28,7 +28,9 @@ export class GoogleSheetsService
         const parsed = JSON.parse(errText);
         msg = parsed.error?.message || msg;
       } catch {}
-      throw new Error(msg);
+      const err: any = new Error(msg);
+      err.status = res.status;
+      throw err;
     }
 
     return res.json();

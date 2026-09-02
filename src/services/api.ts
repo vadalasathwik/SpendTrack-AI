@@ -1,5 +1,5 @@
 import { Expense, RecurringExpense, CategoryItem, MonthlyItem } from '../types';
-import { getAccessToken } from './authService';
+import { getAccessToken, setAccessToken } from './authService';
 
 async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = await getAccessToken();
@@ -17,6 +17,10 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
   });
 
   if (!res.ok) {
+    if (res.status === 401) {
+      setAccessToken(null);
+      throw new Error('Not authenticated. Please sign in with Google.');
+    }
     const errorBody = await res.json().catch(() => ({}));
     throw new Error(errorBody.error || `Request failed with status ${res.status}`);
   }

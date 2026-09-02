@@ -32,6 +32,7 @@ provider.addScope('https://www.googleapis.com/auth/calendar.events');
 
 let isSigningIn = false;
 let cachedAccessToken: string | null = null;
+const STORAGE_KEY = 'spendtrack_google_access_token';
 
 export const onAuthStateChange = (callback: (user: User | null) => void) => {
   if (!auth) {
@@ -39,6 +40,9 @@ export const onAuthStateChange = (callback: (user: User | null) => void) => {
     return () => {};
   }
   return onAuthStateChanged(auth, (user) => {
+    if (!user) {
+      setAccessToken(null);
+    }
     callback(user);
   });
 };
@@ -53,8 +57,8 @@ export const signInWithGoogle = async (): Promise<{ user: User; accessToken: str
       throw new Error('Could not retrieve access token from Google sign-in.');
     }
 
-    cachedAccessToken = credential.accessToken;
-    return { user: result.user, accessToken: cachedAccessToken };
+    setAccessToken(credential.accessToken);
+    return { user: result.user, accessToken: credential.accessToken };
   } catch (error: any) {
     console.error('Google Sign In Error:', error);
     throw error;
@@ -64,16 +68,32 @@ export const signInWithGoogle = async (): Promise<{ user: User; accessToken: str
 };
 
 export const getAccessToken = async (): Promise<string | null> => {
-  return cachedAccessToken;
+  if (cachedAccessToken) return cachedAccessToken;
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      cachedAccessToken = stored;
+      return cachedAccessToken;
+    }
+  }
+  return null;
 };
 
 export const setAccessToken = (token: string | null) => {
   cachedAccessToken = token;
+  if (typeof window !== 'undefined' && window.localStorage) {
+    if (token) {
+      localStorage.setItem(STORAGE_KEY, token);
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }
 };
 
 export const signOutApp = async () => {
   if (auth) {
     await signOut(auth);
   }
-  cachedAccessToken = null;
+  setAccessToken(null);
 };
+

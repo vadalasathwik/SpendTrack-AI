@@ -10,6 +10,7 @@ import {
   Sparkles,
   Layers,
   LogOut,
+  LogIn,
   RefreshCw,
   ShoppingCart,
   Bot,
@@ -114,6 +115,24 @@ export function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Google Sign-In Handler
+  const handleGoogleSignIn = async () => {
+    try {
+      setSyncStatus({ state: 'syncing' });
+      const res = await signInWithGoogle();
+      if (res?.user) {
+        setUser(res.user);
+        await loadDataFromWorkspace();
+      }
+    } catch (err: any) {
+      console.error('Google Sign In failed:', err);
+      setSyncStatus({
+        state: 'error',
+        errorMessage: err.message || 'Google Sign-In failed',
+      });
+    }
+  };
 
   // Load all Workspace Data
   const loadDataFromWorkspace = async () => {
@@ -414,6 +433,17 @@ export function App() {
               compact={true}
             />
 
+            {!user || syncStatus.state === 'error' ? (
+              <button
+                id="header-sign-in-btn"
+                onClick={handleGoogleSignIn}
+                className="px-3.5 py-2 text-xs sm:text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Sign In with Google</span>
+              </button>
+            ) : null}
+
             {/* Quick Add Expense Action Button */}
             <button
               id="header-quick-add-btn"
@@ -590,6 +620,7 @@ export function App() {
             onExportCsv={handleExportCsv}
             onImportCsv={handleImportCsv}
             onSignOut={signOutApp}
+            onGoogleSignIn={handleGoogleSignIn}
             userEmail={user?.email}
             workspaceStatus={workspaceStatus}
             onRefreshWorkspace={loadDataFromWorkspace}

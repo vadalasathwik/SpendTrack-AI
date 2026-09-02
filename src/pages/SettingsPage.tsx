@@ -24,6 +24,7 @@ interface SettingsPageProps {
   onExportCsv: () => void;
   onImportCsv: (file: File) => void;
   onSignOut: () => void;
+  onGoogleSignIn?: () => void;
   userEmail?: string;
   workspaceStatus?: { spreadsheetId: string; driveFolders: any } | null;
   onRefreshWorkspace: () => void;
@@ -35,6 +36,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onExportCsv,
   onImportCsv,
   onSignOut,
+  onGoogleSignIn,
   userEmail,
   workspaceStatus,
   onRefreshWorkspace,
@@ -95,6 +97,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {onGoogleSignIn && (
+              <button
+                onClick={onGoogleSignIn}
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-lg flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>Google Sign-In</span>
+              </button>
+            )}
             <button
               onClick={onRefreshWorkspace}
               className="px-3 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg flex items-center gap-1.5 cursor-pointer"
