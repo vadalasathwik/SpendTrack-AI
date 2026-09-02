@@ -245,25 +245,62 @@ CRITICAL TRUTHFULNESS & ACCURACY DIRECTIVES:
       parts: [{ text: params.message }],
     });
 
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents,
-        config: {
-          systemInstruction,
-          temperature: 0.2, // Low temperature for high numerical precision
-        },
-      });
+    const modelsToTry = ['gemini-3.6-flash', 'gemini-3.6-flash-lite'];
+    const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    let lastError: any = null;
 
-      const responseText = response.text;
-      if (!responseText) {
-        throw new Error('No response text received from Gemini.');
+    for (const modelName of modelsToTry) {
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const response = await ai.models.generateContent({
+            model: modelName,
+            contents,
+            config: {
+              systemInstruction,
+              temperature: 0.2, // Low temperature for high numerical precision
+            },
+          });
+
+          const responseText = response.text;
+          if (!responseText) {
+            throw new Error('No response text received from Gemini.');
+          }
+
+          return responseText;
+        } catch (error: any) {
+          lastError = error;
+          const status = error?.status || error?.statusCode;
+          const msg = String(error?.message || '');
+          const is503 = status === 503 || msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand');
+          const is404 = status === 404 || msg.includes('404') || msg.includes('NOT_FOUND') || msg.includes('no longer available');
+
+          console.warn(`Gemini API model ${modelName} attempt ${attempt} warning:`, msg);
+
+          if (is503 && attempt === 1) {
+            console.log('SpendTrack AI is temporarily busy due to high demand. Retrying automatically...');
+            await delay(800);
+            continue;
+          }
+
+          if (is404) {
+            console.warn('The configured Gemini model is unavailable. Falling back to the latest supported model.');
+            break;
+          }
+
+          break;
+        }
       }
+    }
 
-      return responseText;
-    } catch (error: any) {
-      console.error('Gemini API chat error:', error);
-      throw error;
+    const lastMsg = String(lastError?.message || '');
+    const lastStatus = lastError?.status || lastError?.statusCode;
+
+    if (lastStatus === 503 || lastMsg.includes('503') || lastMsg.includes('UNAVAILABLE')) {
+      throw new Error('SpendTrack AI is temporarily busy due to high demand. Retrying automatically...');
+    } else if (lastStatus === 404 || lastMsg.includes('404') || lastMsg.includes('NOT_FOUND')) {
+      throw new Error('The configured Gemini model is unavailable. Falling back to the latest supported model.');
+    } else {
+      throw new Error('SpendTrack AI service is temporarily unavailable.');
     }
   }
 }
