@@ -1,4 +1,4 @@
-import { CalendarRepository } from '../services/interfaces';
+import { CalendarRepository } from '../services/interfaces.js';
 
 const CALENDAR_API = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
 

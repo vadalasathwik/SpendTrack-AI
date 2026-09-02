@@ -1,8 +1,6 @@
-import type { Request, Response } from 'express';
-import { createExpressApp } from '../server/app';
+import { createExpressApp } from '../server/app.js';
 
 const app = createExpressApp();
 
-export default function handler(req: Request, res: Response) {
-  return app(req, res);
-}
+export default app;
+

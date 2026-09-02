@@ -1,8 +1,8 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { GoogleSheetsService } from './google/sheetsService';
-import { GoogleDriveService } from './google/driveService';
-import { GoogleCalendarService } from './google/calendarService';
-import { geminiAssistantService } from './services/geminiService';
+import { GoogleSheetsService } from './google/sheetsService.js';
+import { GoogleDriveService } from './google/driveService.js';
+import { GoogleCalendarService } from './google/calendarService.js';
+import { geminiAssistantService } from './services/geminiService.js';
 
 export function createExpressApp(): express.Application {
   const app = express();

@@ -1,13 +1,13 @@
 import { GoogleGenAI } from '@google/genai';
-import { Expense, RecurringExpense, CategoryItem, DateRange } from '../../src/types';
+import { Expense, RecurringExpense, CategoryItem, DateRange } from '../../src/types.js';
 import {
   calculateCategoryTotals,
   filterExpensesByDateRange,
   generateItemAnalytics,
   comparePeriods,
   formatCurrency,
-} from '../../src/utils/calculations';
-import { getPreviousPeriod } from '../../src/utils/dateRanges';
+} from '../../src/utils/calculations.js';
+import { getPreviousPeriod } from '../../src/utils/dateRanges.js';
 
 let aiClient: GoogleGenAI | null = null;
 

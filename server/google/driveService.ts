@@ -1,4 +1,4 @@
-import { DriveStorageRepository } from '../services/interfaces';
+import { DriveStorageRepository } from '../services/interfaces.js';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';

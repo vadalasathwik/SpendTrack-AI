@@ -1,11 +1,11 @@
-import { Expense, CategoryItem, RecurringExpense, MonthlyItem } from '../../src/types';
+import { Expense, CategoryItem, RecurringExpense, MonthlyItem } from '../../src/types.js';
 import {
   ExpenseRepository,
   CategoryRepository,
   RecurringExpenseRepository,
   MonthlyItemRepository,
-} from '../services/interfaces';
-import { DEFAULT_CATEGORIES, DEFAULT_MONTHLY_ITEMS } from '../../src/data/defaults';
+} from '../services/interfaces.js';
+import { DEFAULT_CATEGORIES, DEFAULT_MONTHLY_ITEMS } from '../../src/data/defaults.js';
 
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
