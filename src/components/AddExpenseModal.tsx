@@ -18,8 +18,8 @@ import {
   Camera,
   Trash2,
 } from 'lucide-react';
-import { Expense, CategoryItem, MonthlyItem } from '../types';
-import { DEFAULT_UNITS } from '../data/defaults';
+import { Expense, CategoryItem, MonthlyItem } from '../types.js';
+import { DEFAULT_UNITS } from '../data/defaults.js';
 import {
   calculateDuration,
   calculatePricePerUnit,
@@ -30,8 +30,8 @@ import {
   getCurrentlyInUseStatus,
   formatConsumptionVelocity,
   formatCurrency,
-} from '../utils/calculations';
-import { SpendTrackApi } from '../services/api';
+} from '../utils/calculations.js';
+import { SpendTrackApi } from '../services/api.js';
 
 interface AddExpenseModalProps {
   isOpen: boolean;

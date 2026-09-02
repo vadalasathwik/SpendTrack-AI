@@ -33,7 +33,7 @@ import {
   Activity,
   ArrowRight,
 } from 'lucide-react';
-import { Expense, DateRange, CategorySpending, ItemAnalyticsSummary, MonthlyItem } from '../types';
+import { Expense, DateRange, CategorySpending, ItemAnalyticsSummary, MonthlyItem } from '../types.js';
 import {
   calculateCategoryTotals,
   filterExpensesByDateRange,
@@ -42,9 +42,9 @@ import {
   generateConsumptionInsights,
   getCurrentlyInUseStatus,
   formatConsumptionVelocity,
-} from '../utils/calculations';
-import { formatDisplayDate } from '../utils/dateRanges';
-import { CATEGORY_COLORS } from '../data/defaults';
+} from '../utils/calculations.js';
+import { formatDisplayDate } from '../utils/dateRanges.js';
+import { CATEGORY_COLORS } from '../data/defaults.js';
 
 interface DashboardPageProps {
   expenses: Expense[];

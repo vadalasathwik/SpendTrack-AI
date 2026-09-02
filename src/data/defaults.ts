@@ -1,4 +1,4 @@
-import { Expense, CategoryItem, RecurringExpense, MonthlyItem } from '../types';
+import { Expense, CategoryItem, RecurringExpense, MonthlyItem } from '../types.js';
 
 export const DEFAULT_UNITS: string[] = [
   'kg',

@@ -14,10 +14,10 @@ import {
   DollarSign,
   Zap,
 } from 'lucide-react';
-import { RecurringExpense, CategoryItem } from '../types';
-import { formatCurrency } from '../utils/calculations';
-import { formatDisplayDate } from '../utils/dateRanges';
-import { CATEGORY_COLORS } from '../data/defaults';
+import { RecurringExpense, CategoryItem } from '../types.js';
+import { formatCurrency } from '../utils/calculations.js';
+import { formatDisplayDate } from '../utils/dateRanges.js';
+import { CATEGORY_COLORS } from '../data/defaults.js';
 
 interface RecurringPageProps {
   recurringExpenses: RecurringExpense[];

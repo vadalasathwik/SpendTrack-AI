@@ -1,4 +1,4 @@
-import { DateRangePreset, DateRange } from '../types';
+import { DateRangePreset, DateRange } from '../types.js';
 
 export function formatDateToYYYYMMDD(d: Date): string {
   const year = d.getFullYear();

@@ -17,10 +17,10 @@ import {
   Clock,
   Sparkles,
 } from 'lucide-react';
-import { Expense, CategoryItem, DateRange } from '../types';
-import { filterExpensesByDateRange, formatCurrency } from '../utils/calculations';
-import { formatDisplayDate } from '../utils/dateRanges';
-import { CATEGORY_COLORS } from '../data/defaults';
+import { Expense, CategoryItem, DateRange } from '../types.js';
+import { filterExpensesByDateRange, formatCurrency } from '../utils/calculations.js';
+import { formatDisplayDate } from '../utils/dateRanges.js';
+import { CATEGORY_COLORS } from '../data/defaults.js';
 
 interface ExpensesPageProps {
   expenses: Expense[];

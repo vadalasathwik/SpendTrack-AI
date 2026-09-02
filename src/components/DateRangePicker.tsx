@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Calendar, ChevronDown } from 'lucide-react';
-import { DateRangePreset, DateRange } from '../types';
-import { getDateRangeFromPreset } from '../utils/dateRanges';
+import { DateRangePreset, DateRange } from '../types.js';
+import { getDateRangeFromPreset } from '../utils/dateRanges.js';
 
 interface DateRangePickerProps {
   value: DateRange;

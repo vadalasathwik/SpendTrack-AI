@@ -1,5 +1,5 @@
-import { Expense, RecurringExpense, CategoryItem, DateRange } from '../types';
-import { getAccessToken } from './authService';
+import { Expense, RecurringExpense, CategoryItem, DateRange } from '../types.js';
+import { getAccessToken } from './authService.js';
 
 export interface AIChatMessage {
   id: string;

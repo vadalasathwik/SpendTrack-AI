@@ -1,5 +1,5 @@
-import { Expense, RecurringExpense, CategoryItem, MonthlyItem } from '../types';
-import { getAccessToken, setAccessToken } from './authService';
+import { Expense, RecurringExpense, CategoryItem, MonthlyItem } from '../types.js';
+import { getAccessToken, setAccessToken } from './authService.js';
 
 async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = await getAccessToken();

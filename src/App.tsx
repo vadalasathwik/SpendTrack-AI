@@ -23,32 +23,32 @@ import {
   DateRange,
   SyncStatus,
   MonthlyItem,
-} from './types';
+} from './types.js';
 import {
   DEFAULT_CATEGORIES,
   INITIAL_SAMPLE_EXPENSES,
   INITIAL_RECURRING_EXPENSES,
   DEFAULT_MONTHLY_ITEMS,
-} from './data/defaults';
-import { getDateRangeFromPreset } from './utils/dateRanges';
-import { SpendTrackApi } from './services/api';
-import { signInWithGoogle, signOutApp, onAuthStateChange } from './services/authService';
+} from './data/defaults.js';
+import { getDateRangeFromPreset } from './utils/dateRanges.js';
+import { SpendTrackApi } from './services/api.js';
+import { signInWithGoogle, signOutApp, onAuthStateChange } from './services/authService.js';
 
 // UI Components
-import { SyncStatusBadge } from './components/SyncStatusBadge';
-import { DateRangePicker } from './components/DateRangePicker';
-import { AddExpenseModal } from './components/AddExpenseModal';
-import { MobileMoreDrawer } from './components/MobileMoreDrawer';
+import { SyncStatusBadge } from './components/SyncStatusBadge.js';
+import { DateRangePicker } from './components/DateRangePicker.js';
+import { AddExpenseModal } from './components/AddExpenseModal.js';
+import { MobileMoreDrawer } from './components/MobileMoreDrawer.js';
 
 // Pages
-import { DashboardPage } from './pages/DashboardPage';
-import { ExpensesPage } from './pages/ExpensesPage';
-import { MonthlyItemsPage } from './pages/MonthlyItemsPage';
-import { ItemsAnalyticsPage } from './pages/ItemsAnalyticsPage';
-import { AnalyticsPage } from './pages/AnalyticsPage';
-import { RecurringPage } from './pages/RecurringPage';
-import { SettingsPage } from './pages/SettingsPage';
-import { AIAssistantPage } from './pages/AIAssistantPage';
+import { DashboardPage } from './pages/DashboardPage.js';
+import { ExpensesPage } from './pages/ExpensesPage.js';
+import { MonthlyItemsPage } from './pages/MonthlyItemsPage.js';
+import { ItemsAnalyticsPage } from './pages/ItemsAnalyticsPage.js';
+import { AnalyticsPage } from './pages/AnalyticsPage.js';
+import { RecurringPage } from './pages/RecurringPage.js';
+import { SettingsPage } from './pages/SettingsPage.js';
+import { AIAssistantPage } from './pages/AIAssistantPage.js';
 
 export function App() {
   // Navigation State

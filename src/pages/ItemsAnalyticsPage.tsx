@@ -26,15 +26,15 @@ import {
   AlertTriangle,
   Lightbulb,
 } from 'lucide-react';
-import { Expense, ItemAnalyticsSummary } from '../types';
+import { Expense, ItemAnalyticsSummary } from '../types.js';
 import {
   generateItemAnalytics,
   generateConsumptionInsights,
   formatCurrency,
   formatConsumptionVelocity,
-} from '../utils/calculations';
-import { formatDisplayDate } from '../utils/dateRanges';
-import { CATEGORY_COLORS } from '../data/defaults';
+} from '../utils/calculations.js';
+import { formatDisplayDate } from '../utils/dateRanges.js';
+import { CATEGORY_COLORS } from '../data/defaults.js';
 
 interface ItemsAnalyticsPageProps {
   expenses: Expense[];

@@ -14,9 +14,9 @@ import {
   CornerDownLeft,
   Lightbulb,
 } from 'lucide-react';
-import { Expense, RecurringExpense, CategoryItem, DateRange } from '../types';
-import { SpendTrackAIService, AIChatMessage } from '../services/aiService';
-import { filterExpensesByDateRange, formatCurrency } from '../utils/calculations';
+import { Expense, RecurringExpense, CategoryItem, DateRange } from '../types.js';
+import { SpendTrackAIService, AIChatMessage } from '../services/aiService.js';
+import { filterExpensesByDateRange, formatCurrency } from '../utils/calculations.js';
 
 interface AIAssistantPageProps {
   expenses: Expense[];

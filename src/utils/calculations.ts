@@ -1,5 +1,5 @@
-import { Expense, CategorySpending, PeriodComparisonResult, ItemAnalyticsSummary } from '../types';
-import { CATEGORY_COLORS } from '../data/defaults';
+import { Expense, CategorySpending, PeriodComparisonResult, ItemAnalyticsSummary } from '../types.js';
+import { CATEGORY_COLORS } from '../data/defaults.js';
 
 /**
  * Parses YYYY-MM-DD to UTC midnight milliseconds for timezone-safe calendar day arithmetic

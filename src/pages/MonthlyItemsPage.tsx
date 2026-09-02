@@ -19,9 +19,9 @@ import {
   ArrowUpRight,
   Package,
 } from 'lucide-react';
-import { MonthlyItem, CategoryItem, Expense } from '../types';
-import { formatCurrency } from '../utils/calculations';
-import { DEFAULT_UNITS, CATEGORY_COLORS } from '../data/defaults';
+import { MonthlyItem, CategoryItem, Expense } from '../types.js';
+import { formatCurrency } from '../utils/calculations.js';
+import { DEFAULT_UNITS, CATEGORY_COLORS } from '../data/defaults.js';
 
 interface MonthlyItemsPageProps {
   monthlyItems: MonthlyItem[];

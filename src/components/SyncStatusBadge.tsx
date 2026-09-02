@@ -1,6 +1,6 @@
 import React from 'react';
 import { RefreshCw, CheckCircle2, AlertCircle, WifiOff, Cloud } from 'lucide-react';
-import { SyncStatus } from '../types';
+import { SyncStatus } from '../types.js';
 
 interface SyncStatusBadgeProps {
   status: SyncStatus;

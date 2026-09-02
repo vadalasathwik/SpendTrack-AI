@@ -21,10 +21,10 @@ import {
   Layers,
   Sparkles,
 } from 'lucide-react';
-import { Expense, DateRange } from '../types';
-import { comparePeriods, formatCurrency, generateItemAnalytics } from '../utils/calculations';
-import { getPreviousPeriod, formatDisplayDate } from '../utils/dateRanges';
-import { CATEGORY_COLORS } from '../data/defaults';
+import { Expense, DateRange } from '../types.js';
+import { comparePeriods, formatCurrency, generateItemAnalytics } from '../utils/calculations.js';
+import { getPreviousPeriod, formatDisplayDate } from '../utils/dateRanges.js';
+import { CATEGORY_COLORS } from '../data/defaults.js';
 
 interface AnalyticsPageProps {
   expenses: Expense[];

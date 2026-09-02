@@ -15,8 +15,8 @@ import {
   HardDrive,
   Calendar,
 } from 'lucide-react';
-import { CategoryItem } from '../types';
-import { formatCurrency } from '../utils/calculations';
+import { CategoryItem } from '../types.js';
+import { formatCurrency } from '../utils/calculations.js';
 
 interface SettingsPageProps {
   categories: CategoryItem[];
