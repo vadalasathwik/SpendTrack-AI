@@ -30,7 +30,6 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
   isSigningIn = false,
   errorMessage = null,
 }) => {
-  const [activeModal, setActiveModal] = useState<'privacy' | 'terms' | null>(null);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col justify-between relative overflow-hidden selection:bg-emerald-100 selection:text-emerald-900">
@@ -308,12 +307,11 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
       {/* Footer Section */}
       <footer className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 border-t border-slate-200/70 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 z-10">
         <div className="flex items-center gap-2">
-          <span className="font-bold text-slate-700">SpendTrack</span>
-          <span>&copy; {new Date().getFullYear()}</span>
+          <span>&copy; 2026 SpendTrack. Personal AI Finance Workspace.</span>
         </div>
 
         {/* Footer Navigation Links */}
-        <div className="flex items-center gap-3 font-semibold text-slate-600">
+        <div className="flex items-center gap-4 font-semibold text-slate-600">
           <a
             href="/privacy"
             className="hover:text-emerald-700 transition-colors cursor-pointer"
@@ -327,84 +325,8 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
           >
             Terms of Service
           </a>
-          <span className="text-slate-300">•</span>
-          <span className="text-slate-500 font-medium flex items-center gap-1">
-            Powered by Google Workspace
-          </span>
         </div>
       </footer>
-
-      {/* Privacy & Terms Modals */}
-      {activeModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 max-h-[85vh] overflow-y-auto relative animate-in fade-in zoom-in-95 duration-200">
-            <button
-              onClick={() => setActiveModal(null)}
-              className="absolute top-5 right-5 p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {activeModal === 'privacy' ? (
-              <div>
-                <div className="flex items-center gap-2 text-emerald-600 mb-3">
-                  <ShieldCheck className="w-6 h-6" />
-                  <h3 className="text-2xl font-black text-slate-900">Privacy Policy</h3>
-                </div>
-                <div className="prose prose-slate prose-sm space-y-3 text-slate-600">
-                  <p className="font-medium text-slate-800">
-                    Your Privacy and Data Ownership are SpendTrack's top priorities.
-                  </p>
-                  <p>
-                    <strong>1. Zero Data Harvesting:</strong> SpendTrack operates directly against your personal Google Workspace. We do not store your financial records on external database servers.
-                  </p>
-                  <p>
-                    <strong>2. Google Scope Usage:</strong>
-                  </p>
-                  <ul className="list-disc pl-5 space-y-1">
-                    <li><strong>Google Sheets:</strong> Used solely to read and write your expense records in your designated SpendTrack sheet.</li>
-                    <li><strong>Google Drive:</strong> Used solely to upload and organize receipt images in a SpendTrack folder inside your Drive.</li>
-                    <li><strong>Google Calendar:</strong> Used solely to post bill reminder events for your recurring expenses.</li>
-                  </ul>
-                  <p>
-                    <strong>3. Data Storage:</strong> All files created remain inside your Google Account. You maintain full ownership and access control at all times.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="flex items-center gap-2 text-emerald-600 mb-3">
-                  <FileSpreadsheet className="w-6 h-6" />
-                  <h3 className="text-2xl font-black text-slate-900">Terms of Service</h3>
-                </div>
-                <div className="prose prose-slate prose-sm space-y-3 text-slate-600">
-                  <p className="font-medium text-slate-800">
-                    By using SpendTrack, you agree to the following terms:
-                  </p>
-                  <p>
-                    <strong>1. Service Usage:</strong> SpendTrack provides tools to record expenses, track item prices, set calendar bill reminders, and generate Gemini AI insights within your Google Workspace.
-                  </p>
-                  <p>
-                    <strong>2. Account & Permissions:</strong> You grant SpendTrack authorization to interface with your Google Sheets, Google Drive, and Google Calendar for operational functions.
-                  </p>
-                  <p>
-                    <strong>3. User Responsibilities:</strong> You remain responsible for maintaining access to your Google Account and securing your OAuth credentials.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
-              <button
-                onClick={() => setActiveModal(null)}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl cursor-pointer transition-all"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
