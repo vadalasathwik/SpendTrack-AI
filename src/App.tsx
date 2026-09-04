@@ -16,6 +16,8 @@ import {
   Bot,
   Menu,
   Users,
+  Bell,
+  User,
 } from 'lucide-react';
 import {
   Expense,
@@ -42,6 +44,7 @@ import { AddExpenseModal } from './components/AddExpenseModal.js';
 import { MobileMoreDrawer } from './components/MobileMoreDrawer.js';
 import { ProvisioningProgressModal } from './components/ProvisioningProgressModal.js';
 import { ReceiptScannerModal } from './components/ReceiptScannerModal.js';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt.js';
 
 // Pages
 import { DashboardPage } from './pages/DashboardPage.js';
@@ -480,7 +483,8 @@ export function App() {
       )}
       {/* Top Application Header */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
+        {/* Desktop Header (>= 768px) */}
+        <div className="hidden md:flex max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 items-center justify-between gap-3">
           {/* Logo & Brand */}
           <div
             onClick={() => setActiveTab('dashboard')}
@@ -536,6 +540,51 @@ export function App() {
             >
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Add Expense</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Header (< 768px) */}
+        <div className="flex md:hidden max-w-7xl mx-auto px-4 h-16 items-center justify-between">
+          <div
+            onClick={() => setActiveTab('dashboard')}
+            className="flex items-center gap-2.5 cursor-pointer select-none"
+          >
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+              <TrendingUp className="w-5 h-5" />
+            </div>
+            <span className="font-black text-lg tracking-tight text-slate-900">SPENDTRACK</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <SyncStatusBadge
+              status={syncStatus}
+              isOnline={isOnline}
+              onRetry={loadDataFromWorkspace}
+              compact={true}
+            />
+
+            <button
+              onClick={() => alert("Notifications: All systems operational.")}
+              className="p-2 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 relative cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
+              aria-label="Notifications"
+            >
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" />
+            </button>
+
+            <button
+              onClick={() => setActiveTab('settings')}
+              className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-800 font-bold border-2 border-emerald-500 flex items-center justify-center text-xs cursor-pointer shadow-xs overflow-hidden"
+              aria-label="Profile"
+            >
+              {user?.photoURL ? (
+                <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
+              ) : user?.email ? (
+                user.email.substring(0, 2).toUpperCase()
+              ) : (
+                <User className="w-4 h-4" />
+              )}
             </button>
           </div>
         </div>
@@ -723,16 +772,16 @@ export function App() {
         )}
       </main>
 
-      {/* STREAMLINED MOBILE BOTTOM NAVIGATION (5 High-Impact Actions) */}
-      <div
+      {/* STREAMLINED MOBILE BOTTOM NAVIGATION */}
+      <nav
         id="mobile-bottom-nav"
-        className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200/90 z-40 px-3 py-2 shadow-xl flex justify-between items-center"
+        className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200/90 z-40 px-2 py-1.5 shadow-xl flex justify-around items-center"
       >
-        {/* 1. Dashboard */}
+        {/* 1. Home */}
         <button
           id="mobile-nav-dashboard"
           onClick={() => setActiveTab('dashboard')}
-          className={`flex flex-col items-center justify-center flex-1 py-1 text-[11px] font-bold transition-all cursor-pointer ${
+          className={`flex flex-col items-center justify-center py-1 px-2 text-[10px] font-bold transition-all cursor-pointer min-w-[44px] min-h-[44px] ${
             activeTab === 'dashboard' ? 'text-emerald-600 font-black' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -744,7 +793,7 @@ export function App() {
         <button
           id="mobile-nav-expenses"
           onClick={() => setActiveTab('expenses')}
-          className={`flex flex-col items-center justify-center flex-1 py-1 text-[11px] font-bold transition-all cursor-pointer ${
+          className={`flex flex-col items-center justify-center py-1 px-2 text-[10px] font-bold transition-all cursor-pointer min-w-[44px] min-h-[44px] ${
             activeTab === 'expenses' ? 'text-emerald-600 font-black' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
@@ -753,7 +802,7 @@ export function App() {
         </button>
 
         {/* 3. Center Elevated Quick Add Button */}
-        <div className="flex-1 flex justify-center -mt-6">
+        <div className="flex justify-center -mt-6">
           <button
             id="mobile-nav-add-btn"
             onClick={() => {
@@ -761,39 +810,49 @@ export function App() {
               setInitialMonthlyItem(null);
               setIsAddExpenseOpen(true);
             }}
-            className="w-13 h-13 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30 border-4 border-slate-50 active:scale-95 transition-all cursor-pointer"
+            className="w-13 h-13 rounded-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white flex items-center justify-center shadow-lg shadow-emerald-600/35 border-4 border-slate-50 active:scale-95 transition-all cursor-pointer"
             title="Add Expense"
           >
             <Plus className="w-6 h-6 stroke-[2.5]" />
           </button>
         </div>
 
-        {/* 4. Analytics & Item Intelligence */}
+        {/* 4. AI */}
         <button
-          id="mobile-nav-items"
-          onClick={() => setActiveTab('items')}
-          className={`flex flex-col items-center justify-center flex-1 py-1 text-[11px] font-bold transition-all cursor-pointer ${
-            activeTab === 'items' ? 'text-emerald-600 font-black' : 'text-slate-500 hover:text-slate-800'
+          id="mobile-nav-ai"
+          onClick={() => setActiveTab('ai')}
+          className={`flex flex-col items-center justify-center py-1 px-2 text-[10px] font-bold transition-all cursor-pointer min-w-[44px] min-h-[44px] ${
+            activeTab === 'ai' ? 'text-emerald-600 font-black' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Sparkles className="w-5 h-5 mb-0.5" />
-          <span>Analytics</span>
+          <Bot className="w-5 h-5 mb-0.5" />
+          <span>AI</span>
         </button>
 
-        {/* 5. More Drawer Trigger */}
+        {/* 5. Receipts / Monthly Items */}
         <button
-          id="mobile-nav-more"
-          onClick={() => setIsMoreDrawerOpen(true)}
-          className={`flex flex-col items-center justify-center flex-1 py-1 text-[11px] font-bold transition-all cursor-pointer ${
-            ['monthly-items', 'recurring', 'ai', 'settings'].includes(activeTab)
-              ? 'text-emerald-600 font-black'
-              : 'text-slate-500 hover:text-slate-800'
+          id="mobile-nav-receipts"
+          onClick={() => setActiveTab('monthly-items')}
+          className={`flex flex-col items-center justify-center py-1 px-2 text-[10px] font-bold transition-all cursor-pointer min-w-[44px] min-h-[44px] ${
+            activeTab === 'monthly-items' ? 'text-emerald-600 font-black' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Menu className="w-5 h-5 mb-0.5" />
-          <span>More</span>
+          <ShoppingCart className="w-5 h-5 mb-0.5" />
+          <span>Receipts</span>
         </button>
-      </div>
+
+        {/* 6. Profile / Settings */}
+        <button
+          id="mobile-nav-profile"
+          onClick={() => setActiveTab('settings')}
+          className={`flex flex-col items-center justify-center py-1 px-2 text-[10px] font-bold transition-all cursor-pointer min-w-[44px] min-h-[44px] ${
+            activeTab === 'settings' ? 'text-emerald-600 font-black' : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <User className="w-5 h-5 mb-0.5" />
+          <span>Profile</span>
+        </button>
+      </nav>
 
       {/* Mobile More Features Drawer */}
       <MobileMoreDrawer
@@ -832,6 +891,9 @@ export function App() {
         categories={categories}
         onSaveExpenses={handleSaveMultipleExpenses}
       />
+
+      {/* PWA Install Banner */}
+      <PWAInstallPrompt />
             </div>
           )
         }
