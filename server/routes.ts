@@ -1,7 +1,6 @@
 import { Router } from "express";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
-import { verifyFirebaseIdToken } from "./auth/firebaseAdmin.js";
 
 const router = Router();
 
@@ -16,35 +15,21 @@ router.post("/google", async (req, res) => {
       return res.status(400).json({ error: "Missing idToken" });
     }
 
-    let uid = "";
-    let email = "";
-    let name = "";
-    let picture = "";
+    const ticket = await oauthClient.verifyIdToken({
+      idToken,
+      ...(googleClientId ? { audience: googleClientId } : {}),
+    });
 
-    try {
-      const ticket = await oauthClient.verifyIdToken({
-        idToken,
-        ...(googleClientId ? { audience: googleClientId } : {}),
-      });
-      const payload = ticket.getPayload();
-      if (payload) {
-        uid = payload.sub;
-        email = payload.email || "";
-        name = payload.name || "";
-        picture = payload.picture || "";
-      }
-    } catch (googleErr) {
-      try {
-        const decoded = await verifyFirebaseIdToken(idToken);
-        uid = decoded.uid;
-        email = decoded.email || "";
-        name = decoded.name || "";
-        picture = decoded.picture || "";
-      } catch (fbErr) {
-        console.error("Token verification error:", googleErr);
-        throw googleErr;
-      }
+    const payload = ticket.getPayload();
+
+    if (!payload) {
+      return res.status(401).json({ error: "Invalid Google token payload" });
     }
+
+    const uid = payload.sub;
+    const email = payload.email || "";
+    const name = payload.name || "";
+    const photoURL = payload.picture || "";
 
     const token = jwt.sign(
       {
@@ -61,7 +46,7 @@ router.post("/google", async (req, res) => {
         uid,
         email,
         name,
-        photoURL: picture,
+        photoURL,
       },
       workspace: {
         spreadsheetId: "",
@@ -70,9 +55,9 @@ router.post("/google", async (req, res) => {
       },
       isNewUser: false,
     });
-  } catch (error) {
-    console.error("Token verification failed:", error);
-    res.status(401).json({ error: "Invalid token" });
+  } catch (err: any) {
+    console.error("Google token verification failed:", err);
+    res.status(401).json({ error: "Invalid Google ID token" });
   }
 });
 

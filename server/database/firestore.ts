@@ -21,25 +21,6 @@ export interface UserDocument {
 
 let firestoreInstance: any = null;
 
-// Initialize Firestore if Firebase Admin is present
-try {
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || 'spendtrack';
-
-  if (serviceAccountJson) {
-    // @ts-ignore
-    import('firebase-admin').then((admin: any) => {
-      if (admin.apps.length > 0) {
-        firestoreInstance = admin.firestore();
-      }
-    }).catch(() => {
-      console.warn('Firebase Admin Firestore fallback active.');
-    });
-  }
-} catch (e) {
-  console.warn('Firestore initialization notice:', e);
-}
-
 /**
  * Retrieves a user document from Firestore collection 'users' by uid.
  */
