@@ -1,143 +1,309 @@
-import { Expense, RecurringExpense, CategoryItem, MonthlyItem } from '../types.js';
-import { getAccessToken, setAccessToken } from './authService.js';
+import {
+  Expense,
+  RecurringExpense,
+  CategoryItem,
+  MonthlyItem,
+} from "../types";
+import { getStoredJWT, clearAuthSession } from "./authService";
 
-async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = await getAccessToken();
+/* -------------------------------------------------------
+   Universal authenticated fetch
+-------------------------------------------------------- */
+async function apiFetch<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const token = getStoredJWT();
+
   if (!token) {
-    throw new Error('Not authenticated. Please sign in with Google.');
+    throw new Error(
+      "Not authenticated. Please sign in with Google."
+    );
   }
 
   const res = await fetch(endpoint, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
-      ...options.headers,
+      ...(options.headers || {}),
     },
   });
 
   if (!res.ok) {
     if (res.status === 401) {
-      setAccessToken(null);
-      throw new Error('Not authenticated. Please sign in with Google.');
+      clearAuthSession();
+      throw new Error(
+        "Session expired or unauthorized. Please sign in with Google again."
+      );
     }
+
     const errorBody = await res.json().catch(() => ({}));
-    throw new Error(errorBody.error || `Request failed with status ${res.status}`);
+
+    throw new Error(
+      errorBody.error || `Request failed (${res.status})`
+    );
   }
 
   return res.json();
 }
 
+/* -------------------------------------------------------
+   SpendTrack API
+-------------------------------------------------------- */
 export const SpendTrackApi = {
-  // Check Workspace status
+  // Workspace
   async checkWorkspaceStatus() {
-    return apiFetch<{ success: boolean; spreadsheetId: string; driveFolders: any }>('/api/workspace/status');
+    return apiFetch<{
+      success: boolean;
+      spreadsheetId: string;
+      driveFolders: any;
+    }>("/api/workspace/status");
   },
 
-  // Monthly Items (Templates)
+  async createFamilyWorkspace() {
+    return apiFetch<any>("/api/workspace/create", {
+      method: "POST",
+    });
+  },
+
+  async getWorkspaceMembers() {
+    return apiFetch<{
+      workspace: any;
+      members: Array<{
+        uid: string;
+        email: string;
+        name: string;
+        photoURL?: string;
+        role: string;
+        joinedAt: string;
+      }>;
+      invites: Array<{
+        id: string;
+        email: string;
+        role: string;
+        token: string;
+        createdAt: string;
+        status: string;
+      }>;
+      currentRole: string;
+    }>("/api/workspace/members");
+  },
+
+  async inviteWorkspaceMember(
+    email: string,
+    role: "editor" | "viewer"
+  ) {
+    return apiFetch<any>("/api/workspace/invite", {
+      method: "POST",
+      body: JSON.stringify({ email, role }),
+    });
+  },
+
+  async acceptWorkspaceInvite(token: string) {
+    return apiFetch<any>("/api/workspace/accept", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    });
+  },
+
+  async removeWorkspaceMember(targetUid: string) {
+    return apiFetch<{ success: boolean }>(
+      "/api/workspace/member",
+      {
+        method: "DELETE",
+        body: JSON.stringify({ targetUid }),
+      }
+    );
+  },
+
+  // Monthly Items
   async getMonthlyItems(): Promise<MonthlyItem[]> {
-    return apiFetch<MonthlyItem[]>('/api/monthly-items');
+    return apiFetch<MonthlyItem[]>("/api/monthly-items");
   },
 
-  async createMonthlyItem(item: Omit<MonthlyItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<MonthlyItem> {
-    return apiFetch<MonthlyItem>('/api/monthly-items', {
-      method: 'POST',
+  async createMonthlyItem(
+    item: Omit<
+      MonthlyItem,
+      "id" | "createdAt" | "updatedAt"
+    >
+  ): Promise<MonthlyItem> {
+    return apiFetch<MonthlyItem>("/api/monthly-items", {
+      method: "POST",
       body: JSON.stringify(item),
     });
   },
 
-  async updateMonthlyItem(id: string, item: Partial<MonthlyItem>): Promise<MonthlyItem> {
-    return apiFetch<MonthlyItem>(`/api/monthly-items/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(item),
-    });
+  async updateMonthlyItem(
+    id: string,
+    item: Partial<MonthlyItem>
+  ): Promise<MonthlyItem> {
+    return apiFetch<MonthlyItem>(
+      `/api/monthly-items/${id}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(item),
+      }
+    );
   },
 
-  async deleteMonthlyItem(id: string): Promise<{ success: boolean }> {
-    return apiFetch<{ success: boolean }>(`/api/monthly-items/${id}`, {
-      method: 'DELETE',
-    });
+  async deleteMonthlyItem(id: string) {
+    return apiFetch<{ success: boolean }>(
+      `/api/monthly-items/${id}`,
+      {
+        method: "DELETE",
+      }
+    );
   },
 
   // Expenses
   async getExpenses(): Promise<Expense[]> {
-    return apiFetch<Expense[]>('/api/expenses');
+    return apiFetch<Expense[]>("/api/expenses");
   },
 
-  async createExpense(expense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>): Promise<Expense> {
-    return apiFetch<Expense>('/api/expenses', {
-      method: 'POST',
+  async createExpense(
+    expense: Omit<
+      Expense,
+      "id" | "createdAt" | "updatedAt"
+    >
+  ): Promise<Expense> {
+    return apiFetch<Expense>("/api/expenses", {
+      method: "POST",
       body: JSON.stringify(expense),
     });
   },
 
-  async updateExpense(id: string, expense: Partial<Expense>): Promise<Expense> {
+  async updateExpense(
+    id: string,
+    expense: Partial<Expense>
+  ): Promise<Expense> {
     return apiFetch<Expense>(`/api/expenses/${id}`, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify(expense),
     });
   },
 
-  async deleteExpense(id: string): Promise<{ success: boolean }> {
-    return apiFetch<{ success: boolean }>(`/api/expenses/${id}`, {
-      method: 'DELETE',
-    });
+  async deleteExpense(id: string) {
+    return apiFetch<{ success: boolean }>(
+      `/api/expenses/${id}`,
+      {
+        method: "DELETE",
+      }
+    );
   },
 
   // Categories
   async getCategories(): Promise<CategoryItem[]> {
-    return apiFetch<CategoryItem[]>('/api/categories');
+    return apiFetch<CategoryItem[]>("/api/categories");
   },
 
-  async saveCategories(categories: CategoryItem[]): Promise<CategoryItem[]> {
-    return apiFetch<CategoryItem[]>('/api/categories', {
-      method: 'POST',
+  async saveCategories(categories: CategoryItem[]) {
+    return apiFetch<CategoryItem[]>("/api/categories", {
+      method: "POST",
       body: JSON.stringify(categories),
     });
   },
 
-  // Recurring Expenses
-  async getRecurringExpenses(): Promise<RecurringExpense[]> {
-    return apiFetch<RecurringExpense[]>('/api/recurring');
+  // Recurring Bills
+  async getRecurringExpenses(): Promise<
+    RecurringExpense[]
+  > {
+    return apiFetch<RecurringExpense[]>("/api/recurring");
   },
 
   async createRecurringExpense(
-    item: Omit<RecurringExpense, 'id' | 'createdAt' | 'updatedAt'>
-  ): Promise<RecurringExpense> {
-    return apiFetch<RecurringExpense>('/api/recurring', {
-      method: 'POST',
+    item: Omit<
+      RecurringExpense,
+      "id" | "createdAt" | "updatedAt"
+    >
+  ) {
+    return apiFetch<RecurringExpense>("/api/recurring", {
+      method: "POST",
       body: JSON.stringify(item),
     });
   },
 
-  async updateRecurringExpense(id: string, item: Partial<RecurringExpense>): Promise<RecurringExpense> {
-    return apiFetch<RecurringExpense>(`/api/recurring/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(item),
-    });
+  async updateRecurringExpense(
+    id: string,
+    item: Partial<RecurringExpense>
+  ) {
+    return apiFetch<RecurringExpense>(
+      `/api/recurring/${id}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(item),
+      }
+    );
   },
 
-  async deleteRecurringExpense(id: string, calendarEventId?: string): Promise<{ success: boolean }> {
+  async deleteRecurringExpense(
+    id: string,
+    calendarEventId?: string
+  ) {
     const url = calendarEventId
-      ? `/api/recurring/${id}?calendarEventId=${encodeURIComponent(calendarEventId)}`
+      ? `/api/recurring/${id}?calendarEventId=${encodeURIComponent(
+          calendarEventId
+        )}`
       : `/api/recurring/${id}`;
+
     return apiFetch<{ success: boolean }>(url, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   },
 
-  // Drive Upload
-  async uploadReceipt(file: { name: string; type: string; base64Data: string }) {
-    return apiFetch<{ fileId: string; fileName: string; webViewLink: string }>('/api/drive/upload-receipt', {
-      method: 'POST',
+  // Google Drive
+  async uploadReceipt(file: {
+    name: string;
+    type: string;
+    base64Data: string;
+  }) {
+    return apiFetch<{
+      fileId: string;
+      fileName: string;
+      webViewLink: string;
+    }>("/api/drive/upload-receipt", {
+      method: "POST",
       body: JSON.stringify(file),
     });
   },
 
-  // File metadata
   async getDriveFile(fileId: string) {
-    return apiFetch<{ fileId: string; name: string; mimeType: string; webViewLink: string; thumbnailLink?: string }>(
-      `/api/drive/file/${fileId}`
-    );
+    return apiFetch<{
+      fileId: string;
+      name: string;
+      mimeType: string;
+      webViewLink: string;
+      thumbnailLink?: string;
+    }>(`/api/drive/file/${fileId}`);
+  },
+
+  // AI Receipt Scanner
+  async scanReceipt(payload: {
+    name: string;
+    type: string;
+    base64Data: string;
+  }) {
+    return apiFetch<any>("/api/receipt/scan", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Budget AI
+  async getBudgetSummary() {
+    return apiFetch<any>("/api/budget/summary");
+  },
+
+  async predictBudget(
+    clientExpenses?: Expense[],
+    clientRecurring?: RecurringExpense[]
+  ) {
+    return apiFetch<any>("/api/budget/predict", {
+      method: "POST",
+      body: JSON.stringify({
+        clientExpenses,
+        clientRecurring,
+      }),
+    });
   },
 };

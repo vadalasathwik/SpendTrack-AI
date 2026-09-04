@@ -15,6 +15,7 @@ import {
   ShoppingCart,
   Bot,
   Menu,
+  Users,
 } from 'lucide-react';
 import {
   Expense,
@@ -39,6 +40,8 @@ import { SyncStatusBadge } from './components/SyncStatusBadge.js';
 import { DateRangePicker } from './components/DateRangePicker.js';
 import { AddExpenseModal } from './components/AddExpenseModal.js';
 import { MobileMoreDrawer } from './components/MobileMoreDrawer.js';
+import { ProvisioningProgressModal } from './components/ProvisioningProgressModal.js';
+import { ReceiptScannerModal } from './components/ReceiptScannerModal.js';
 
 // Pages
 import { DashboardPage } from './pages/DashboardPage.js';
@@ -49,17 +52,26 @@ import { AnalyticsPage } from './pages/AnalyticsPage.js';
 import { RecurringPage } from './pages/RecurringPage.js';
 import { SettingsPage } from './pages/SettingsPage.js';
 import { AIAssistantPage } from './pages/AIAssistantPage.js';
+import { WelcomePage } from './pages/WelcomePage.js';
+import { BudgetAIPage } from './pages/BudgetAIPage.js';
+import { Routes, Route } from 'react-router-dom';
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import Terms from "./pages/Terms";
+import { FamilyWorkspacePage } from './pages/FamilyWorkspacePage.js';
 
 export function App() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'expenses' | 'monthly-items' | 'items' | 'analytics' | 'recurring' | 'ai' | 'settings'
+    'dashboard' | 'budget' | 'expenses' | 'monthly-items' | 'items' | 'analytics' | 'recurring' | 'ai' | 'family' | 'settings'
   >('dashboard');
   const [isMoreDrawerOpen, setIsMoreDrawerOpen] = useState(false);
 
-  // Auth State
+  // Auth & Workspace Provisioning State
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isProvisioning, setIsProvisioning] = useState(false);
+  const [provisioningStep, setProvisioningStep] = useState(0);
 
   // Date Range State
   const [dateRange, setDateRange] = useState<DateRange>(getDateRangeFromPreset('currentMonth'));
@@ -77,6 +89,7 @@ export function App() {
 
   // Modals & Assistant State
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [isScanReceiptOpen, setIsScanReceiptOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [initialMonthlyItem, setInitialMonthlyItem] = useState<MonthlyItem | null>(null);
   const [selectedAnalyticsItem, setSelectedAnalyticsItem] = useState<string | null>(null);
@@ -116,11 +129,17 @@ export function App() {
     return () => unsubscribe();
   }, []);
 
-  // Google Sign-In Handler
+  // Google Sign-In & Workspace Provisioning Handler
   const handleGoogleSignIn = async () => {
     try {
+      setIsProvisioning(true);
+      setProvisioningStep(0);
       setSyncStatus({ state: 'syncing' });
-      const res = await signInWithGoogle();
+
+      const res = await signInWithGoogle((stepIndex) => {
+        setProvisioningStep(stepIndex);
+      });
+
       if (res?.user) {
         setUser(res.user);
         await loadDataFromWorkspace();
@@ -131,6 +150,10 @@ export function App() {
         state: 'error',
         errorMessage: err.message || 'Google Sign-In failed',
       });
+    } finally {
+      setTimeout(() => {
+        setIsProvisioning(false);
+      }, 500);
     }
   };
 
@@ -195,6 +218,24 @@ export function App() {
         const created = await SpendTrackApi.createExpense(expenseData);
         setExpenses((prev) => [created, ...prev]);
       }
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  const handleSaveMultipleExpenses = async (
+    expenseList: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>[]
+  ) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      const createdItems: Expense[] = [];
+      for (const exp of expenseList) {
+        const created = await SpendTrackApi.createExpense(exp);
+        createdItems.push(created);
+      }
+      setExpenses((prev) => [...createdItems, ...prev]);
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
       setSyncStatus({ state: 'error', errorMessage: err.message });
@@ -397,7 +438,46 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800" id="spendtrack-root">
+    <Routes>
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route
+        path="*"
+        element={
+          authLoading ? (
+            <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center font-sans text-slate-800">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-xl shadow-emerald-600/30 animate-bounce mb-4">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mb-2" />
+              <p className="text-sm font-semibold text-slate-500">Initializing SpendTrack Workspace...</p>
+            </div>
+          ) : !user && !isDemoMode ? (
+            <WelcomePage
+              onSignIn={handleGoogleSignIn}
+              onExploreDemo={() => setIsDemoMode(true)}
+              isSigningIn={syncStatus.state === 'syncing'}
+              errorMessage={syncStatus.state === 'error' ? syncStatus.errorMessage : null}
+            />
+          ) : (
+            <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800" id="spendtrack-root">
+      {!user && isDemoMode && (
+        <div className="bg-emerald-900 text-emerald-100 text-xs sm:text-sm py-2 px-4 text-center font-medium flex items-center justify-center gap-2 shadow-inner z-50">
+          <span>💡 Previewing SpendTrack in Demo Mode. Connect your own Google Workspace for live sync.</span>
+          <button
+            onClick={handleGoogleSignIn}
+            className="underline font-bold hover:text-white cursor-pointer ml-1"
+          >
+            Continue with Google &rarr;
+          </button>
+          <button
+            onClick={() => setIsDemoMode(false)}
+            className="ml-3 text-emerald-300 hover:text-white text-xs underline cursor-pointer"
+          >
+            Back to Welcome Page
+          </button>
+        </div>
+      )}
       {/* Top Application Header */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
@@ -465,6 +545,8 @@ export function App() {
           <nav className="flex space-x-6 overflow-x-auto scrollbar-none">
             {[
               { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+              { key: 'budget', label: 'Budget AI', icon: TrendingUp, highlight: true },
+              { key: 'family', label: 'Family Workspace', icon: Users, highlight: true },
               { key: 'expenses', label: 'Expenses', icon: Receipt },
               { key: 'monthly-items', label: 'Monthly Items', icon: ShoppingCart },
               { key: 'items', label: 'Item Intelligence', icon: Sparkles },
@@ -508,6 +590,7 @@ export function App() {
               setInitialMonthlyItem(null);
               setIsAddExpenseOpen(true);
             }}
+            onOpenScanReceipt={() => setIsScanReceiptOpen(true)}
             onViewExpenseHistory={() => setActiveTab('expenses')}
             onViewMonthlyItems={() => setActiveTab('monthly-items')}
             onSelectItemAnalytics={(itemName) => {
@@ -517,6 +600,18 @@ export function App() {
             onOpenAIWithQuestion={handleOpenAIWithQuestion}
             onQuickAddFromItem={handleQuickAddPurchaseFromTemplate}
           />
+        )}
+
+        {activeTab === 'budget' && (
+          <BudgetAIPage
+            expenses={expenses}
+            recurringExpenses={recurringExpenses}
+            dateRange={dateRange}
+          />
+        )}
+
+        {activeTab === 'family' && (
+          <FamilyWorkspacePage />
         )}
 
         {activeTab === 'expenses' && (
@@ -723,7 +818,25 @@ export function App() {
         monthlyItems={monthlyItems}
         initialMonthlyItem={initialMonthlyItem}
       />
-    </div>
+
+      {/* Workspace Provisioning Progress Modal */}
+      <ProvisioningProgressModal
+        isOpen={isProvisioning}
+        currentStepIndex={provisioningStep}
+      />
+
+      {/* AI Receipt Scanner Modal (Gemini Vision) */}
+      <ReceiptScannerModal
+        isOpen={isScanReceiptOpen}
+        onClose={() => setIsScanReceiptOpen(false)}
+        categories={categories}
+        onSaveExpenses={handleSaveMultipleExpenses}
+      />
+            </div>
+          )
+        }
+      />
+    </Routes>
   );
 }
 

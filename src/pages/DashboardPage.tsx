@@ -32,8 +32,14 @@ import {
   Flame,
   Activity,
   ArrowRight,
+  RefreshCw,
+  User as UserIcon,
+  HardDrive,
+  FileSpreadsheet,
+  Camera,
 } from 'lucide-react';
 import { Expense, DateRange, CategorySpending, ItemAnalyticsSummary, MonthlyItem } from '../types.js';
+import { useUser } from '../context/UserContext.js';
 import {
   calculateCategoryTotals,
   filterExpensesByDateRange,
@@ -51,6 +57,7 @@ interface DashboardPageProps {
   dateRange: DateRange;
   monthlyItems?: MonthlyItem[];
   onOpenAddExpense: () => void;
+  onOpenScanReceipt?: () => void;
   onViewExpenseHistory: () => void;
   onViewMonthlyItems?: () => void;
   onSelectItemAnalytics: (itemName: string) => void;
@@ -63,12 +70,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   dateRange,
   monthlyItems = [],
   onOpenAddExpense,
+  onOpenScanReceipt,
   onViewExpenseHistory,
   onViewMonthlyItems,
   onSelectItemAnalytics,
   onOpenAIWithQuestion,
   onQuickAddFromItem,
 }) => {
+  const { user, workspace, refreshWorkspace } = useUser();
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+
   // Determine dynamic time-of-day greeting
   const currentHour = new Date().getHours();
   const greeting =
@@ -147,6 +158,82 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
   return (
     <div className="space-y-6 pb-12" id="dashboard-container">
+      {/* 0. User Profile Section & Workspace Connection Status Card */}
+      <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-teal-950 text-white rounded-3xl p-6 sm:p-7 shadow-xl relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-emerald-800/40">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Left: Profile Information */}
+        <div className="flex items-center gap-4 z-10">
+          {user?.photoURL ? (
+            <img
+              src={user.photoURL}
+              alt={user.name || 'User Profile'}
+              className="w-14 h-14 rounded-2xl ring-4 ring-emerald-500/30 object-cover shadow-md"
+            />
+          ) : (
+            <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-xl shadow-lg ring-4 ring-emerald-500/30">
+              {user?.name ? user.name.charAt(0).toUpperCase() : <UserIcon className="w-7 h-7" />}
+            </div>
+          )}
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg sm:text-xl font-black tracking-tight text-white">
+                {user?.name || 'SpendTrack User'}
+              </h2>
+              <span className="px-2 py-0.5 rounded-full text-[10px] uppercase font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                Workspace Member
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-300 font-medium">{user?.email || 'Google Workspace Account'}</p>
+            <p className="text-[11px] text-emerald-400 font-semibold mt-0.5 flex items-center gap-2">
+              <span>Family Workspace active</span>
+              <span>&bull;</span>
+              <span>Family Budget</span>
+              <span>&bull;</span>
+              <span>Shared Expenses</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Right: Workspace Status Badges */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto z-10">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-bold shadow-2xs">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Google Sheets Connected</span>
+            </div>
+
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-bold shadow-2xs">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <HardDrive className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Drive Connected</span>
+            </div>
+
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-bold shadow-2xs">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <Calendar className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Calendar Connected</span>
+            </div>
+          </div>
+
+          {/* Refresh Workspace Button */}
+          <button
+            id="refresh-workspace-btn"
+            onClick={async () => {
+              setIsRefreshing(true);
+              await refreshWorkspace();
+              setTimeout(() => setIsRefreshing(false), 500);
+            }}
+            disabled={isRefreshing}
+            className="px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95 disabled:opacity-75"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <span>Refresh Workspace</span>
+          </button>
+        </div>
+      </div>
+
       {/* 1. Header Greeting & Date Range Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs">
         <div>
@@ -162,10 +249,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
+          {onOpenScanReceipt && (
+            <button
+              id="dashboard-scan-receipt-btn"
+              onClick={onOpenScanReceipt}
+              className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs sm:text-sm rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer active:scale-95 border border-emerald-600"
+            >
+              <Camera className="w-4 h-4 text-emerald-300" />
+              <span>📷 Scan Receipt</span>
+            </button>
+          )}
           <button
             id="dashboard-primary-add-btn"
             onClick={onOpenAddExpense}
-            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer"
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95"
           >
             <Plus className="w-4 h-4" />
             <span>Add Expense</span>

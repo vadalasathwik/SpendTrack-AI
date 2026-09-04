@@ -1,5 +1,5 @@
 import { Expense, RecurringExpense, CategoryItem, DateRange } from '../types.js';
-import { getAccessToken } from './authService.js';
+import { getStoredJWT } from './authService.js';
 
 export interface AIChatMessage {
   id: string;
@@ -23,7 +23,7 @@ export const SpendTrackAIService = {
    * Sends a user prompt to the server-side SpendTrack AI service
    */
   async sendMessage(params: SendAIMessageParams): Promise<string> {
-    const token = await getAccessToken();
+    const token = getStoredJWT();
 
     // Map history to simple role/content pairs
     const historyPayload = params.history

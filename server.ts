@@ -1,32 +1,37 @@
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
-
-import express from 'express';
-import path from 'path';
-import { createServer as createViteServer } from 'vite';
-import { createExpressApp } from './server/app.js';
+import "dotenv/config";
+import { createServer as createViteServer } from "vite";
+import fs from "fs/promises";
+import path from "path";
+import { createExpressApp } from "./server/app.js";
 
 const app = createExpressApp();
 const PORT = 3000;
 
-async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
+async function start() {
+  const vite = await createViteServer({
+    server: { middlewareMode: true },
+    appType: "custom",
+  });
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`SpendTrack server running on http://localhost:${PORT}`);
+  // API routes already exist inside createExpressApp()
+
+  app.use(vite.middlewares);
+
+  // React fallback (LAST)
+  app.use("*", async (req, res, next) => {
+    try {
+      const template = await fs.readFile(path.resolve("index.html"), "utf8");
+      const html = await vite.transformIndexHtml(req.originalUrl, template);
+      res.status(200).type("html").send(html);
+    } catch (e) {
+      vite.ssrFixStacktrace(e as Error);
+      next(e);
+    }
+  });
+
+  app.listen(PORT, () => {
+    console.log(`SpendTrack running at http://localhost:${PORT}`);
   });
 }
 
-startServer();
+start();

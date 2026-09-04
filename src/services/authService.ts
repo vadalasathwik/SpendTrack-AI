@@ -1,99 +1,151 @@
-import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
-  getAuth,
   signInWithPopup,
   GoogleAuthProvider,
   onAuthStateChanged,
   User,
   signOut,
-} from 'firebase/auth';
+} from "firebase/auth";
+import { auth } from "./firebase";
 
-let app: any;
-let auth: any;
+const JWT_STORAGE_KEY = "spendtrack_jwt";
+const USER_PROFILE_KEY = "spendtrack_user_profile";
+const WORKSPACE_METADATA_KEY = "spendtrack_workspace_metadata";
 
-try {
-  // Try importing or accessing window config
-  const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDummyKeyForFallbackOnly",
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "spendtrack.firebaseapp.com",
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "spendtrack",
-  };
-  app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-  auth = getAuth(app);
-} catch (e) {
-  console.warn('Firebase initialization notice:', e);
+export interface UserProfile {
+  uid: string;
+  email: string;
+  name: string;
+  photoURL?: string;
 }
 
-// Configure Google Auth Provider with requested Workspace Scopes
-export const provider = new GoogleAuthProvider();
-provider.addScope('https://www.googleapis.com/auth/drive.file');
-provider.addScope('https://www.googleapis.com/auth/spreadsheets');
-provider.addScope('https://www.googleapis.com/auth/calendar.events');
+export interface WorkspaceMetadata {
+  spreadsheetId: string;
+  driveFolderId: string;
+  calendarId: string;
+}
 
-let isSigningIn = false;
-let cachedAccessToken: string | null = null;
-const STORAGE_KEY = 'spendtrack_google_access_token';
+export interface SignInResult {
+  token: string;
+  user: UserProfile;
+  workspace: WorkspaceMetadata;
+  isNewUser: boolean;
+}
 
-export const onAuthStateChange = (callback: (user: User | null) => void) => {
-  if (!auth) {
-    callback(null);
-    return () => {};
-  }
-  return onAuthStateChanged(auth, (user) => {
-    if (!user) {
-      setAccessToken(null);
-    }
-    callback(user);
+/* ---------------- Storage ---------------- */
+
+export const getStoredJWT = () =>
+  localStorage.getItem(JWT_STORAGE_KEY);
+
+export const setStoredJWT = (token: string | null) => {
+  if (token) localStorage.setItem(JWT_STORAGE_KEY, token);
+  else localStorage.removeItem(JWT_STORAGE_KEY);
+};
+
+export const getStoredUserProfile = (): UserProfile | null => {
+  const raw = localStorage.getItem(USER_PROFILE_KEY);
+  return raw ? JSON.parse(raw) : null;
+};
+
+export const setStoredUserProfile = (user: UserProfile | null) => {
+  if (user)
+    localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(user));
+  else localStorage.removeItem(USER_PROFILE_KEY);
+};
+
+export const getStoredWorkspace = (): WorkspaceMetadata | null => {
+  const raw = localStorage.getItem(WORKSPACE_METADATA_KEY);
+  return raw ? JSON.parse(raw) : null;
+};
+
+export const setStoredWorkspace = (
+  ws: WorkspaceMetadata | null
+) => {
+  if (ws)
+    localStorage.setItem(
+      WORKSPACE_METADATA_KEY,
+      JSON.stringify(ws)
+    );
+  else localStorage.removeItem(WORKSPACE_METADATA_KEY);
+};
+
+export const clearAuthSession = () => {
+  localStorage.removeItem(JWT_STORAGE_KEY);
+  localStorage.removeItem(USER_PROFILE_KEY);
+  localStorage.removeItem(WORKSPACE_METADATA_KEY);
+};
+
+/* ---------------- Auth Listener ---------------- */
+
+export const onAuthStateChange = (
+  callback: (user: User | null) => void
+) => {
+  return onAuthStateChanged(auth, callback);
+};
+
+/* ---------------- Google Sign In ---------------- */
+
+export const signInWithGoogle = async (
+  onStepProgress?: (step: number) => void
+): Promise<SignInResult | null> => {
+  const provider = new GoogleAuthProvider();
+
+  provider.setCustomParameters({
+    prompt: "select_account",
   });
-};
 
-export const signInWithGoogle = async (): Promise<{ user: User; accessToken: string } | null> => {
-  if (!auth) throw new Error('Firebase Auth is not ready.');
+  provider.addScope("https://www.googleapis.com/auth/drive.file");
+  provider.addScope("https://www.googleapis.com/auth/spreadsheets");
+  provider.addScope("https://www.googleapis.com/auth/calendar.events");
+
   try {
-    isSigningIn = true;
+    onStepProgress?.(0);
+
     const result = await signInWithPopup(auth, provider);
-    const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (!credential?.accessToken) {
-      throw new Error('Could not retrieve access token from Google sign-in.');
+
+    const credential =
+      GoogleAuthProvider.credentialFromResult(result);
+
+    const firebaseIdToken = await result.user.getIdToken(true);
+
+    const googleAccessToken = credential?.accessToken;
+
+    onStepProgress?.(1);
+
+    const response = await fetch("/api/auth/google", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        idToken: firebaseIdToken,
+        accessToken: googleAccessToken,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || "Authentication failed");
     }
 
-    setAccessToken(credential.accessToken);
-    return { user: result.user, accessToken: credential.accessToken };
-  } catch (error: any) {
-    console.error('Google Sign In Error:', error);
-    throw error;
-  } finally {
-    isSigningIn = false;
+    const data: SignInResult = await response.json();
+
+    setStoredJWT(data.token);
+    setStoredUserProfile(data.user);
+    setStoredWorkspace(data.workspace);
+
+    onStepProgress?.(5);
+
+    return data;
+  } catch (err) {
+    clearAuthSession();
+    console.error(err);
+    throw err;
   }
 };
 
-export const getAccessToken = async (): Promise<string | null> => {
-  if (cachedAccessToken) return cachedAccessToken;
-  if (typeof window !== 'undefined' && window.localStorage) {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      cachedAccessToken = stored;
-      return cachedAccessToken;
-    }
-  }
-  return null;
-};
-
-export const setAccessToken = (token: string | null) => {
-  cachedAccessToken = token;
-  if (typeof window !== 'undefined' && window.localStorage) {
-    if (token) {
-      localStorage.setItem(STORAGE_KEY, token);
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  }
-};
+/* ---------------- Sign Out ---------------- */
 
 export const signOutApp = async () => {
-  if (auth) {
-    await signOut(auth);
-  }
-  setAccessToken(null);
+  await signOut(auth);
+  clearAuthSession();
 };
-

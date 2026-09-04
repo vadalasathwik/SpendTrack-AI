@@ -12,6 +12,7 @@ import {
   ExternalLink,
   ShieldCheck,
   FileSpreadsheet,
+  TrendingUp,
 } from 'lucide-react';
 
 interface MobileMoreDrawerProps {
@@ -32,6 +33,13 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
   if (!isOpen) return null;
 
   const menuItems = [
+    {
+      id: 'budget',
+      title: 'Budget AI & Inflation',
+      subtitle: 'Predict future spend & track staple inflation',
+      icon: TrendingUp,
+      color: 'text-emerald-600 bg-emerald-50',
+    },
     {
       id: 'monthly-items',
       title: 'Monthly Items Catalog',

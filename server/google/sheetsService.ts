@@ -37,11 +37,11 @@ export class GoogleSheetsService
   }
 
   /**
-   * Locates or creates a dedicated "SpendTrack" Spreadsheet in the user's Google Drive.
+   * Locates or creates a dedicated "SpendTrack Database" Spreadsheet in the user's Google Drive.
    */
   async getOrCreateSpendTrackSpreadsheet(token: string): Promise<string> {
-    // 1. Search for existing spreadsheet titled "SpendTrack"
-    const query = `name = 'SpendTrack' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`;
+    // 1. Search for existing spreadsheet titled "SpendTrack Database" or legacy "SpendTrack"
+    const query = `(name = 'SpendTrack Database' or name = 'SpendTrack') and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`;
     const searchUrl = `${DRIVE_API}?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name)`;
     const searchRes = await this.fetchWithAuth(searchUrl, token);
 
@@ -53,13 +53,13 @@ export class GoogleSheetsService
     const createUrl = SHEETS_API;
     const body = {
       properties: {
-        title: 'SpendTrack',
+        title: 'SpendTrack Database',
       },
       sheets: [
         { properties: { title: 'Expenses', gridProperties: { frozenRowCount: 1 } } },
         { properties: { title: 'Categories', gridProperties: { frozenRowCount: 1 } } },
-        { properties: { title: 'Items', gridProperties: { frozenRowCount: 1 } } },
-        { properties: { title: 'Recurring Expenses', gridProperties: { frozenRowCount: 1 } } },
+        { properties: { title: 'Monthly Items', gridProperties: { frozenRowCount: 1 } } },
+        { properties: { title: 'Recurring Bills', gridProperties: { frozenRowCount: 1 } } },
         { properties: { title: 'Settings', gridProperties: { frozenRowCount: 1 } } },
       ],
     };
@@ -155,9 +155,9 @@ export class GoogleSheetsService
       { range: 'Expenses!A1:U1', values: [expenseHeaders] },
       { range: 'Categories!A1:C1', values: [categoryHeaders] },
       { range: `Categories!A2:C${1 + defaultCategoryRows.length}`, values: defaultCategoryRows },
-      { range: 'Items!A1:L1', values: [itemHeaders] },
-      { range: `Items!A2:L${1 + defaultItemRows.length}`, values: defaultItemRows },
-      { range: 'Recurring Expenses!A1:N1', values: [recurringHeaders] },
+      { range: '\'Monthly Items\'!A1:L1', values: [itemHeaders] },
+      { range: `'Monthly Items'!A2:L${1 + defaultItemRows.length}`, values: defaultItemRows },
+      { range: '\'Recurring Bills\'!A1:N1', values: [recurringHeaders] },
       { range: 'Settings!A1:B1', values: [settingsHeaders] },
       {
         range: 'Settings!A2:B3',
@@ -415,7 +415,9 @@ export class GoogleSheetsService
 
   async getRecurringExpenses(token: string): Promise<RecurringExpense[]> {
     const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
-    const res = await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/Recurring Expenses!A2:N`, token);
+    const res = await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/'Recurring Bills'!A2:N`, token).catch(async () => {
+      return this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/'Recurring Expenses'!A2:N`, token);
+    });
 
     const rows = res.values || [];
     return rows.map((row: any[]) => ({
@@ -469,14 +471,24 @@ export class GoogleSheetsService
     ];
 
     await this.fetchWithAuth(
-      `${SHEETS_API}/${spreadsheetId}/values/Recurring Expenses!A:N:append?valueInputOption=USER_ENTERED`,
+      `${SHEETS_API}/${spreadsheetId}/values/'Recurring Bills'!A:N:append?valueInputOption=USER_ENTERED`,
       token,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ values: [row] }),
       }
-    );
+    ).catch(async () => {
+      return this.fetchWithAuth(
+        `${SHEETS_API}/${spreadsheetId}/values/'Recurring Expenses'!A:N:append?valueInputOption=USER_ENTERED`,
+        token,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values: [row] }),
+        }
+      );
+    });
 
     return newRecurring;
   }
@@ -519,14 +531,24 @@ export class GoogleSheetsService
     ];
 
     await this.fetchWithAuth(
-      `${SHEETS_API}/${spreadsheetId}/values/Recurring Expenses!A${rowNumber}:N${rowNumber}?valueInputOption=USER_ENTERED`,
+      `${SHEETS_API}/${spreadsheetId}/values/'Recurring Bills'!A${rowNumber}:N${rowNumber}?valueInputOption=USER_ENTERED`,
       token,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ values: [row] }),
       }
-    );
+    ).catch(async () => {
+      return this.fetchWithAuth(
+        `${SHEETS_API}/${spreadsheetId}/values/'Recurring Expenses'!A${rowNumber}:N${rowNumber}?valueInputOption=USER_ENTERED`,
+        token,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values: [row] }),
+        }
+      );
+    });
 
     return updated;
   }
@@ -541,7 +563,7 @@ export class GoogleSheetsService
     }
 
     const meta = await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}?fields=sheets.properties`, token);
-    const recurringSheet = meta.sheets.find((s: any) => s.properties.title === 'Recurring Expenses');
+    const recurringSheet = meta.sheets.find((s: any) => s.properties.title === 'Recurring Bills' || s.properties.title === 'Recurring Expenses');
     const sheetId = recurringSheet ? recurringSheet.properties.sheetId : 0;
 
     const rowNumber = index + 1; // 0-indexed row deletion
@@ -571,9 +593,8 @@ export class GoogleSheetsService
 
   async getMonthlyItems(token: string): Promise<MonthlyItem[]> {
     const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
-    const res = await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/Items!A2:L`, token).catch(async () => {
-      // If Items sheet doesn't exist yet in legacy spreadsheets, return defaults
-      return { values: [] };
+    const res = await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/'Monthly Items'!A2:L`, token).catch(async () => {
+      return this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/Items!A2:L`, token).catch(async () => ({ values: [] }));
     });
 
     const rows = res.values || [];
@@ -628,14 +649,24 @@ export class GoogleSheetsService
     ];
 
     await this.fetchWithAuth(
-      `${SHEETS_API}/${spreadsheetId}/values/Items!A:L:append?valueInputOption=USER_ENTERED`,
+      `${SHEETS_API}/${spreadsheetId}/values/'Monthly Items'!A:L:append?valueInputOption=USER_ENTERED`,
       token,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ values: [row] }),
       }
-    );
+    ).catch(async () => {
+      return this.fetchWithAuth(
+        `${SHEETS_API}/${spreadsheetId}/values/Items!A:L:append?valueInputOption=USER_ENTERED`,
+        token,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values: [row] }),
+        }
+      );
+    });
 
     return newItem;
   }
@@ -676,14 +707,24 @@ export class GoogleSheetsService
     ];
 
     await this.fetchWithAuth(
-      `${SHEETS_API}/${spreadsheetId}/values/Items!A${rowNumber}:L${rowNumber}?valueInputOption=USER_ENTERED`,
+      `${SHEETS_API}/${spreadsheetId}/values/'Monthly Items'!A${rowNumber}:L${rowNumber}?valueInputOption=USER_ENTERED`,
       token,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ values: [row] }),
       }
-    );
+    ).catch(async () => {
+      return this.fetchWithAuth(
+        `${SHEETS_API}/${spreadsheetId}/values/Items!A${rowNumber}:L${rowNumber}?valueInputOption=USER_ENTERED`,
+        token,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ values: [row] }),
+        }
+      );
+    });
 
     return updated;
   }
@@ -698,7 +739,7 @@ export class GoogleSheetsService
     }
 
     const meta = await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}?fields=sheets.properties`, token);
-    const itemSheet = meta.sheets.find((s: any) => s.properties.title === 'Items');
+    const itemSheet = meta.sheets.find((s: any) => s.properties.title === 'Monthly Items' || s.properties.title === 'Items');
     const sheetId = itemSheet ? itemSheet.properties.sheetId : 0;
 
     const rowNumber = index + 1; // 0-indexed row deletion
