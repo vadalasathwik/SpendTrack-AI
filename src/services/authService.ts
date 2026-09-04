@@ -105,9 +105,11 @@ export const signInWithGoogle = async (
     const credential =
       GoogleAuthProvider.credentialFromResult(result);
 
-    const firebaseIdToken = await result.user.getIdToken(true);
+    const googleCredential = credential?.idToken || credential?.accessToken;
 
-    const googleAccessToken = credential?.accessToken;
+    if (!googleCredential) {
+      throw new Error("Failed to obtain Google credential from sign-in.");
+    }
 
     onStepProgress?.(1);
 
@@ -117,8 +119,7 @@ export const signInWithGoogle = async (
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        idToken: firebaseIdToken,
-        accessToken: googleAccessToken,
+        idToken: googleCredential,
       }),
     });
 
