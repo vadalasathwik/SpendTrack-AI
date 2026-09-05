@@ -85,14 +85,19 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const greeting =
     currentHour < 12 ? 'Good morning' : currentHour < 17 ? 'Good afternoon' : 'Good evening';
 
-  // Filtered expenses for active date range
-  const filteredExpenses = filterExpensesByDateRange(
-    expenses,
-    dateRange.startDate,
-    dateRange.endDate
-  );
+  // Filtered expenses for active date range - Memoized on expenses & dateRange
+  const filteredExpenses = React.useMemo(() => {
+    return filterExpensesByDateRange(
+      expenses,
+      dateRange.startDate,
+      dateRange.endDate
+    );
+  }, [expenses, dateRange.startDate, dateRange.endDate]);
 
-  const totalSpending = filteredExpenses.reduce((s, e) => s + (Number(e.totalPrice) || 0), 0);
+  const totalSpending = React.useMemo(() => {
+    return filteredExpenses.reduce((s, e) => s + (Number(e.totalPrice) || 0), 0);
+  }, [filteredExpenses]);
+
   const expenseCount = filteredExpenses.length;
 
   const startDateObj = new Date(dateRange.startDate);
@@ -103,58 +108,75 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   );
   const averageDailySpending = Number((totalSpending / totalDays).toFixed(2));
 
-  // Category breakdown
-  const categoryTotals = calculateCategoryTotals(filteredExpenses);
+  // Category breakdown - Memoized on filteredExpenses
+  const categoryTotals = React.useMemo(() => {
+    return calculateCategoryTotals(filteredExpenses);
+  }, [filteredExpenses]);
+
   const highestCategory = categoryTotals.length > 0 ? categoryTotals[0] : null;
 
-  // Most expensive expense
-  const mostExpensiveExpense =
-    filteredExpenses.length > 0
+  // Most expensive expense - Memoized on filteredExpenses
+  const mostExpensiveExpense = React.useMemo(() => {
+    return filteredExpenses.length > 0
       ? [...filteredExpenses].sort((a, b) => (Number(b.totalPrice) || 0) - (Number(a.totalPrice) || 0))[0]
       : null;
+  }, [filteredExpenses]);
 
-  // Daily Spending Trend Data
-  const trendMap: Record<string, number> = {};
-  for (const exp of filteredExpenses) {
-    if (exp.purchaseDate) {
-      trendMap[exp.purchaseDate] = (trendMap[exp.purchaseDate] || 0) + (Number(exp.totalPrice) || 0);
+  // Daily Spending Trend Data - Memoized on filteredExpenses
+  const spendingTrend = React.useMemo(() => {
+    const trendMap: Record<string, number> = {};
+    for (const exp of filteredExpenses) {
+      if (exp.purchaseDate) {
+        const dateKey = exp.purchaseDate.split('T')[0];
+        trendMap[dateKey] = (trendMap[dateKey] || 0) + (Number(exp.totalPrice) || 0);
+      }
     }
-  }
 
-  const sortedTrendDates = Object.keys(trendMap).sort();
-  const spendingTrend = sortedTrendDates.map((date) => ({
-    date,
-    displayDate: formatDisplayDate(date),
-    amount: trendMap[date],
-  }));
+    const sortedTrendDates = Object.keys(trendMap).sort();
+    return sortedTrendDates.map((date) => ({
+      date,
+      displayDate: formatDisplayDate(date),
+      amount: trendMap[date],
+    }));
+  }, [filteredExpenses]);
 
-  // Find currently in-use expenses across all records
-  const currentlyInUseList: {
-    expense: Expense;
-    daysSoFar: number;
-    estimatedDailyCost?: number;
-  }[] = [];
+  // Find currently in-use expenses across all records - Memoized on expenses
+  const currentlyInUseList = React.useMemo(() => {
+    const list: {
+      expense: Expense;
+      daysSoFar: number;
+      estimatedDailyCost?: number;
+    }[] = [];
 
-  for (const exp of expenses) {
-    const status = getCurrentlyInUseStatus(exp);
-    if (status.isInUse && status.daysSoFar !== undefined) {
-      currentlyInUseList.push({
-        expense: exp,
-        daysSoFar: status.daysSoFar,
-        estimatedDailyCost: status.dailyCostSoFar,
-      });
+    for (const exp of expenses) {
+      const status = getCurrentlyInUseStatus(exp);
+      if (status.isInUse && status.daysSoFar !== undefined) {
+        list.push({
+          expense: exp,
+          daysSoFar: status.daysSoFar,
+          estimatedDailyCost: status.dailyCostSoFar,
+        });
+      }
     }
-  }
+    return list;
+  }, [expenses]);
 
-  // Generate top deterministic insights
-  const allInsights = generateConsumptionInsights(expenses).slice(0, 4);
+  // Generate top deterministic insights - Memoized on expenses
+  const allInsights = React.useMemo(() => {
+    return generateConsumptionInsights(expenses).slice(0, 4);
+  }, [expenses]);
 
-  // Active Monthly Items for Quick Add
-  const activeMonthlyTemplates = monthlyItems.filter((m) => m.isEnabled !== false);
+  // Active Monthly Items for Quick Add - Memoized on monthlyItems
+  const activeMonthlyTemplates = React.useMemo(() => {
+    return monthlyItems.filter((m) => m.isEnabled !== false);
+  }, [monthlyItems]);
 
-  const recentExpenses = [...filteredExpenses]
-    .sort((a, b) => (b.purchaseDate || '').localeCompare(a.purchaseDate || ''))
-    .slice(0, 5);
+  // Recent Expenses - Memoized on filteredExpenses
+  const recentExpenses = React.useMemo(() => {
+    return [...filteredExpenses]
+      .sort((a, b) => (b.purchaseDate || '').localeCompare(a.purchaseDate || ''))
+      .slice(0, 5);
+  }, [filteredExpenses]);
 
   return (
     <div className="space-y-6 pb-12" id="dashboard-container">

@@ -2,26 +2,51 @@ import { Expense, CategorySpending, PeriodComparisonResult, ItemAnalyticsSummary
 import { CATEGORY_COLORS } from '../data/defaults.js';
 
 /**
- * Parses YYYY-MM-DD to UTC midnight milliseconds for timezone-safe calendar day arithmetic
+ * Parses any date format (YYYY-MM-DD, MM/DD/YYYY, YYYY/MM/DD, ISO string) to UTC midnight milliseconds
  */
 export function parseDateToUTC(dateStr?: string): number | undefined {
   if (!dateStr) return undefined;
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    const year = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1;
-    const day = parseInt(parts[2], 10);
+  const cleanDateStr = dateStr.trim().split('T')[0];
+  
+  // YYYY-MM-DD format
+  const dashParts = cleanDateStr.split('-');
+  if (dashParts.length === 3) {
+    const year = parseInt(dashParts[0], 10);
+    const month = parseInt(dashParts[1], 10) - 1;
+    const day = parseInt(dashParts[2], 10);
     if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
       return Date.UTC(year, month, day);
     }
   }
+
+  // Slash separator YYYY/MM/DD or MM/DD/YYYY
+  const slashParts = cleanDateStr.split('/');
+  if (slashParts.length === 3) {
+    if (slashParts[0].length === 4) {
+      // YYYY/MM/DD
+      const year = parseInt(slashParts[0], 10);
+      const month = parseInt(slashParts[1], 10) - 1;
+      const day = parseInt(slashParts[2], 10);
+      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+        return Date.UTC(year, month, day);
+      }
+    } else {
+      // MM/DD/YYYY or D/M/YYYY
+      const month = parseInt(slashParts[0], 10) - 1;
+      const day = parseInt(slashParts[1], 10);
+      const year = parseInt(slashParts[2], 10);
+      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+        return Date.UTC(year, month, day);
+      }
+    }
+  }
+
   const d = new Date(dateStr);
   return isNaN(d.getTime()) ? undefined : d.getTime();
 }
 
 /**
- * Calculates duration in days between two YYYY-MM-DD date strings
- * E.g., 2026-07-04 to 2026-08-04 = 31 days, 2026-08-05 to 2026-09-06 = 32 days, same-day = 1 day minimum
+ * Calculates duration in days between two date strings
  */
 export function calculateDuration(startDate?: string, endDate?: string): number | undefined {
   if (!startDate || !endDate) return undefined;
@@ -225,12 +250,21 @@ export function filterExpensesByDateRange(
   startDate: string,
   endDate: string
 ): Expense[] {
+  const startUTC = parseDateToUTC(startDate);
+  const endUTC = parseDateToUTC(endDate);
+
+  if (startUTC === undefined || endUTC === undefined) {
+    return expenses;
+  }
+
+  // Set endUTC to end of that calendar day (23:59:59.999)
+  const endOfDayUTC = endUTC + (24 * 60 * 60 * 1000 - 1);
+
   return expenses.filter((exp) => {
     if (!exp.purchaseDate) return false;
-    const dateStr = exp.purchaseDate.split('T')[0];
-    const startStr = startDate.split('T')[0];
-    const endStr = endDate.split('T')[0];
-    return dateStr >= startStr && dateStr <= endStr;
+    const expUTC = parseDateToUTC(exp.purchaseDate);
+    if (expUTC === undefined) return false;
+    return expUTC >= startUTC && expUTC <= endOfDayUTC;
   });
 }
 
