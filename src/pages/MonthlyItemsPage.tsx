@@ -22,7 +22,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { MonthlyItem, CategoryItem, Expense, ConsumptionLog } from '../types.js';
-import { formatCurrency } from '../utils/calculations.js';
+import { formatCurrency, calculateMonthlyItemIntelligence } from '../utils/calculations.js';
 import { DEFAULT_UNITS, CATEGORY_COLORS } from '../data/defaults.js';
 import { formatDisplayDate } from '../utils/dateRanges.js';
 
@@ -251,19 +251,12 @@ export const MonthlyItemsPage: React.FC<MonthlyItemsPageProps> = ({
       {filtered.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((item) => {
-            const { count, avgDuration } = getItemStats(item.name);
-            const remaining = item.remainingQuantity !== undefined
-              ? item.remainingQuantity
-              : item.openingStock !== undefined
-              ? item.openingStock
-              : item.quantityPurchased !== undefined
-              ? item.quantityPurchased
-              : 0;
-
-            const opening = item.openingStock || item.quantityPurchased || (remaining > 0 ? remaining : 1);
-            const minThreshold = item.minimumThreshold !== undefined ? item.minimumThreshold : 2;
-            const isLowStock = remaining <= minThreshold;
-            const percentageStock = Math.min(100, Math.max(0, Math.round((remaining / opening) * 100)));
+            const intel = calculateMonthlyItemIntelligence(item, consumptionLogs);
+            const remaining = intel.remainingQuantity;
+            const opening = intel.openingStock || (remaining > 0 ? remaining : 1);
+            const minThreshold = intel.minimumThreshold;
+            const isLowStock = intel.isLowStock;
+            const percentageStock = Math.min(100, Math.max(0, Math.round((remaining / (opening || 1)) * 100)));
 
             return (
               <div
@@ -328,13 +321,17 @@ export const MonthlyItemsPage: React.FC<MonthlyItemsPageProps> = ({
                   </div>
 
                   {/* Stock Remaining & Progress Bar */}
-                  <div className="my-3.5 p-3.5 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+                  <div className="my-3.5 p-3.5 rounded-2xl bg-slate-50 border border-slate-100 space-y-2.5">
                     <div className="flex items-center justify-between text-xs">
                       <div>
-                        <span className="text-[10px] text-slate-400 block font-semibold uppercase">Remaining Stock</span>
+                        <span className="text-[10px] text-slate-400 block font-semibold uppercase">
+                          Remaining Quantity
+                        </span>
                         <span className={`font-black text-base sm:text-lg ${isLowStock ? 'text-amber-700' : 'text-slate-900'}`}>
                           {remaining} {item.unit}
-                          <span className="text-xs font-normal text-slate-400 ml-1">/ {opening} {item.unit}</span>
+                          {opening > 0 && (
+                            <span className="text-xs font-normal text-slate-400 ml-1">/ {opening} {item.unit}</span>
+                          )}
                         </span>
                       </div>
 
@@ -356,15 +353,25 @@ export const MonthlyItemsPage: React.FC<MonthlyItemsPageProps> = ({
                       />
                     </div>
 
-                    {/* Purchase & Start Using Dates */}
-                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60 text-[11px] text-slate-500">
+                    {/* Consumption Intelligence: Daily Usage, Depletion Date, Reorder Date */}
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/60 text-[11px]">
                       <div>
-                        <span className="text-slate-400 block text-[10px]">Purchased Date</span>
-                        <strong className="text-slate-800 font-semibold">{item.purchasedDate ? formatDisplayDate(item.purchasedDate) : '—'}</strong>
+                        <span className="text-slate-400 block text-[10px] font-semibold">Daily Usage</span>
+                        <strong className="text-slate-800 font-bold block truncate">
+                          {intel.dailyUsage > 0 ? `${intel.dailyUsage} ${item.unit}/d` : '—'}
+                        </strong>
                       </div>
                       <div>
-                        <span className="text-slate-400 block text-[10px]">Start Using Date</span>
-                        <strong className="text-emerald-700 font-semibold">{item.startUsingDate ? formatDisplayDate(item.startUsingDate) : '—'}</strong>
+                        <span className="text-slate-400 block text-[10px] font-semibold">Est. Depletion</span>
+                        <strong className="text-slate-800 font-bold block truncate">
+                          {intel.estimatedDepletionDate ? formatDisplayDate(intel.estimatedDepletionDate) : '—'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] font-semibold">Reorder Date</span>
+                        <strong className="text-emerald-700 font-bold block truncate">
+                          {intel.recommendedReorderDate ? formatDisplayDate(intel.recommendedReorderDate) : '—'}
+                        </strong>
                       </div>
                     </div>
                   </div>
@@ -376,7 +383,7 @@ export const MonthlyItemsPage: React.FC<MonthlyItemsPageProps> = ({
                   )}
                 </div>
 
-                {/* Action Buttons: Consume & Log Purchase */}
+                {/* Action Buttons: Consume Qty & Log Purchase */}
                 <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                   <button
                     onClick={() => onOpenConsumeModal(item)}

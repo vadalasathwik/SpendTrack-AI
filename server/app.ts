@@ -467,6 +467,103 @@ export function createExpressApp() {
     }
   });
 
+  // SpendTrack AI Chat History & Notifications
+  app.get("/api/ai/chat/history", async (req, res) => {
+    try {
+      const token = getGoogleToken(req);
+      if (!token) return res.status(401).json({ error: "Google authentication required" });
+      const history = await googleSheetsService.getAIChatHistory(token);
+      res.json({ success: true, history });
+    } catch (err: any) {
+      console.error("GET /api/ai/chat/history error:", err);
+      res.status(500).json({ error: err.message || "Failed to fetch AI chat history" });
+    }
+  });
+
+  app.post("/api/ai/chat/history", async (req, res) => {
+    try {
+      const token = getGoogleToken(req);
+      if (!token) return res.status(401).json({ error: "Google authentication required" });
+      const saved = await googleSheetsService.saveAIChatMessage(token, req.body || {});
+      res.json({ success: true, saved });
+    } catch (err: any) {
+      console.error("POST /api/ai/chat/history error:", err);
+      res.status(500).json({ error: err.message || "Failed to save AI chat message" });
+    }
+  });
+
+  app.delete("/api/ai/chat/history/:chatId", async (req, res) => {
+    try {
+      const token = getGoogleToken(req);
+      if (!token) return res.status(401).json({ error: "Google authentication required" });
+      await googleSheetsService.deleteAIChat(token, req.params.chatId);
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("DELETE /api/ai/chat/history error:", err);
+      res.status(500).json({ error: err.message || "Failed to delete AI chat session" });
+    }
+  });
+
+  app.get("/api/notifications", async (req, res) => {
+    try {
+      const token = getGoogleToken(req);
+      if (!token) return res.status(401).json({ error: "Google authentication required" });
+      const notifications = await googleSheetsService.getNotifications(token);
+      res.json({ success: true, notifications });
+    } catch (err: any) {
+      console.error("GET /api/notifications error:", err);
+      res.status(500).json({ error: err.message || "Failed to fetch notifications" });
+    }
+  });
+
+  app.post("/api/notifications", async (req, res) => {
+    try {
+      const token = getGoogleToken(req);
+      if (!token) return res.status(401).json({ error: "Google authentication required" });
+      const notification = await googleSheetsService.saveNotification(token, req.body || {});
+      res.json({ success: true, notification });
+    } catch (err: any) {
+      console.error("POST /api/notifications error:", err);
+      res.status(500).json({ error: err.message || "Failed to save notification" });
+    }
+  });
+
+  app.put("/api/notifications/:id", async (req, res) => {
+    try {
+      const token = getGoogleToken(req);
+      if (!token) return res.status(401).json({ error: "Google authentication required" });
+      const updated = await googleSheetsService.updateNotification(token, req.params.id, req.body || {});
+      res.json({ success: true, notification: updated });
+    } catch (err: any) {
+      console.error("PUT /api/notifications error:", err);
+      res.status(500).json({ error: err.message || "Failed to update notification" });
+    }
+  });
+
+  app.delete("/api/notifications/:id", async (req, res) => {
+    try {
+      const token = getGoogleToken(req);
+      if (!token) return res.status(401).json({ error: "Google authentication required" });
+      await googleSheetsService.deleteNotification(token, req.params.id);
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("DELETE /api/notifications/:id error:", err);
+      res.status(500).json({ error: err.message || "Failed to delete notification" });
+    }
+  });
+
+  app.delete("/api/notifications", async (req, res) => {
+    try {
+      const token = getGoogleToken(req);
+      if (!token) return res.status(401).json({ error: "Google authentication required" });
+      await googleSheetsService.clearAllNotifications(token);
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("DELETE /api/notifications error:", err);
+      res.status(500).json({ error: err.message || "Failed to clear all notifications" });
+    }
+  });
+
   // Catch-all 404 for ANY /api/* request to prevent falling through to Vite HTML fallback
   app.all("/api/*", (req, res) => {
     res.status(404).json({ error: `API endpoint ${req.method} ${req.path} not found` });

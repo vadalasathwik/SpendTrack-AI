@@ -579,6 +579,24 @@ export interface MonthlyItemIntelligence {
 }
 
 /**
+ * Helper to check if a monthly item is a physical inventory/consumable item
+ * Excludes recurring bills, utilities, subscriptions, WiFi, Electricity, Rent, Netflix
+ */
+export function isInventoryItem(item: MonthlyItem): boolean {
+  if (item.usageTrackingEnabled === false) return false;
+
+  const cat = (item.category || '').toLowerCase();
+  const nonInventoryCats = ['bills', 'utilities', 'subscription', 'subscriptions', 'rent', 'insurance', 'services'];
+  if (nonInventoryCats.includes(cat)) return false;
+
+  const name = (item.name || '').toLowerCase();
+  const nonInventoryKeywords = ['wifi', 'electricity', 'rent', 'netflix', 'spotify', 'broadband', 'water bill', 'recharge', 'maintenance', 'mobile bill'];
+  if (nonInventoryKeywords.some((kw) => name.includes(kw))) return false;
+
+  return true;
+}
+
+/**
  * Calculates item consumption intelligence (daily/weekly/monthly usage, days remaining, estimated depletion date, recommended reorder date) from MonthlyItem and ConsumptionLogs
  */
 export function calculateMonthlyItemIntelligence(
@@ -637,7 +655,8 @@ export function calculateMonthlyItemIntelligence(
     }
   }
 
-  const isLowStock = remainingQuantity <= minimumThreshold || (daysRemaining !== null && daysRemaining <= 5);
+  const isInventory = isInventoryItem(item);
+  const isLowStock = isInventory && minimumThreshold > 0 && remainingQuantity <= minimumThreshold;
 
   return {
     itemId: item.id,

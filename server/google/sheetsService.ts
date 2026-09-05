@@ -64,6 +64,8 @@ export class GoogleSheetsService
           { properties: { title: 'Recurring Bills', gridProperties: { frozenRowCount: 1 } } },
           { properties: { title: 'ConsumptionLog', gridProperties: { frozenRowCount: 1 } } },
           { properties: { title: 'Settings', gridProperties: { frozenRowCount: 1 } } },
+          { properties: { title: 'AIChatHistory', gridProperties: { frozenRowCount: 1 } } },
+          { properties: { title: 'Notifications', gridProperties: { frozenRowCount: 1 } } },
         ],
       };
 
@@ -124,6 +126,14 @@ export class GoogleSheetsService
             ['id', 'itemId', 'itemName', 'consumedQuantity', 'unit', 'consumedDate', 'notes', 'createdAt', 'updatedAt'],
           ],
         },
+        {
+          range: 'AIChatHistory!A1:E1',
+          values: [['chatId', 'messageId', 'role', 'message', 'timestamp']],
+        },
+        {
+          range: 'Notifications!A1:F1',
+          values: [['id', 'type', 'title', 'message', 'createdAt', 'read']],
+        },
         { range: 'Settings!A1:B1', values: [['key', 'value']] },
         {
           range: 'Settings!A2:B3',
@@ -180,6 +190,40 @@ export class GoogleSheetsService
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             values: [['key', 'value']],
+          }),
+        });
+      }
+
+      if (!existingTitles.includes('AIChatHistory')) {
+        await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, token, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requests: [{ addSheet: { properties: { title: 'AIChatHistory', gridProperties: { frozenRowCount: 1 } } } }],
+          }),
+        });
+        await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/AIChatHistory!A1:E1?valueInputOption=USER_ENTERED`, token, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            values: [['chatId', 'messageId', 'role', 'message', 'timestamp']],
+          }),
+        });
+      }
+
+      if (!existingTitles.includes('Notifications')) {
+        await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, token, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requests: [{ addSheet: { properties: { title: 'Notifications', gridProperties: { frozenRowCount: 1 } } } }],
+          }),
+        });
+        await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/Notifications!A1:F1?valueInputOption=USER_ENTERED`, token, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            values: [['id', 'type', 'title', 'message', 'createdAt', 'read']],
           }),
         });
       }
@@ -973,6 +1017,179 @@ export class GoogleSheetsService
     }
 
     return updatedMap;
+  }
+
+  // ==================== AI CHAT HISTORY ====================
+
+  async getAIChatHistory(token: string): Promise<Array<{ chatId: string; messageId: string; role: string; message: string; timestamp: string }>> {
+    const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
+    const url = `${SHEETS_API}/${spreadsheetId}/values/AIChatHistory!A2:E`;
+    try {
+      const res = await this.fetchWithAuth(url, token);
+      const rows = res.values || [];
+      return rows.map((row: any[]) => ({
+        chatId: row[0] || '',
+        messageId: row[1] || '',
+        role: row[2] || 'user',
+        message: row[3] || '',
+        timestamp: row[4] || new Date().toISOString(),
+      })).filter((r) => r.chatId && r.message);
+    } catch (err) {
+      console.warn('Failed to read AIChatHistory tab from Google Sheets:', err);
+      return [];
+    }
+  }
+
+  async saveAIChatMessage(
+    token: string,
+    data: { chatId: string; messageId?: string; role: string; message: string; timestamp?: string }
+  ): Promise<{ chatId: string; messageId: string; role: string; message: string; timestamp: string }> {
+    const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
+    const messageId = data.messageId || `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const timestamp = data.timestamp || new Date().toISOString();
+    const row = [data.chatId, messageId, data.role, data.message, timestamp];
+
+    const appendUrl = `${SHEETS_API}/${spreadsheetId}/values/AIChatHistory!A2:E:append?valueInputOption=USER_ENTERED`;
+    await this.fetchWithAuth(appendUrl, token, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: [row] }),
+    });
+
+    return { chatId: data.chatId, messageId, role: data.role, message: data.message, timestamp };
+  }
+
+  async deleteAIChat(token: string, chatId: string): Promise<void> {
+    const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
+    const history = await this.getAIChatHistory(token);
+    const remaining = history.filter((h) => h.chatId !== chatId);
+
+    const clearUrl = `${SHEETS_API}/${spreadsheetId}/values/AIChatHistory!A2:E:clear`;
+    try {
+      await this.fetchWithAuth(clearUrl, token, { method: 'POST' });
+    } catch (e) {
+      console.warn('Clear chat history notice:', e);
+    }
+
+    if (remaining.length > 0) {
+      const rows = remaining.map((r) => [r.chatId, r.messageId, r.role, r.message, r.timestamp]);
+      const updateUrl = `${SHEETS_API}/${spreadsheetId}/values/AIChatHistory!A2:E${rows.length + 1}?valueInputOption=USER_ENTERED`;
+      await this.fetchWithAuth(updateUrl, token, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: rows }),
+      });
+    }
+  }
+
+  // ==================== NOTIFICATIONS ====================
+
+  async getNotifications(token: string): Promise<Array<{ id: string; type: string; title: string; message: string; createdAt: string; read: boolean }>> {
+    const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
+    const url = `${SHEETS_API}/${spreadsheetId}/values/Notifications!A2:F`;
+    try {
+      const res = await this.fetchWithAuth(url, token);
+      const rows = res.values || [];
+      return rows.map((row: any[]) => ({
+        id: row[0] || '',
+        type: row[1] || 'bill_upcoming',
+        title: row[2] || '',
+        message: row[3] || '',
+        createdAt: row[4] || new Date().toISOString(),
+        read: row[5] === 'true',
+      })).filter((n) => n.id && n.title);
+    } catch (err) {
+      console.warn('Failed to read Notifications tab from Google Sheets:', err);
+      return [];
+    }
+  }
+
+  async saveNotification(
+    token: string,
+    notif: { id?: string; type: string; title: string; message: string; createdAt?: string; read?: boolean }
+  ): Promise<{ id: string; type: string; title: string; message: string; createdAt: string; read: boolean }> {
+    const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
+    const id = notif.id || `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const createdAt = notif.createdAt || new Date().toISOString();
+    const read = notif.read ?? false;
+
+    // Check if notification with same ID already exists
+    const existing = await this.getNotifications(token);
+    if (existing.some((n) => n.id === id)) {
+      return this.updateNotification(token, id, { read });
+    }
+
+    const row = [id, notif.type, notif.title, notif.message, createdAt, read ? 'true' : 'false'];
+    const appendUrl = `${SHEETS_API}/${spreadsheetId}/values/Notifications!A2:F:append?valueInputOption=USER_ENTERED`;
+    await this.fetchWithAuth(appendUrl, token, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: [row] }),
+    });
+
+    return { id, type: notif.type, title: notif.title, message: notif.message, createdAt, read };
+  }
+
+  async updateNotification(
+    token: string,
+    id: string,
+    updates: Partial<{ read: boolean }>
+  ): Promise<{ id: string; type: string; title: string; message: string; createdAt: string; read: boolean }> {
+    const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
+    const list = await this.getNotifications(token);
+    let updatedNotif = list.find((n) => n.id === id);
+
+    if (updatedNotif) {
+      if (updates.read !== undefined) updatedNotif.read = updates.read;
+      const rows = list.map((n) => [n.id, n.type, n.title, n.message, n.createdAt, n.read ? 'true' : 'false']);
+      const clearUrl = `${SHEETS_API}/${spreadsheetId}/values/Notifications!A2:F:clear`;
+      try {
+        await this.fetchWithAuth(clearUrl, token, { method: 'POST' });
+      } catch (e) {
+        console.warn('Clear notifications notice:', e);
+      }
+      const updateUrl = `${SHEETS_API}/${spreadsheetId}/values/Notifications!A2:F${rows.length + 1}?valueInputOption=USER_ENTERED`;
+      await this.fetchWithAuth(updateUrl, token, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: rows }),
+      });
+    }
+
+    return updatedNotif || { id, type: 'bill_upcoming', title: '', message: '', createdAt: new Date().toISOString(), read: !!updates.read };
+  }
+
+  async deleteNotification(token: string, id: string): Promise<void> {
+    const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
+    const list = await this.getNotifications(token);
+    const remaining = list.filter((n) => n.id !== id);
+
+    const clearUrl = `${SHEETS_API}/${spreadsheetId}/values/Notifications!A2:F:clear`;
+    try {
+      await this.fetchWithAuth(clearUrl, token, { method: 'POST' });
+    } catch (e) {
+      console.warn('Clear notifications notice:', e);
+    }
+
+    if (remaining.length > 0) {
+      const rows = remaining.map((n) => [n.id, n.type, n.title, n.message, n.createdAt, n.read ? 'true' : 'false']);
+      const updateUrl = `${SHEETS_API}/${spreadsheetId}/values/Notifications!A2:F${rows.length + 1}?valueInputOption=USER_ENTERED`;
+      await this.fetchWithAuth(updateUrl, token, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: rows }),
+      });
+    }
+  }
+
+  async clearAllNotifications(token: string): Promise<void> {
+    const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
+    const clearUrl = `${SHEETS_API}/${spreadsheetId}/values/Notifications!A2:F:clear`;
+    try {
+      await this.fetchWithAuth(clearUrl, token, { method: 'POST' });
+    } catch (e) {
+      console.warn('Clear all notifications notice:', e);
+    }
   }
 }
 

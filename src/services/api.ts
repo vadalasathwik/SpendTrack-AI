@@ -4,6 +4,8 @@ import {
   CategoryItem,
   MonthlyItem,
   ConsumptionLog,
+  AppNotification,
+  AIChatRecord,
 } from "../types";
 import { getStoredJWT, clearAuthSession } from "./authService";
 
@@ -350,6 +352,55 @@ export const SpendTrackApi = {
     return apiFetch<Record<string, string>>("/api/settings", {
       method: "POST",
       body: JSON.stringify(settings),
+    });
+  },
+
+  // AI Chat History
+  async getAIChatHistory(): Promise<AIChatRecord[]> {
+    return apiFetch<AIChatRecord[]>("/api/ai/chat/history");
+  },
+
+  async saveAIChatMessage(record: Omit<AIChatRecord, "timestamp"> & { timestamp?: string }) {
+    return apiFetch<{ success: boolean; record: AIChatRecord }>("/api/ai/chat/history", {
+      method: "POST",
+      body: JSON.stringify(record),
+    });
+  },
+
+  async deleteAIChat(chatId: string) {
+    return apiFetch<{ success: boolean }>(`/api/ai/chat/history?chatId=${encodeURIComponent(chatId)}`, {
+      method: "DELETE",
+    });
+  },
+
+  // Notifications
+  async getNotifications(): Promise<AppNotification[]> {
+    return apiFetch<AppNotification[]>("/api/notifications");
+  },
+
+  async saveNotification(notification: Omit<AppNotification, "id" | "createdAt"> & { id?: string; createdAt?: string }) {
+    return apiFetch<AppNotification>("/api/notifications", {
+      method: "POST",
+      body: JSON.stringify(notification),
+    });
+  },
+
+  async updateNotification(id: string, updates: Partial<AppNotification>) {
+    return apiFetch<AppNotification>(`/api/notifications/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(updates),
+    });
+  },
+
+  async deleteNotification(id: string) {
+    return apiFetch<{ success: boolean }>(`/api/notifications/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async clearAllNotifications() {
+    return apiFetch<{ success: boolean }>("/api/notifications/clear-all", {
+      method: "POST",
     });
   },
 };

@@ -90,6 +90,7 @@ export function App() {
   const [monthlyItems, setMonthlyItems] = useState<MonthlyItem[]>([]);
   const [consumptionLogs, setConsumptionLogs] = useState<ConsumptionLog[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>(DEFAULT_CATEGORIES);
+  const [persistedNotifications, setPersistedNotifications] = useState<AppNotification[]>([]);
 
   // User & Budget Settings Store
   const [userSettings, setUserSettings] = useState<UserSettings>({
@@ -185,13 +186,14 @@ export function App() {
       const status = await SpendTrackApi.checkWorkspaceStatus();
       setWorkspaceStatus(status);
 
-      const [loadedExpenses, loadedRecurring, loadedCategories, loadedMonthly, loadedLogs, loadedSettings] = await Promise.all([
+      const [loadedExpenses, loadedRecurring, loadedCategories, loadedMonthly, loadedLogs, loadedSettings, loadedNotifs] = await Promise.all([
         SpendTrackApi.getExpenses(),
         SpendTrackApi.getRecurringExpenses(),
         SpendTrackApi.getCategories(),
         SpendTrackApi.getMonthlyItems(),
         SpendTrackApi.getConsumptionLogs(),
         SpendTrackApi.getSettings().catch(() => ({} as Record<string, string>)),
+        SpendTrackApi.getNotifications().catch(() => []),
       ]);
 
       setExpenses(loadedExpenses || []);
@@ -201,6 +203,7 @@ export function App() {
       }
       setMonthlyItems(loadedMonthly || []);
       setConsumptionLogs(loadedLogs || []);
+      setPersistedNotifications(loadedNotifs || []);
 
       const parsedSettings: UserSettings = {
         currencySymbol: loadedSettings.currencySymbol || '₹',
@@ -300,11 +303,12 @@ export function App() {
     }
   };
 
-  // Dynamically calculate notifications from recurringExpenses & monthlyItems
-  const notifications = React.useMemo<AppNotification[]>(() => {
-    const list: AppNotification[] = [];
+  // Sync live bill & inventory alerts into persistedNotifications
+  useEffect(() => {
+    const liveAlerts: AppNotification[] = [];
     const today = new Date();
     const currentDay = today.getDate();
+    const nowISO = new Date().toISOString();
 
     for (const bill of recurringExpenses) {
       if (bill.isActive === false) continue;
@@ -312,31 +316,37 @@ export function App() {
       const title = bill.name || bill.title || 'Recurring Bill';
 
       if (diff < 0 && Math.abs(diff) <= 5) {
-        list.push({
+        liveAlerts.push({
           id: `notif-overdue-${bill.id}`,
           type: 'bill_overdue',
           title: `Overdue: ${title}`,
           message: `${title} was due on the ${bill.dueDay}th of this month. Amount: ₹${bill.amount}`,
           state: 'Overdue',
           billId: bill.id,
+          createdAt: nowISO,
+          read: false,
         });
       } else if (diff === 0) {
-        list.push({
+        liveAlerts.push({
           id: `notif-due-${bill.id}`,
           type: 'bill_due',
           title: `Due Today: ${title}`,
           message: `${title} is due today! Amount: ₹${bill.amount}`,
           state: 'Due Today',
           billId: bill.id,
+          createdAt: nowISO,
+          read: false,
         });
       } else if (diff > 0 && diff <= (bill.reminderDays || 3)) {
-        list.push({
+        liveAlerts.push({
           id: `notif-up-${bill.id}`,
           type: 'bill_upcoming',
           title: `Upcoming: ${title}`,
           message: `${title} is due in ${diff} day${diff > 1 ? 's' : ''} (on the ${bill.dueDay}th). Amount: ₹${bill.amount}`,
           state: 'Upcoming',
           billId: bill.id,
+          createdAt: nowISO,
+          read: false,
         });
       }
     }
@@ -344,19 +354,58 @@ export function App() {
     for (const item of monthlyItems) {
       const intel = calculateMonthlyItemIntelligence(item, consumptionLogs);
       if (intel.isLowStock) {
-        list.push({
+        liveAlerts.push({
           id: `notif-stock-${item.id}`,
           type: 'stock_low',
           title: `Low Stock: ${item.name}`,
           message: `Remaining stock is ${intel.remainingQuantity} ${item.unit} (Threshold: ${intel.minimumThreshold} ${item.unit}).`,
           state: 'Low Stock',
           itemId: item.id,
+          createdAt: nowISO,
+          read: false,
         });
       }
     }
 
-    return list;
+    if (liveAlerts.length > 0) {
+      setPersistedNotifications((prev) => {
+        const existingIds = new Set(prev.map((n) => n.id));
+        const newItems = liveAlerts.filter((n) => !existingIds.has(n.id));
+        if (newItems.length > 0) {
+          newItems.forEach((n) => SpendTrackApi.saveNotification(n).catch(() => {}));
+          return [...newItems, ...prev];
+        }
+        return prev;
+      });
+    }
   }, [recurringExpenses, monthlyItems, consumptionLogs]);
+
+  // Notification Actions
+  const handleMarkNotifAsRead = async (id: string) => {
+    setPersistedNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+    SpendTrackApi.updateNotification(id, { read: true }).catch(() => {});
+  };
+
+  const handleMarkAllNotifsAsRead = async () => {
+    setPersistedNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    persistedNotifications.forEach((n) => {
+      if (!n.read) {
+        SpendTrackApi.updateNotification(n.id, { read: true }).catch(() => {});
+      }
+    });
+  };
+
+  const handleClearNotif = async (id: string) => {
+    setPersistedNotifications((prev) => prev.filter((n) => n.id !== id));
+    SpendTrackApi.deleteNotification(id).catch(() => {});
+  };
+
+  const handleClearAllNotifs = async () => {
+    setPersistedNotifications([]);
+    SpendTrackApi.clearAllNotifications().catch(() => {});
+  };
 
   // CRUD for Expenses
   const handleSaveExpense = async (expenseData: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -672,9 +721,9 @@ export function App() {
               aria-label="Notifications"
             >
               <Bell className="w-4 h-4 text-slate-700" />
-              {notifications.length > 0 && (
+              {persistedNotifications.filter((n) => !n.read).length > 0 && (
                 <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black ring-2 ring-white">
-                  {notifications.length}
+                  {persistedNotifications.filter((n) => !n.read).length}
                 </span>
               )}
             </button>
@@ -732,9 +781,9 @@ export function App() {
               aria-label="Notifications"
             >
               <Bell className="w-5 h-5" />
-              {notifications.length > 0 && (
+              {persistedNotifications.filter((n) => !n.read).length > 0 && (
                 <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-black ring-2 ring-white">
-                  {notifications.length}
+                  {persistedNotifications.filter((n) => !n.read).length}
                 </span>
               )}
             </button>
@@ -1078,7 +1127,11 @@ export function App() {
       <NotificationDrawer
         isOpen={isNotificationDrawerOpen}
         onClose={() => setIsNotificationDrawerOpen(false)}
-        notifications={notifications}
+        notifications={persistedNotifications}
+        onMarkAsRead={handleMarkNotifAsRead}
+        onMarkAllAsRead={handleMarkAllNotifsAsRead}
+        onClearNotification={handleClearNotif}
+        onClearAllNotifications={handleClearAllNotifs}
         onSelectNotification={(notif) => {
           if (notif.type === 'stock_low') {
             setActiveTab('monthly-items');

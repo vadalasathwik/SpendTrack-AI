@@ -88,14 +88,36 @@ export interface ConsumptionLog {
 
 export interface AppNotification {
   id: string;
-  type: 'bill_upcoming' | 'bill_due' | 'bill_overdue' | 'stock_low';
+  type: 'bill_upcoming' | 'bill_due' | 'bill_overdue' | 'stock_low' | 'ai_insight' | 'success';
   title: string;
   message: string;
-  state: 'Upcoming' | 'Due Today' | 'Overdue' | 'Low Stock';
+  state: 'Upcoming' | 'Due Today' | 'Overdue' | 'Low Stock' | 'AI Insight' | 'Success';
   date?: string;
   itemId?: string;
   billId?: string;
   read?: boolean;
+  createdAt?: string;
+}
+
+export interface AIChatRecord {
+  chatId: string;
+  messageId: string;
+  role: 'user' | 'assistant' | 'model';
+  message: string;
+  timestamp: string;
+}
+
+export interface AIChatSession {
+  id: string;
+  title: string;
+  createdAt: string;
+  messages: Array<{
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: string;
+    status?: 'sending' | 'sent' | 'error';
+  }>;
 }
 
 export interface UserSettings {
