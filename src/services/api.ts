@@ -3,6 +3,7 @@ import {
   RecurringExpense,
   CategoryItem,
   MonthlyItem,
+  ConsumptionLog,
 } from "../types";
 import { getStoredJWT, clearAuthSession } from "./authService";
 
@@ -247,6 +248,39 @@ export const SpendTrackApi = {
       : `/api/recurring/${id}`;
 
     return apiFetch<{ success: boolean }>(url, {
+      method: "DELETE",
+    });
+  },
+
+  async generateDueRecurringExpenses() {
+    return apiFetch<{
+      success: boolean;
+      createdExpenses: Expense[];
+      updatedBills: RecurringExpense[];
+    }>("/api/recurring/generate-due", {
+      method: "POST",
+    });
+  },
+
+  // Consumption Log
+  async getConsumptionLogs(): Promise<ConsumptionLog[]> {
+    return apiFetch<ConsumptionLog[]>("/api/consumption-log");
+  },
+
+  async createConsumptionLog(
+    log: Omit<ConsumptionLog, "id" | "createdAt" | "updatedAt">
+  ) {
+    return apiFetch<{ log: ConsumptionLog; updatedItem: MonthlyItem | null }>(
+      "/api/consumption-log",
+      {
+        method: "POST",
+        body: JSON.stringify(log),
+      }
+    );
+  },
+
+  async deleteConsumptionLog(id: string) {
+    return apiFetch<{ success: boolean }>(`/api/consumption-log/${id}`, {
       method: "DELETE",
     });
   },

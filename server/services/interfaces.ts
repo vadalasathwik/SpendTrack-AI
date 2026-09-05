@@ -1,4 +1,4 @@
-import { Expense, RecurringExpense, CategoryItem, UserSettings, MonthlyItem } from '../../src/types';
+import { Expense, RecurringExpense, CategoryItem, UserSettings, MonthlyItem, ConsumptionLog } from '../../src/types';
 
 export interface ExpenseRepository {
   getExpenses(token: string): Promise<Expense[]>;
@@ -13,6 +13,12 @@ export interface MonthlyItemRepository {
   createMonthlyItem(token: string, item: Omit<MonthlyItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<MonthlyItem>;
   updateMonthlyItem(token: string, id: string, item: Partial<MonthlyItem>): Promise<MonthlyItem>;
   deleteMonthlyItem(token: string, id: string): Promise<boolean>;
+}
+
+export interface ConsumptionLogRepository {
+  getConsumptionLogs(token: string): Promise<ConsumptionLog[]>;
+  createConsumptionLog(token: string, log: Omit<ConsumptionLog, 'id' | 'createdAt' | 'updatedAt'>): Promise<ConsumptionLog>;
+  deleteConsumptionLog(token: string, id: string): Promise<boolean>;
 }
 
 export interface CategoryRepository {

@@ -18,6 +18,8 @@ export interface Expense {
   receiptFileName?: string;
   receiptViewLink?: string;
   calendarEventId?: string;
+  source?: 'manual' | 'recurring' | 'receipt' | 'quick';
+  recurringId?: string;
   createdAt: string; // ISO
   updatedAt: string; // ISO
 }
@@ -31,12 +33,18 @@ export interface CategoryItem {
 
 export interface MonthlyItem {
   id: string;
-  name: string;
+  name: string; // itemName
   category: string;
   subcategory?: string;
   typicalPrice?: number;
   typicalQuantity?: number;
   unit: string;
+  purchasedDate?: string; // YYYY-MM-DD
+  startUsingDate?: string; // YYYY-MM-DD
+  quantityPurchased?: number;
+  openingStock?: number;
+  remainingQuantity?: number;
+  minimumThreshold?: number;
   usageTrackingEnabled: boolean;
   notes?: string;
   isEnabled: boolean;
@@ -46,19 +54,48 @@ export interface MonthlyItem {
 
 export interface RecurringExpense {
   id: string;
-  name: string;
+  name: string; // title
+  title?: string;
   category: string;
   subcategory?: string;
   amount: number;
   frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
-  dueDay: number; // day of month (1-31) or next due date YYYY-MM-DD
+  dueDay: number; // day of month (1-31)
   dueDate?: string; // YYYY-MM-DD
+  autopost?: boolean;
+  reminderDays?: number;
+  isActive?: boolean;
+  lastGeneratedMonth?: string; // YYYY-MM
   notes?: string;
   calendarReminderEnabled?: boolean;
   calendarEventId?: string;
   lastRecordedDate?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ConsumptionLog {
+  id: string;
+  itemId: string;
+  itemName: string;
+  consumedQuantity: number;
+  unit: string;
+  consumedDate: string; // YYYY-MM-DD
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AppNotification {
+  id: string;
+  type: 'bill_upcoming' | 'bill_due' | 'bill_overdue' | 'stock_low';
+  title: string;
+  message: string;
+  state: 'Upcoming' | 'Due Today' | 'Overdue' | 'Low Stock';
+  date?: string;
+  itemId?: string;
+  billId?: string;
+  read?: boolean;
 }
 
 export interface UserSettings {
@@ -105,7 +142,17 @@ export interface ItemAnalyticsSummary {
   previousPrice?: number;
   priceChange?: number;
   percentagePriceChange?: number;
+  // Consumption intelligence metrics
+  remainingQuantity?: number;
+  minimumThreshold?: number;
+  dailyUsage?: number;
+  weeklyUsage?: number;
+  monthlyAverage?: number;
+  daysRemaining?: number;
+  estimatedDepletionDate?: string;
+  recommendedReorderDate?: string;
   history: Expense[];
+  consumptionLogs?: ConsumptionLog[];
 }
 
 export interface CategorySpending {

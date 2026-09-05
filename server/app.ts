@@ -172,6 +172,76 @@ export function createExpressApp() {
     }
   });
 
+  // Consumption Log CRUD
+  app.get("/api/consumption-log", async (req, res) => {
+    try {
+      const token = getGoogleToken(req);
+      if (!token) {
+        return res.status(401).json({ error: "Google authentication required" });
+      }
+      const logs = await googleSheetsService.getConsumptionLogs(token);
+      res.json(logs);
+    } catch (err: any) {
+      console.warn("Sheets sync warning (getConsumptionLogs):", err.message);
+      res.status(500).json({ error: err.message || "Failed to fetch consumption logs" });
+    }
+  });
+
+  app.post("/api/consumption-log", async (req, res) => {
+    try {
+      const token = getGoogleToken(req);
+      if (!token) {
+        return res.status(401).json({ error: "Google authentication required" });
+      }
+      const log = await googleSheetsService.createConsumptionLog(token, req.body);
+
+      // Update remaining quantity on matching MonthlyItem
+      let updatedItem = null;
+      if (req.body.itemId || req.body.itemName) {
+        const items = await googleSheetsService.getMonthlyItems(token);
+        const match = items.find(
+          (m) => m.id === req.body.itemId || m.name.toLowerCase() === (req.body.itemName || '').toLowerCase()
+        );
+        if (match) {
+          const currentRemaining =
+            match.remainingQuantity !== undefined
+              ? match.remainingQuantity
+              : match.openingStock !== undefined
+              ? match.openingStock
+              : match.quantityPurchased !== undefined
+              ? match.quantityPurchased
+              : 0;
+
+          const newRemaining = Math.max(
+            0,
+            Number((currentRemaining - (req.body.consumedQuantity || 0)).toFixed(2))
+          );
+
+          updatedItem = await googleSheetsService.updateMonthlyItem(token, match.id, {
+            remainingQuantity: newRemaining,
+          });
+        }
+      }
+
+      res.json({ log, updatedItem });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || "Failed to log consumption" });
+    }
+  });
+
+  app.delete("/api/consumption-log/:id", async (req, res) => {
+    try {
+      const token = getGoogleToken(req);
+      if (!token) {
+        return res.status(401).json({ error: "Google authentication required" });
+      }
+      await googleSheetsService.deleteConsumptionLog(token, req.params.id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || "Failed to delete consumption log" });
+    }
+  });
+
   // Categories
   app.get("/api/categories", async (req, res) => {
     try {
@@ -225,6 +295,57 @@ export function createExpressApp() {
       res.json(created);
     } catch (err: any) {
       res.status(400).json({ error: err.message || "Failed to create recurring expense" });
+    }
+  });
+
+  app.post("/api/recurring/generate-due", async (req, res) => {
+    try {
+      const token = getGoogleToken(req);
+      if (!token) {
+        return res.status(401).json({ error: "Google authentication required" });
+      }
+      const bills = await googleSheetsService.getRecurringExpenses(token);
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      const currentMonthNum = today.getMonth() + 1;
+      const currentMonthStr = `${currentYear}-${String(currentMonthNum).padStart(2, "0")}`;
+      const currentDay = today.getDate();
+
+      const createdExpenses: any[] = [];
+      const updatedBills: any[] = [];
+
+      for (const bill of bills) {
+        if (bill.isActive === false || bill.autopost === false) continue;
+        if (bill.lastGeneratedMonth === currentMonthStr) continue;
+
+        const targetDueDay = Math.min(bill.dueDay || 1, new Date(currentYear, currentMonthNum, 0).getDate());
+        const dueDateStr = `${currentYear}-${String(currentMonthNum).padStart(2, "0")}-${String(targetDueDay).padStart(2, "0")}`;
+
+        if (currentDay >= targetDueDay) {
+          const expense = await googleSheetsService.createExpense(token, {
+            itemName: bill.name || bill.title || "Recurring Bill",
+            category: bill.category || "Utilities",
+            subcategory: bill.subcategory || "",
+            totalPrice: bill.amount || 0,
+            purchaseDate: dueDateStr,
+            notes: bill.notes ? `Auto-generated: ${bill.notes}` : "Auto-generated recurring bill",
+            source: "recurring",
+            recurringId: bill.id,
+          });
+
+          const updatedBill = await googleSheetsService.updateRecurringExpense(token, bill.id, {
+            lastGeneratedMonth: currentMonthStr,
+            lastRecordedDate: dueDateStr,
+          });
+
+          createdExpenses.push(expense);
+          updatedBills.push(updatedBill);
+        }
+      }
+
+      res.json({ success: true, createdExpenses, updatedBills });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to auto-generate recurring expenses" });
     }
   });
 

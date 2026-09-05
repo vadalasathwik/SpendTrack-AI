@@ -26,11 +26,14 @@ import {
   DateRange,
   SyncStatus,
   MonthlyItem,
+  ConsumptionLog,
+  AppNotification,
 } from './types.js';
 import {
   DEFAULT_CATEGORIES,
 } from './data/defaults.js';
 import { getDateRangeFromPreset } from './utils/dateRanges.js';
+import { calculateMonthlyItemIntelligence } from './utils/calculations.js';
 import { SpendTrackApi } from './services/api.js';
 import { signInWithGoogle, signOutApp, onAuthStateChange } from './services/authService.js';
 
@@ -42,6 +45,8 @@ import { MobileMoreDrawer } from './components/MobileMoreDrawer.js';
 import { ProvisioningProgressModal } from './components/ProvisioningProgressModal.js';
 import { ReceiptScannerModal } from './components/ReceiptScannerModal.js';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt.js';
+import { NotificationDrawer } from './components/NotificationDrawer.js';
+import { ConsumeQuantityModal } from './components/ConsumeQuantityModal.js';
 
 // Pages
 import { DashboardPage } from './pages/DashboardPage.js';
@@ -80,6 +85,7 @@ export function App() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
   const [monthlyItems, setMonthlyItems] = useState<MonthlyItem[]>([]);
+  const [consumptionLogs, setConsumptionLogs] = useState<ConsumptionLog[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>(DEFAULT_CATEGORIES);
 
   // Sync / Workspace status
@@ -90,6 +96,9 @@ export function App() {
   // Modals & Assistant State
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [isScanReceiptOpen, setIsScanReceiptOpen] = useState(false);
+  const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
+  const [isConsumeModalOpen, setIsConsumeModalOpen] = useState(false);
+  const [selectedConsumeItem, setSelectedConsumeItem] = useState<MonthlyItem | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [initialMonthlyItem, setInitialMonthlyItem] = useState<MonthlyItem | null>(null);
   const [selectedAnalyticsItem, setSelectedAnalyticsItem] = useState<string | null>(null);
@@ -163,11 +172,12 @@ export function App() {
       const status = await SpendTrackApi.checkWorkspaceStatus();
       setWorkspaceStatus(status);
 
-      const [loadedExpenses, loadedRecurring, loadedCategories, loadedMonthly] = await Promise.all([
+      const [loadedExpenses, loadedRecurring, loadedCategories, loadedMonthly, loadedLogs] = await Promise.all([
         SpendTrackApi.getExpenses(),
         SpendTrackApi.getRecurringExpenses(),
         SpendTrackApi.getCategories(),
         SpendTrackApi.getMonthlyItems(),
+        SpendTrackApi.getConsumptionLogs(),
       ]);
 
       setExpenses(loadedExpenses || []);
@@ -176,6 +186,20 @@ export function App() {
         setCategories(loadedCategories);
       }
       setMonthlyItems(loadedMonthly || []);
+      setConsumptionLogs(loadedLogs || []);
+
+      // Trigger auto expense generation for due recurring bills on workspace load
+      try {
+        const autoResult = await SpendTrackApi.generateDueRecurringExpenses();
+        if (autoResult && autoResult.createdExpenses && autoResult.createdExpenses.length > 0) {
+          setExpenses((prev) => [...autoResult.createdExpenses, ...prev]);
+          if (autoResult.updatedBills) {
+            setRecurringExpenses(autoResult.updatedBills);
+          }
+        }
+      } catch (autoErr) {
+        console.warn('Auto recurring generation notice:', autoErr);
+      }
 
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
@@ -186,6 +210,98 @@ export function App() {
       });
     }
   };
+
+  // Consumption Log Handlers
+  const handleSaveConsumptionLog = async (payload: {
+    itemId: string;
+    itemName: string;
+    consumedQuantity: number;
+    unit: string;
+    consumedDate: string;
+    notes?: string;
+  }) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      const createdLog = await SpendTrackApi.createConsumptionLog(payload);
+      setConsumptionLogs((prev) => [createdLog, ...prev]);
+
+      const matchedItem = monthlyItems.find((m) => m.id === payload.itemId);
+      if (matchedItem) {
+        const currentQty = matchedItem.remainingQuantity !== undefined
+          ? matchedItem.remainingQuantity
+          : (matchedItem.openingStock || matchedItem.quantityPurchased || 0);
+        const newQty = Math.max(0, Number((currentQty - payload.consumedQuantity).toFixed(2)));
+
+        const updatedItem = await SpendTrackApi.updateMonthlyItem(matchedItem.id, {
+          remainingQuantity: newQty,
+        });
+        setMonthlyItems((prev) => prev.map((m) => (m.id === matchedItem.id ? updatedItem : m)));
+      }
+
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  // Dynamically calculate notifications from recurringExpenses & monthlyItems
+  const notifications = React.useMemo<AppNotification[]>(() => {
+    const list: AppNotification[] = [];
+    const today = new Date();
+    const currentDay = today.getDate();
+
+    for (const bill of recurringExpenses) {
+      if (bill.isActive === false) continue;
+      const diff = bill.dueDay - currentDay;
+      const title = bill.name || bill.title || 'Recurring Bill';
+
+      if (diff < 0 && Math.abs(diff) <= 5) {
+        list.push({
+          id: `notif-overdue-${bill.id}`,
+          type: 'bill_overdue',
+          title: `Overdue: ${title}`,
+          message: `${title} was due on the ${bill.dueDay}th of this month. Amount: ₹${bill.amount}`,
+          state: 'Overdue',
+          billId: bill.id,
+        });
+      } else if (diff === 0) {
+        list.push({
+          id: `notif-due-${bill.id}`,
+          type: 'bill_due',
+          title: `Due Today: ${title}`,
+          message: `${title} is due today! Amount: ₹${bill.amount}`,
+          state: 'Due Today',
+          billId: bill.id,
+        });
+      } else if (diff > 0 && diff <= (bill.reminderDays || 3)) {
+        list.push({
+          id: `notif-up-${bill.id}`,
+          type: 'bill_upcoming',
+          title: `Upcoming: ${title}`,
+          message: `${title} is due in ${diff} day${diff > 1 ? 's' : ''} (on the ${bill.dueDay}th). Amount: ₹${bill.amount}`,
+          state: 'Upcoming',
+          billId: bill.id,
+        });
+      }
+    }
+
+    for (const item of monthlyItems) {
+      const intel = calculateMonthlyItemIntelligence(item, consumptionLogs);
+      if (intel.isLowStock) {
+        list.push({
+          id: `notif-stock-${item.id}`,
+          type: 'stock_low',
+          title: `Low Stock: ${item.name}`,
+          message: `Remaining stock is ${intel.remainingQuantity} ${item.unit} (Threshold: ${intel.minimumThreshold} ${item.unit}).`,
+          state: 'Low Stock',
+          itemId: item.id,
+        });
+      }
+    }
+
+    return list;
+  }, [recurringExpenses, monthlyItems, consumptionLogs]);
 
   // CRUD for Expenses
   const handleSaveExpense = async (expenseData: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -494,6 +610,20 @@ export function App() {
               compact={true}
             />
 
+            {/* Notification Bell Button */}
+            <button
+              onClick={() => setIsNotificationDrawerOpen(true)}
+              className="p-2 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 relative cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center border border-slate-200"
+              aria-label="Notifications"
+            >
+              <Bell className="w-4 h-4 text-slate-700" />
+              {notifications.length > 0 && (
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black ring-2 ring-white">
+                  {notifications.length}
+                </span>
+              )}
+            </button>
+
             {!user || syncStatus.state === 'error' ? (
               <button
                 id="header-sign-in-btn"
@@ -542,12 +672,16 @@ export function App() {
             />
 
             <button
-              onClick={() => alert("Notifications: All systems operational.")}
+              onClick={() => setIsNotificationDrawerOpen(true)}
               className="p-2 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 relative cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
               aria-label="Notifications"
             >
               <Bell className="w-5 h-5" />
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" />
+              {notifications.length > 0 && (
+                <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-black ring-2 ring-white">
+                  {notifications.length}
+                </span>
+              )}
             </button>
 
             <button
@@ -611,6 +745,8 @@ export function App() {
             expenses={expenses}
             dateRange={dateRange}
             monthlyItems={monthlyItems}
+            recurringExpenses={recurringExpenses}
+            consumptionLogs={consumptionLogs}
             onOpenAddExpense={() => {
               setEditingExpense(null);
               setInitialMonthlyItem(null);
@@ -619,12 +755,17 @@ export function App() {
             onOpenScanReceipt={() => setIsScanReceiptOpen(true)}
             onViewExpenseHistory={() => setActiveTab('expenses')}
             onViewMonthlyItems={() => setActiveTab('monthly-items')}
+            onViewRecurringBills={() => setActiveTab('recurring')}
             onSelectItemAnalytics={(itemName) => {
               setSelectedAnalyticsItem(itemName);
               setActiveTab('items');
             }}
             onOpenAIWithQuestion={handleOpenAIWithQuestion}
             onQuickAddFromItem={handleQuickAddPurchaseFromTemplate}
+            onOpenConsumeModal={(item) => {
+              setSelectedConsumeItem(item);
+              setIsConsumeModalOpen(true);
+            }}
           />
         )}
 
@@ -668,10 +809,15 @@ export function App() {
             monthlyItems={monthlyItems}
             categories={categories}
             expenses={expenses}
+            consumptionLogs={consumptionLogs}
             onSaveMonthlyItem={handleSaveMonthlyItem}
             onDeleteMonthlyItem={handleDeleteMonthlyItem}
             onToggleMonthlyItem={handleToggleMonthlyItem}
             onQuickAddPurchase={handleQuickAddPurchaseFromTemplate}
+            onConsumeQuantity={(item) => {
+              setSelectedConsumeItem(item);
+              setIsConsumeModalOpen(true);
+            }}
             onViewItemHistory={(itemName) => {
               setSelectedAnalyticsItem(itemName);
               setActiveTab('items');
@@ -867,6 +1013,32 @@ export function App() {
         onClose={() => setIsScanReceiptOpen(false)}
         categories={categories}
         onSaveExpenses={handleSaveMultipleExpenses}
+      />
+
+      {/* Notification Drawer */}
+      <NotificationDrawer
+        isOpen={isNotificationDrawerOpen}
+        onClose={() => setIsNotificationDrawerOpen(false)}
+        notifications={notifications}
+        onSelectNotification={(notif) => {
+          if (notif.type === 'stock_low') {
+            setActiveTab('monthly-items');
+          } else {
+            setActiveTab('recurring');
+          }
+        }}
+      />
+
+      {/* Consume Quantity Modal */}
+      <ConsumeQuantityModal
+        isOpen={isConsumeModalOpen}
+        onClose={() => {
+          setIsConsumeModalOpen(false);
+          setSelectedConsumeItem(null);
+        }}
+        monthlyItems={monthlyItems}
+        initialItem={selectedConsumeItem}
+        onSaveConsumption={handleSaveConsumptionLog}
       />
 
       {/* PWA Install Banner */}

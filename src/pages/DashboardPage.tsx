@@ -38,7 +38,7 @@ import {
   FileSpreadsheet,
   Camera,
 } from 'lucide-react';
-import { Expense, DateRange, CategorySpending, ItemAnalyticsSummary, MonthlyItem } from '../types.js';
+import { Expense, DateRange, CategorySpending, ItemAnalyticsSummary, MonthlyItem, RecurringExpense, ConsumptionLog } from '../types.js';
 import { useUser } from '../context/UserContext.js';
 import {
   calculateCategoryTotals,
@@ -48,6 +48,7 @@ import {
   generateConsumptionInsights,
   getCurrentlyInUseStatus,
   formatConsumptionVelocity,
+  calculateMonthlyItemIntelligence,
 } from '../utils/calculations.js';
 import { formatDisplayDate } from '../utils/dateRanges.js';
 import { CATEGORY_COLORS } from '../data/defaults.js';
@@ -56,26 +57,34 @@ interface DashboardPageProps {
   expenses: Expense[];
   dateRange: DateRange;
   monthlyItems?: MonthlyItem[];
+  recurringExpenses?: RecurringExpense[];
+  consumptionLogs?: ConsumptionLog[];
   onOpenAddExpense: () => void;
   onOpenScanReceipt?: () => void;
   onViewExpenseHistory: () => void;
   onViewMonthlyItems?: () => void;
+  onViewRecurringBills?: () => void;
   onSelectItemAnalytics: (itemName: string) => void;
   onOpenAIWithQuestion?: (question: string) => void;
   onQuickAddFromItem?: (item: MonthlyItem) => void;
+  onOpenConsumeModal?: (item: MonthlyItem) => void;
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
   expenses,
   dateRange,
   monthlyItems = [],
+  recurringExpenses = [],
+  consumptionLogs = [],
   onOpenAddExpense,
   onOpenScanReceipt,
   onViewExpenseHistory,
   onViewMonthlyItems,
+  onViewRecurringBills,
   onSelectItemAnalytics,
   onOpenAIWithQuestion,
   onQuickAddFromItem,
+  onOpenConsumeModal,
 }) => {
   const { user, workspace, refreshWorkspace } = useUser();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
@@ -170,6 +179,43 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const activeMonthlyTemplates = React.useMemo(() => {
     return monthlyItems.filter((m) => m.isEnabled !== false);
   }, [monthlyItems]);
+
+  // Items running low or requiring depletion check - Memoized
+  const itemsRunningLow = React.useMemo(() => {
+    return monthlyItems
+      .map((item) => ({ item, intel: calculateMonthlyItemIntelligence(item, consumptionLogs) }))
+      .filter((x) => x.intel.isLowStock || (x.intel.daysRemaining !== null && x.intel.daysRemaining <= 7));
+  }, [monthlyItems, consumptionLogs]);
+
+  // Bills due this week - Memoized
+  const billsDueThisWeek = React.useMemo(() => {
+    const todayDay = new Date().getDate();
+    return recurringExpenses.filter((r) => {
+      if (r.isActive === false) return false;
+      const diff = r.dueDay - todayDay;
+      return diff >= 0 && diff <= 7;
+    });
+  }, [recurringExpenses]);
+
+  // Recurring vs Variable Breakdown - Memoized
+  const recurringVsVariableData = React.useMemo(() => {
+    let recurringTotal = 0;
+    let variableTotal = 0;
+
+    for (const exp of filteredExpenses) {
+      const price = Number(exp.totalPrice) || 0;
+      if (exp.source === 'recurring' || exp.recurringId) {
+        recurringTotal += price;
+      } else {
+        variableTotal += price;
+      }
+    }
+
+    return [
+      { name: 'Recurring Bills', amount: Number(recurringTotal.toFixed(2)), color: '#3B82F6' },
+      { name: 'Variable Spending', amount: Number(variableTotal.toFixed(2)), color: '#10B981' },
+    ];
+  }, [filteredExpenses]);
 
   // Recent Expenses - Memoized on filteredExpenses
   const recentExpenses = React.useMemo(() => {
@@ -637,6 +683,107 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
         </div>
       )}
+
+      {/* 6.5. Bottom Cards: Bills Due This Week & Items Running Low */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Bills Due This Week */}
+        <div className="bg-white p-5 rounded-2xl border border-amber-200/80 shadow-2xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-600" />
+                <h3 className="font-bold text-sm text-slate-900">Bills Due This Week</h3>
+              </div>
+              {onViewRecurringBills && (
+                <button
+                  onClick={onViewRecurringBills}
+                  className="text-xs font-semibold text-amber-700 hover:underline cursor-pointer"
+                >
+                  Manage ({recurringExpenses.length})
+                </button>
+              )}
+            </div>
+
+            {billsDueThisWeek.length > 0 ? (
+              <div className="space-y-2">
+                {billsDueThisWeek.map((bill) => (
+                  <div
+                    key={bill.id}
+                    className="p-3 rounded-xl bg-amber-50/60 border border-amber-100 flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="font-bold text-xs text-slate-900">{bill.name || bill.title}</div>
+                      <div className="text-[11px] text-amber-800 font-medium">
+                        Due on day {bill.dueDay} of this month
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-black text-xs text-slate-900">
+                        {formatCurrency(bill.amount)}
+                      </div>
+                      {bill.autopost && (
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">
+                          Auto-post
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 py-3">No recurring bills due within the next 7 days.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Items Running Low Card */}
+        <div className="bg-white p-5 rounded-2xl border border-rose-200/80 shadow-2xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Flame className="w-4 h-4 text-rose-600" />
+                <h3 className="font-bold text-sm text-slate-900">Items Running Low</h3>
+              </div>
+              {onViewMonthlyItems && (
+                <button
+                  onClick={onViewMonthlyItems}
+                  className="text-xs font-semibold text-rose-700 hover:underline cursor-pointer"
+                >
+                  Inventory ({monthlyItems.length})
+                </button>
+              )}
+            </div>
+
+            {itemsRunningLow.length > 0 ? (
+              <div className="space-y-2">
+                {itemsRunningLow.map(({ item, intel }) => (
+                  <div
+                    key={item.id}
+                    className="p-3 rounded-xl bg-rose-50/60 border border-rose-100 flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="font-bold text-xs text-slate-900">{item.name}</div>
+                      <div className="text-[11px] text-rose-800 font-medium">
+                        Remaining: {intel.remainingQuantity} {item.unit} • Threshold: {intel.minimumThreshold} {item.unit}
+                      </div>
+                    </div>
+                    {onOpenConsumeModal && (
+                      <button
+                        onClick={() => onOpenConsumeModal(item)}
+                        className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] shadow-2xs transition-all cursor-pointer"
+                      >
+                        Consume Qty
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 py-3">All household items are adequately stocked above minimum threshold.</p>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* 7. Recent Expenses List */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs" id="recent-expenses-section">

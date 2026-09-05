@@ -1,4 +1,4 @@
-import { Expense, CategorySpending, PeriodComparisonResult, ItemAnalyticsSummary } from '../types.js';
+import { Expense, CategorySpending, PeriodComparisonResult, ItemAnalyticsSummary, MonthlyItem, ConsumptionLog } from '../types.js';
 import { CATEGORY_COLORS } from '../data/defaults.js';
 
 /**
@@ -560,3 +560,100 @@ export function generateConsumptionInsights(expenses: Expense[]): ConsumptionIns
 
   return insights;
 }
+
+export interface MonthlyItemIntelligence {
+  itemId: string;
+  itemName: string;
+  category: string;
+  unit: string;
+  remainingQuantity: number;
+  openingStock: number;
+  minimumThreshold: number;
+  dailyUsage: number;
+  weeklyUsage: number;
+  monthlyAverage: number;
+  daysRemaining: number | null;
+  estimatedDepletionDate: string | null;
+  recommendedReorderDate: string | null;
+  isLowStock: boolean;
+}
+
+/**
+ * Calculates item consumption intelligence (daily/weekly/monthly usage, days remaining, estimated depletion date, recommended reorder date) from MonthlyItem and ConsumptionLogs
+ */
+export function calculateMonthlyItemIntelligence(
+  item: MonthlyItem,
+  logs: ConsumptionLog[]
+): MonthlyItemIntelligence {
+  const itemLogs = logs.filter(
+    (l) => l.itemId === item.id || (l.itemName && l.itemName.trim().toLowerCase() === item.name.trim().toLowerCase())
+  );
+
+  const remainingQuantity = item.remainingQuantity !== undefined ? item.remainingQuantity : (item.openingStock || 0);
+  const openingStock = item.openingStock || 0;
+  const minimumThreshold = item.minimumThreshold || 0;
+
+  let dailyUsage = 0;
+
+  if (itemLogs.length > 0) {
+    const totalConsumed = itemLogs.reduce((sum, l) => sum + (Number(l.consumedQuantity) || 0), 0);
+    const dates = itemLogs.map((l) => parseDateToUTC(l.consumedDate)).filter((d): d is number => d !== undefined);
+    if (item.startUsingDate) {
+      const startMs = parseDateToUTC(item.startUsingDate);
+      if (startMs !== undefined) dates.push(startMs);
+    }
+    const minDateMs = Math.min(...dates);
+    const maxDateMs = Math.max(...dates, Date.now());
+
+    const diffDays = Math.max(1, Math.round((maxDateMs - minDateMs) / (1000 * 60 * 60 * 24)));
+    dailyUsage = Number((totalConsumed / diffDays).toFixed(3));
+  } else if (item.startUsingDate && remainingQuantity < openingStock) {
+    const startMs = parseDateToUTC(item.startUsingDate);
+    if (startMs) {
+      const consumedSoFar = openingStock - remainingQuantity;
+      const diffDays = Math.max(1, Math.round((Date.now() - startMs) / (1000 * 60 * 60 * 24)));
+      dailyUsage = Number((consumedSoFar / diffDays).toFixed(3));
+    }
+  }
+
+  const weeklyUsage = Number((dailyUsage * 7).toFixed(3));
+  const monthlyAverage = Number((dailyUsage * 30.417).toFixed(2));
+
+  let daysRemaining: number | null = null;
+  let estimatedDepletionDate: string | null = null;
+  let recommendedReorderDate: string | null = null;
+
+  if (dailyUsage > 0 && remainingQuantity > 0) {
+    daysRemaining = Math.floor(remainingQuantity / dailyUsage);
+    const depletionMs = Date.now() + daysRemaining * 24 * 60 * 60 * 1000;
+    estimatedDepletionDate = new Date(depletionMs).toISOString().split('T')[0];
+
+    if (minimumThreshold > 0 && remainingQuantity > minimumThreshold) {
+      const daysUntilThreshold = Math.max(0, Math.floor((remainingQuantity - minimumThreshold) / dailyUsage));
+      const reorderMs = Date.now() + daysUntilThreshold * 24 * 60 * 60 * 1000;
+      recommendedReorderDate = new Date(reorderMs).toISOString().split('T')[0];
+    } else if (remainingQuantity <= minimumThreshold) {
+      recommendedReorderDate = new Date().toISOString().split('T')[0];
+    }
+  }
+
+  const isLowStock = remainingQuantity <= minimumThreshold || (daysRemaining !== null && daysRemaining <= 5);
+
+  return {
+    itemId: item.id,
+    itemName: item.name,
+    category: item.category,
+    unit: item.unit,
+    remainingQuantity,
+    openingStock,
+    minimumThreshold,
+    dailyUsage,
+    weeklyUsage,
+    monthlyAverage,
+    daysRemaining,
+    estimatedDepletionDate,
+    recommendedReorderDate,
+    isLowStock,
+  };
+}
+
