@@ -84,6 +84,7 @@ export function createExpressApp() {
       } else {
         created = dataStore.createExpense(req.body);
       }
+      dataStore.saveExpenseRecord(created as any);
       res.json(created);
     } catch (err: any) {
       res.status(400).json({ error: err.message || "Failed to create expense" });
@@ -99,6 +100,7 @@ export function createExpressApp() {
       } else {
         updated = dataStore.updateExpense(req.params.id, req.body);
       }
+      dataStore.saveExpenseRecord(updated as any);
       res.json(updated);
     } catch (err: any) {
       res.status(400).json({ error: err.message || "Failed to update expense" });

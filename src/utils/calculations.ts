@@ -227,7 +227,10 @@ export function filterExpensesByDateRange(
 ): Expense[] {
   return expenses.filter((exp) => {
     if (!exp.purchaseDate) return false;
-    return exp.purchaseDate >= startDate && exp.purchaseDate <= endDate;
+    const dateStr = exp.purchaseDate.split('T')[0];
+    const startStr = startDate.split('T')[0];
+    const endStr = endDate.split('T')[0];
+    return dateStr >= startStr && dateStr <= endStr;
   });
 }
 

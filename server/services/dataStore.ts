@@ -217,6 +217,30 @@ class DataStore {
     return this.state.expenses.length < initLen;
   }
 
+  saveExpenseRecord(record: ExpenseRecord): ExpenseRecord {
+    this.load();
+    const idx = this.state.expenses.findIndex((e) => e.id === record.id);
+    if (idx !== -1) {
+      this.state.expenses[idx] = record;
+    } else {
+      this.state.expenses.unshift(record);
+    }
+    this.save();
+    return record;
+  }
+
+  saveMonthlyItemRecord(record: MonthlyItemRecord): MonthlyItemRecord {
+    this.load();
+    const idx = this.state.monthlyItems.findIndex((m) => m.id === record.id);
+    if (idx !== -1) {
+      this.state.monthlyItems[idx] = record;
+    } else {
+      this.state.monthlyItems.push(record);
+    }
+    this.save();
+    return record;
+  }
+
   // Monthly Items
   getMonthlyItems(): MonthlyItemRecord[] {
     this.load();
