@@ -1,40 +1,34 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
+const env = (import.meta as any)?.env || {};
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: env.VITE_FIREBASE_API_KEY || "demo-api-key",
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || "demo-app.firebaseapp.com",
+  projectId: env.VITE_FIREBASE_PROJECT_ID || "demo-project",
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || "demo-app.appspot.com",
+  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1234567890",
+  appId: env.VITE_FIREBASE_APP_ID || "1:1234567890:web:1234567890",
 };
 
-// Validate required Firebase values
-if (
-  !firebaseConfig.apiKey ||
-  !firebaseConfig.authDomain ||
-  !firebaseConfig.projectId ||
-  !firebaseConfig.appId
-) {
-  throw new Error("Firebase configuration is incomplete. Check .env.local");
+export const isFirebaseConfigured = Boolean(
+  env.VITE_FIREBASE_API_KEY &&
+    env.VITE_FIREBASE_AUTH_DOMAIN &&
+    env.VITE_FIREBASE_PROJECT_ID &&
+    env.VITE_FIREBASE_APP_ID
+);
+
+let appInstance: any;
+let authInstance: any;
+
+try {
+  appInstance = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  authInstance = getAuth(appInstance);
+  authInstance.useDeviceLanguage();
+} catch (err) {
+  console.warn("Firebase safe initialization notice:", err);
 }
 
-// Create only one Firebase app
-export const app =
-  getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-
-// Firebase Auth
-export const auth = getAuth(app);
-
-// Use browser language for Google sign-in
-auth.useDeviceLanguage();
-
-// Safe debug (no API key exposed)
-console.table({
-  origin: window.location.origin,
-  projectId: firebaseConfig.projectId,
-  authDomain: firebaseConfig.authDomain,
-  senderId: firebaseConfig.messagingSenderId,
-  appIdLoaded: !!firebaseConfig.appId,
-});
+export const app = appInstance;
+export const auth = authInstance;

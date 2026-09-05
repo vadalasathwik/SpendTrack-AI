@@ -79,7 +79,17 @@ export const clearAuthSession = () => {
 export const onAuthStateChange = (
   callback: (user: User | null) => void
 ) => {
-  return onAuthStateChanged(auth, callback);
+  if (!auth) {
+    callback(null);
+    return () => {};
+  }
+  try {
+    return onAuthStateChanged(auth, callback);
+  } catch (err) {
+    console.warn("Firebase Auth listener notice:", err);
+    callback(null);
+    return () => {};
+  }
 };
 
 /* ---------------- Google Sign In ---------------- */
@@ -87,6 +97,9 @@ export const onAuthStateChange = (
 export const signInWithGoogle = async (
   onStepProgress?: (step: number) => void
 ): Promise<SignInResult | null> => {
+  if (!auth) {
+    throw new Error("Firebase Authentication is not available. Please verify your configuration.");
+  }
   const provider = new GoogleAuthProvider();
 
   provider.setCustomParameters({
@@ -148,6 +161,8 @@ export const signInWithGoogle = async (
 /* ---------------- Sign Out ---------------- */
 
 export const signOutApp = async () => {
-  await signOut(auth);
+  if (auth) {
+    await signOut(auth).catch(() => {});
+  }
   clearAuthSession();
 };

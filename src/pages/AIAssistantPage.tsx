@@ -52,13 +52,17 @@ const DEFAULT_WELCOME_MESSAGE: AIChatMessage = {
 };
 
 export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
-  expenses,
-  recurringExpenses,
-  categories,
-  dateRange,
+  expenses = [],
+  recurringExpenses = [],
+  categories = [],
+  dateRange = { preset: 'currentMonth' as const, startDate: '', endDate: '', label: 'Current Month' },
   initialQuestion,
   onClearInitialQuestion,
 }) => {
+  const safeExpenses = Array.isArray(expenses) ? expenses : [];
+  const safeRecurring = Array.isArray(recurringExpenses) ? recurringExpenses : [];
+  const safeCategories = Array.isArray(categories) ? categories : [];
+
   const [sessions, setSessions] = useState<AIChatSession[]>([]);
   const [activeChatId, setActiveChatId] = useState<string>(() => `chat_${Date.now()}`);
   const [messages, setMessages] = useState<AIChatMessage[]>([DEFAULT_WELCOME_MESSAGE]);
@@ -72,6 +76,9 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const safeSessions = Array.isArray(sessions) ? sessions : [];
+  const safeMessages = Array.isArray(messages) ? messages : [];
+
   // Load chat history from Google Sheets via backend API
   useEffect(() => {
     let isMounted = true;
@@ -81,11 +88,14 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
         const records = await SpendTrackApi.getAIChatHistory();
         if (!isMounted) return;
 
-        if (records && records.length > 0) {
+        const safeRecords = Array.isArray(records) ? records : [];
+
+        if (safeRecords.length > 0) {
           const sessionMap = new Map<string, AIChatMessage[]>();
           const timeMap = new Map<string, string>();
 
-          records.forEach((rec) => {
+          safeRecords.forEach((rec) => {
+            if (!rec) return;
             const timeStr = rec.timestamp
               ? new Date(rec.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -93,7 +103,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
             const m: AIChatMessage = {
               id: rec.messageId || `msg-${Math.random()}`,
               role: rec.role === 'user' ? 'user' : 'assistant',
-              content: rec.message,
+              content: rec.message || '',
               timestamp: timeStr,
             };
 
@@ -107,8 +117,9 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
           });
 
           const loadedSessions: AIChatSession[] = Array.from(sessionMap.entries()).map(([cid, msgs]) => {
-            const firstUserMsg = msgs.find((m) => m.role === 'user');
-            const title = firstUserMsg
+            const safeMsgs = Array.isArray(msgs) ? msgs : [];
+            const firstUserMsg = safeMsgs.find((m) => m.role === 'user');
+            const title = firstUserMsg && firstUserMsg.content
               ? firstUserMsg.content.length > 30
                 ? firstUserMsg.content.substring(0, 30) + '...'
                 : firstUserMsg.content
@@ -118,7 +129,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
               id: cid,
               title,
               createdAt: timeMap.get(cid) || new Date().toISOString(),
-              messages: msgs,
+              messages: safeMsgs,
             };
           });
 
@@ -127,7 +138,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
           if (loadedSessions.length > 0) {
             const latestSession = loadedSessions[loadedSessions.length - 1];
             setActiveChatId(latestSession.id);
-            setMessages(latestSession.messages);
+            setMessages(Array.isArray(latestSession.messages) ? latestSession.messages : [DEFAULT_WELCOME_MESSAGE]);
           }
         }
       } catch (err) {
@@ -145,10 +156,10 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
 
   // Update current messages view when activeChatId changes
   useEffect(() => {
-    const currentSession = sessions.find((s) => s.id === activeChatId);
-    if (currentSession && currentSession.messages.length > 0) {
+    const currentSession = safeSessions.find((s) => s?.id === activeChatId);
+    if (currentSession && Array.isArray(currentSession.messages) && currentSession.messages.length > 0) {
       setMessages(currentSession.messages);
-    } else if (sessions.length > 0 && !sessions.some((s) => s.id === activeChatId)) {
+    } else if (safeSessions.length > 0 && !safeSessions.some((s) => s?.id === activeChatId)) {
       setMessages([DEFAULT_WELCOME_MESSAGE]);
     }
   }, [activeChatId, sessions]);

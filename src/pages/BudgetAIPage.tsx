@@ -42,10 +42,13 @@ interface BudgetAIPageProps {
 }
 
 export const BudgetAIPage: React.FC<BudgetAIPageProps> = ({
-  expenses,
+  expenses = [],
   recurringExpenses = [],
-  dateRange,
+  dateRange = { preset: 'currentMonth', startDate: '', endDate: '', label: 'Current Month' },
 }) => {
+  const safeExpenses = Array.isArray(expenses) ? expenses : [];
+  const safeRecurring = Array.isArray(recurringExpenses) ? recurringExpenses : [];
+
   const [loading, setLoading] = useState(true);
   const [budgetData, setBudgetData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +57,7 @@ export const BudgetAIPage: React.FC<BudgetAIPageProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const result = await SpendTrackApi.predictBudget(expenses, recurringExpenses);
+      const result = await SpendTrackApi.predictBudget(safeExpenses, safeRecurring);
       setBudgetData(result);
     } catch (err: any) {
       console.warn('Budget AI fetch fallback to local calculation:', err);

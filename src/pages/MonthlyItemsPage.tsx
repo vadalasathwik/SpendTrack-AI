@@ -40,9 +40,9 @@ interface MonthlyItemsPageProps {
 }
 
 export const MonthlyItemsPage: React.FC<MonthlyItemsPageProps> = ({
-  monthlyItems,
-  categories,
-  expenses,
+  monthlyItems = [],
+  categories = [],
+  expenses = [],
   consumptionLogs = [],
   onSaveMonthlyItem,
   onDeleteMonthlyItem,
@@ -51,6 +51,10 @@ export const MonthlyItemsPage: React.FC<MonthlyItemsPageProps> = ({
   onOpenConsumeModal,
   onViewItemHistory,
 }) => {
+  const safeMonthlyItems = Array.isArray(monthlyItems) ? monthlyItems : [];
+  const safeCategories = Array.isArray(categories) ? categories : [];
+  const safeExpenses = Array.isArray(expenses) ? expenses : [];
+  const safeLogs = Array.isArray(consumptionLogs) ? consumptionLogs : [];
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -161,18 +165,24 @@ export const MonthlyItemsPage: React.FC<MonthlyItemsPageProps> = ({
     }
   };
 
-  const filtered = monthlyItems.filter((item) => {
+  const filtered = safeMonthlyItems.filter((item) => {
+    if (!item) return false;
+    const nameStr = item.name || '';
+    const subcatStr = item.subcategory || '';
+    const notesStr = item.notes || '';
+    const queryStr = searchQuery || '';
     const matchesSearch =
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.subcategory && item.subcategory.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.notes && item.notes.toLowerCase().includes(searchQuery.toLowerCase()));
+      nameStr.toLowerCase().includes(queryStr.toLowerCase()) ||
+      subcatStr.toLowerCase().includes(queryStr.toLowerCase()) ||
+      notesStr.toLowerCase().includes(queryStr.toLowerCase());
     const matchesCat = selectedCategory === 'ALL' || item.category === selectedCategory;
     return matchesSearch && matchesCat;
   });
 
   const getItemStats = (itemName: string) => {
-    const matchingExpenses = expenses.filter(
-      (e) => e.itemName.toLowerCase() === itemName.toLowerCase()
+    const targetName = (itemName || '').toLowerCase();
+    const matchingExpenses = safeExpenses.filter(
+      (e) => e && (e.itemName || '').toLowerCase() === targetName
     );
     const count = matchingExpenses.length;
     const durations = matchingExpenses

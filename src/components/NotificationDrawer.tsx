@@ -27,7 +27,7 @@ interface NotificationDrawerProps {
 export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   isOpen,
   onClose,
-  notifications,
+  notifications = [],
   onSelectNotification,
   onMarkAsRead,
   onMarkAllAsRead,
@@ -36,13 +36,14 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const safeNotifications = Array.isArray(notifications) ? notifications : [];
+  const unreadCount = safeNotifications.filter((n) => !n?.read).length;
 
   const getBadgeStyle = (notification: AppNotification) => {
-    if (notification.read) {
+    if (notification?.read) {
       return 'bg-slate-100 text-slate-500 border-slate-200';
     }
-    switch (notification.type) {
+    switch (notification?.type) {
       case 'bill_due':
         return 'bg-amber-50 text-amber-700 border-amber-200';
       case 'bill_overdue':
@@ -108,7 +109,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         </div>
 
         {/* Toolbar: Mark all read / Clear all */}
-        {notifications.length > 0 && (
+        {safeNotifications.length > 0 && (
           <div className="px-4 py-2 bg-slate-100/60 border-b border-slate-100 flex items-center justify-between text-xs">
             {unreadCount > 0 ? (
               <button
@@ -134,35 +135,35 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 
         {/* Notifications List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {notifications.length > 0 ? (
-            notifications.map((n) => (
+          {safeNotifications.length > 0 ? (
+            safeNotifications.map((n) => (
               <div
-                key={n.id}
+                key={n?.id || Math.random()}
                 onClick={() => {
-                  if (!n.read) onMarkAsRead?.(n.id);
+                  if (!n?.read) onMarkAsRead?.(n.id);
                   onSelectNotification?.(n);
                 }}
                 className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 relative group ${
-                  n.read
+                  n?.read
                     ? 'bg-slate-50/60 border-slate-200/60 opacity-80'
                     : 'bg-white border-slate-200 hover:border-emerald-300 shadow-2xs hover:shadow-xs'
                 }`}
               >
                 <div className="p-2 rounded-xl bg-white border border-slate-100 shrink-0 mt-0.5 shadow-2xs">
-                  {getIcon(n.type)}
+                  {getIcon(n?.type)}
                 </div>
 
                 <div className="flex-1 min-w-0 pr-6">
                   <div className="flex items-center justify-between gap-1">
-                    <h4 className={`text-xs font-bold truncate ${n.read ? 'text-slate-600' : 'text-slate-900'}`}>
-                      {n.title}
+                    <h4 className={`text-xs font-bold truncate ${n?.read ? 'text-slate-600' : 'text-slate-900'}`}>
+                      {n?.title || 'Notification'}
                     </h4>
                     <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${getBadgeStyle(n)} shrink-0`}>
-                      {n.read ? 'Read' : n.state}
+                      {n?.read ? 'Read' : n?.state || 'Alert'}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">{n.message}</p>
-                  {n.createdAt && (
+                  <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">{n?.message || ''}</p>
+                  {n?.createdAt && (
                     <p className="text-[9px] text-slate-400 mt-1.5">
                       {new Date(n.createdAt).toLocaleString([], {
                         month: 'short',
@@ -178,7 +179,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onClearNotification?.(n.id);
+                    if (n?.id) onClearNotification?.(n.id);
                   }}
                   title="Clear notification"
                   className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-500 transition-opacity rounded-md cursor-pointer"

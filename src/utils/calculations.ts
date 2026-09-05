@@ -212,11 +212,13 @@ export function calculatePercentageChange(current: number, previous: number): nu
 /**
  * Groups expenses by category and calculates totals and percentages
  */
-export function calculateCategoryTotals(expenses: Expense[]): CategorySpending[] {
+export function calculateCategoryTotals(expenses: Expense[] = []): CategorySpending[] {
+  const safeExpenses = Array.isArray(expenses) ? expenses : [];
   const totals: Record<string, { amount: number; count: number }> = {};
   let totalAll = 0;
 
-  for (const exp of expenses) {
+  for (const exp of safeExpenses) {
+    if (!exp) continue;
     const cat = exp.category || 'Other';
     if (!totals[cat]) {
       totals[cat] = { amount: 0, count: 0 };
@@ -246,22 +248,25 @@ export function calculateCategoryTotals(expenses: Expense[]): CategorySpending[]
  * Filters expenses by date range (inclusive)
  */
 export function filterExpensesByDateRange(
-  expenses: Expense[],
-  startDate: string,
-  endDate: string
+  expenses: Expense[] = [],
+  startDate?: string,
+  endDate?: string
 ): Expense[] {
+  const safeExpenses = Array.isArray(expenses) ? expenses : [];
+  if (!startDate || !endDate) return safeExpenses;
+
   const startUTC = parseDateToUTC(startDate);
   const endUTC = parseDateToUTC(endDate);
 
   if (startUTC === undefined || endUTC === undefined) {
-    return expenses;
+    return safeExpenses;
   }
 
   // Set endUTC to end of that calendar day (23:59:59.999)
   const endOfDayUTC = endUTC + (24 * 60 * 60 * 1000 - 1);
 
-  return expenses.filter((exp) => {
-    if (!exp.purchaseDate) return false;
+  return safeExpenses.filter((exp) => {
+    if (!exp || !exp.purchaseDate) return false;
     const expUTC = parseDateToUTC(exp.purchaseDate);
     if (expUTC === undefined) return false;
     return expUTC >= startUTC && expUTC <= endOfDayUTC;
@@ -271,10 +276,12 @@ export function filterExpensesByDateRange(
 /**
  * Generates item-level analytics summary
  */
-export function generateItemAnalytics(expenses: Expense[], targetItemName?: string): ItemAnalyticsSummary[] {
+export function generateItemAnalytics(expenses: Expense[] = [], targetItemName?: string): ItemAnalyticsSummary[] {
+  const safeExpenses = Array.isArray(expenses) ? expenses : [];
   const itemMap: Record<string, Expense[]> = {};
 
-  for (const exp of expenses) {
+  for (const exp of safeExpenses) {
+    if (!exp) continue;
     const name = (exp.itemName || '').trim();
     if (!name) continue;
     const key = name.toLowerCase();
@@ -285,8 +292,8 @@ export function generateItemAnalytics(expenses: Expense[], targetItemName?: stri
   }
 
   const summaries: ItemAnalyticsSummary[] = Object.keys(itemMap).map((key) => {
-    const list = itemMap[key].sort((a, b) => b.purchaseDate.localeCompare(a.purchaseDate)); // latest first
-    const first = list[0];
+    const list = itemMap[key].sort((a, b) => (b.purchaseDate || '').localeCompare(a.purchaseDate || '')); // latest first
+    const first = list[0] || {} as Expense;
     const totalSpent = list.reduce((sum, e) => sum + (Number(e.totalPrice) || 0), 0);
     
     let totalQty = 0;
@@ -313,7 +320,7 @@ export function generateItemAnalytics(expenses: Expense[], targetItemName?: stri
       }
     }
 
-    const avgPrice = Number((totalSpent / list.length).toFixed(2));
+    const avgPrice = list.length > 0 ? Number((totalSpent / list.length).toFixed(2)) : 0;
     const avgPricePerUnit = qtyCount > 0 && totalQty > 0 ? Number((totalSpent / totalQty).toFixed(2)) : 0;
     const avgDuration = durationCount > 0 ? Math.round(totalDuration / durationCount) : 0;
     const avgDailyCost = dailyCostCount > 0 ? Number((totalDailyCost / dailyCostCount).toFixed(2)) : 0;
@@ -330,8 +337,8 @@ export function generateItemAnalytics(expenses: Expense[], targetItemName?: stri
     }
 
     return {
-      itemName: first.itemName,
-      category: first.category,
+      itemName: first.itemName || 'Unknown Item',
+      category: first.category || 'Other',
       unit,
       totalSpent: Number(totalSpent.toFixed(2)),
       totalQuantity: Number(totalQty.toFixed(2)),
@@ -340,7 +347,7 @@ export function generateItemAnalytics(expenses: Expense[], targetItemName?: stri
       averagePricePerUnit: avgPricePerUnit,
       averageDurationDays: avgDuration,
       averageDailyCost: avgDailyCost,
-      latestPurchaseDate: first.purchaseDate,
+      latestPurchaseDate: first.purchaseDate || '',
       latestPrice,
       previousPrice,
       priceChange,
@@ -351,7 +358,7 @@ export function generateItemAnalytics(expenses: Expense[], targetItemName?: stri
 
   if (targetItemName) {
     const filterKey = targetItemName.trim().toLowerCase();
-    return summaries.filter((s) => s.itemName.toLowerCase() === filterKey);
+    return summaries.filter((s) => (s.itemName || '').toLowerCase() === filterKey);
   }
 
   return summaries.sort((a, b) => b.totalSpent - a.totalSpent);
@@ -361,22 +368,23 @@ export function generateItemAnalytics(expenses: Expense[], targetItemName?: stri
  * Compares two date ranges
  */
 export function comparePeriods(
-  expenses: Expense[],
+  expenses: Expense[] = [],
   currentRange: { startDate: string; endDate: string },
   previousRange: { startDate: string; endDate: string }
 ): PeriodComparisonResult {
-  const currentExpenses = filterExpensesByDateRange(expenses, currentRange.startDate, currentRange.endDate);
-  const previousExpenses = filterExpensesByDateRange(expenses, previousRange.startDate, previousRange.endDate);
+  const safeExpenses = Array.isArray(expenses) ? expenses : [];
+  const currentExpenses = filterExpensesByDateRange(safeExpenses, currentRange?.startDate, currentRange?.endDate);
+  const previousExpenses = filterExpensesByDateRange(safeExpenses, previousRange?.startDate, previousRange?.endDate);
 
   const currentTotal = currentExpenses.reduce((s, e) => s + (Number(e.totalPrice) || 0), 0);
   const previousTotal = previousExpenses.reduce((s, e) => s + (Number(e.totalPrice) || 0), 0);
 
-  const curStart = new Date(currentRange.startDate);
-  const curEnd = new Date(currentRange.endDate);
+  const curStart = currentRange?.startDate ? new Date(currentRange.startDate) : new Date();
+  const curEnd = currentRange?.endDate ? new Date(currentRange.endDate) : new Date();
   const curDays = Math.max(1, Math.round((curEnd.getTime() - curStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
-  const prevStart = new Date(previousRange.startDate);
-  const prevEnd = new Date(previousRange.endDate);
+  const prevStart = previousRange?.startDate ? new Date(previousRange.startDate) : new Date();
+  const prevEnd = previousRange?.endDate ? new Date(previousRange.endDate) : new Date();
   const prevDays = Math.max(1, Math.round((prevEnd.getTime() - prevStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
   const currentDailyAvg = Number((currentTotal / curDays).toFixed(2));
@@ -388,10 +396,12 @@ export function comparePeriods(
   // Category changes
   const curCatMap = new Map<string, number>();
   for (const e of currentExpenses) {
+    if (!e) continue;
     curCatMap.set(e.category, (curCatMap.get(e.category) || 0) + (Number(e.totalPrice) || 0));
   }
   const prevCatMap = new Map<string, number>();
   for (const e of previousExpenses) {
+    if (!e) continue;
     prevCatMap.set(e.category, (prevCatMap.get(e.category) || 0) + (Number(e.totalPrice) || 0));
   }
 
@@ -409,7 +419,7 @@ export function comparePeriods(
   }).sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference));
 
   // Item price changes (items purchased in both or current)
-  const itemSummary = generateItemAnalytics(expenses);
+  const itemSummary = generateItemAnalytics(safeExpenses);
   const itemPriceChanges = itemSummary
     .filter((it) => it.previousPrice !== undefined)
     .map((it) => ({
@@ -423,15 +433,15 @@ export function comparePeriods(
 
   return {
     currentPeriod: {
-      startDate: currentRange.startDate,
-      endDate: currentRange.endDate,
+      startDate: currentRange?.startDate || '',
+      endDate: currentRange?.endDate || '',
       totalSpending: Number(currentTotal.toFixed(2)),
       expenseCount: currentExpenses.length,
       dailyAverage: currentDailyAvg,
     },
     previousPeriod: {
-      startDate: previousRange.startDate,
-      endDate: previousRange.endDate,
+      startDate: previousRange?.startDate || '',
+      endDate: previousRange?.endDate || '',
       totalSpending: Number(previousTotal.toFixed(2)),
       expenseCount: previousExpenses.length,
       dailyAverage: previousDailyAvg,
@@ -446,11 +456,12 @@ export function comparePeriods(
 /**
  * Format currency with symbol
  */
-export function formatCurrency(amount: number, symbol: string = '₹'): string {
+export function formatCurrency(amount: number = 0, symbol: string = '₹'): string {
+  const safeAmount = isNaN(amount) ? 0 : amount;
   const formatted = new Intl.NumberFormat('en-IN', {
     maximumFractionDigits: 2,
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
-  }).format(amount);
+    minimumFractionDigits: safeAmount % 1 === 0 ? 0 : 2,
+  }).format(safeAmount);
   return `${symbol}${formatted}`;
 }
 
@@ -468,12 +479,14 @@ export interface ConsumptionInsight {
  * Derives verified, deterministic item-level consumption and inflation insights.
  * Never invents numbers; only emits insights when sufficient purchase history exists.
  */
-export function generateConsumptionInsights(expenses: Expense[]): ConsumptionInsight[] {
-  const summaries = generateItemAnalytics(expenses);
+export function generateConsumptionInsights(expenses: Expense[] = []): ConsumptionInsight[] {
+  const safeExpenses = Array.isArray(expenses) ? expenses : [];
+  const summaries = generateItemAnalytics(safeExpenses);
   const insights: ConsumptionInsight[] = [];
 
   for (const item of summaries) {
-    const history = item.history.filter((h) => h.durationDays && h.durationDays > 0);
+    if (!item || !item.history) continue;
+    const history = item.history.filter((h) => h && h.durationDays && h.durationDays > 0);
 
     // 1. Average duration insight (e.g. Cooking Gas lasts X days)
     if (item.averageDurationDays > 0 && history.length >= 1) {
@@ -582,8 +595,8 @@ export interface MonthlyItemIntelligence {
  * Helper to check if a monthly item is a physical inventory/consumable item
  * Excludes recurring bills, utilities, subscriptions, WiFi, Electricity, Rent, Netflix
  */
-export function isInventoryItem(item: MonthlyItem): boolean {
-  if (item.usageTrackingEnabled === false) return false;
+export function isInventoryItem(item?: MonthlyItem): boolean {
+  if (!item || item.usageTrackingEnabled === false) return false;
 
   const cat = (item.category || '').toLowerCase();
   const nonInventoryCats = ['bills', 'utilities', 'subscription', 'subscriptions', 'rent', 'insurance', 'services'];
@@ -600,33 +613,47 @@ export function isInventoryItem(item: MonthlyItem): boolean {
  * Calculates item consumption intelligence (daily/weekly/monthly usage, days remaining, estimated depletion date, recommended reorder date) from MonthlyItem and ConsumptionLogs
  */
 export function calculateMonthlyItemIntelligence(
-  item: MonthlyItem,
-  logs: ConsumptionLog[]
+  item?: MonthlyItem,
+  logs: ConsumptionLog[] = []
 ): MonthlyItemIntelligence {
-  const itemLogs = logs.filter(
-    (l) => l.itemId === item.id || (l.itemName && l.itemName.trim().toLowerCase() === item.name.trim().toLowerCase())
+  const safeItem: MonthlyItem = item || {
+    id: 'unknown',
+    name: 'Unknown Item',
+    category: 'Other',
+    unit: 'unit',
+    usageTrackingEnabled: true,
+    isEnabled: true,
+    createdAt: '',
+    updatedAt: '',
+  };
+
+  const safeLogs = Array.isArray(logs) ? logs : [];
+  const itemNameLower = (safeItem.name || '').trim().toLowerCase();
+
+  const itemLogs = safeLogs.filter(
+    (l) => l && (l.itemId === safeItem.id || (l.itemName && l.itemName.trim().toLowerCase() === itemNameLower))
   );
 
-  const remainingQuantity = item.remainingQuantity !== undefined ? item.remainingQuantity : (item.openingStock || 0);
-  const openingStock = item.openingStock || 0;
-  const minimumThreshold = item.minimumThreshold || 0;
+  const remainingQuantity = safeItem.remainingQuantity !== undefined ? safeItem.remainingQuantity : (safeItem.openingStock || 0);
+  const openingStock = safeItem.openingStock || 0;
+  const minimumThreshold = safeItem.minimumThreshold || 0;
 
   let dailyUsage = 0;
 
   if (itemLogs.length > 0) {
     const totalConsumed = itemLogs.reduce((sum, l) => sum + (Number(l.consumedQuantity) || 0), 0);
     const dates = itemLogs.map((l) => parseDateToUTC(l.consumedDate)).filter((d): d is number => d !== undefined);
-    if (item.startUsingDate) {
-      const startMs = parseDateToUTC(item.startUsingDate);
+    if (safeItem.startUsingDate) {
+      const startMs = parseDateToUTC(safeItem.startUsingDate);
       if (startMs !== undefined) dates.push(startMs);
     }
-    const minDateMs = Math.min(...dates);
-    const maxDateMs = Math.max(...dates, Date.now());
+    const minDateMs = dates.length > 0 ? Math.min(...dates) : Date.now();
+    const maxDateMs = dates.length > 0 ? Math.max(...dates, Date.now()) : Date.now();
 
     const diffDays = Math.max(1, Math.round((maxDateMs - minDateMs) / (1000 * 60 * 60 * 24)));
     dailyUsage = Number((totalConsumed / diffDays).toFixed(3));
-  } else if (item.startUsingDate && remainingQuantity < openingStock) {
-    const startMs = parseDateToUTC(item.startUsingDate);
+  } else if (safeItem.startUsingDate && remainingQuantity < openingStock) {
+    const startMs = parseDateToUTC(safeItem.startUsingDate);
     if (startMs) {
       const consumedSoFar = openingStock - remainingQuantity;
       const diffDays = Math.max(1, Math.round((Date.now() - startMs) / (1000 * 60 * 60 * 24)));
@@ -655,14 +682,14 @@ export function calculateMonthlyItemIntelligence(
     }
   }
 
-  const isInventory = isInventoryItem(item);
+  const isInventory = isInventoryItem(safeItem);
   const isLowStock = isInventory && minimumThreshold > 0 && remainingQuantity <= minimumThreshold;
 
   return {
-    itemId: item.id,
-    itemName: item.name,
-    category: item.category,
-    unit: item.unit,
+    itemId: safeItem.id,
+    itemName: safeItem.name,
+    category: safeItem.category,
+    unit: safeItem.unit,
     remainingQuantity,
     openingStock,
     minimumThreshold,
@@ -680,10 +707,11 @@ export function calculateMonthlyItemIntelligence(
  * Calculates budget overview metrics (total budget, spent, remaining, burn rate, safe daily spend, predicted month-end spend, health score)
  */
 export function calculateBudgetMetrics(
-  expenses: Expense[],
+  expenses: Expense[] = [],
   userSettings?: UserSettings,
   dateRange?: DateRange
 ): BudgetMetrics {
+  const safeExpenses = Array.isArray(expenses) ? expenses : [];
   const totalBudget = Number(userSettings?.monthlyBudget) || 0;
   const startDay = Number(userSettings?.budgetStartDay) || 1;
 
@@ -707,8 +735,8 @@ export function calculateBudgetMetrics(
   const cycleEndMs = cycleEndDate.getTime();
   const todayMs = today.getTime();
 
-  const cycleExpenses = expenses.filter((exp) => {
-    if (!exp.purchaseDate) return false;
+  const cycleExpenses = safeExpenses.filter((exp) => {
+    if (!exp || !exp.purchaseDate) return false;
     const expMs = parseDateToUTC(exp.purchaseDate);
     if (expMs === undefined) return false;
     return expMs >= cycleStartMs && expMs <= cycleEndMs;
