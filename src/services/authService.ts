@@ -120,6 +120,7 @@ export const signInWithGoogle = async (
       },
       body: JSON.stringify({
         idToken: googleCredential,
+        accessToken: credential?.accessToken,
       }),
     });
 

@@ -29,9 +29,6 @@ import {
 } from './types.js';
 import {
   DEFAULT_CATEGORIES,
-  INITIAL_SAMPLE_EXPENSES,
-  INITIAL_RECURRING_EXPENSES,
-  DEFAULT_MONTHLY_ITEMS,
 } from './data/defaults.js';
 import { getDateRangeFromPreset } from './utils/dateRanges.js';
 import { SpendTrackApi } from './services/api.js';
@@ -82,7 +79,7 @@ export function App() {
   // Data Store
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[]>([]);
-  const [monthlyItems, setMonthlyItems] = useState<MonthlyItem[]>(DEFAULT_MONTHLY_ITEMS);
+  const [monthlyItems, setMonthlyItems] = useState<MonthlyItem[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>(DEFAULT_CATEGORIES);
 
   // Sync / Workspace status
@@ -123,10 +120,9 @@ export function App() {
       if (firebaseUser) {
         loadDataFromWorkspace();
       } else {
-        // Use initial demo data when offline / preview mode
-        setExpenses(INITIAL_SAMPLE_EXPENSES);
-        setRecurringExpenses(INITIAL_RECURRING_EXPENSES);
-        setMonthlyItems(DEFAULT_MONTHLY_ITEMS);
+        setExpenses([]);
+        setRecurringExpenses([]);
+        setMonthlyItems([]);
       }
     });
     return () => unsubscribe();
@@ -174,39 +170,20 @@ export function App() {
         SpendTrackApi.getMonthlyItems(),
       ]);
 
-      if (loadedExpenses.length > 0) {
-        setExpenses(loadedExpenses);
-      } else {
-        setExpenses(INITIAL_SAMPLE_EXPENSES);
-      }
-
-      if (loadedRecurring.length > 0) {
-        setRecurringExpenses(loadedRecurring);
-      } else {
-        setRecurringExpenses(INITIAL_RECURRING_EXPENSES);
-      }
-
-      if (loadedCategories.length > 0) {
+      setExpenses(loadedExpenses || []);
+      setRecurringExpenses(loadedRecurring || []);
+      if (loadedCategories && loadedCategories.length > 0) {
         setCategories(loadedCategories);
       }
-
-      if (loadedMonthly.length > 0) {
-        setMonthlyItems(loadedMonthly);
-      } else {
-        setMonthlyItems(DEFAULT_MONTHLY_ITEMS);
-      }
+      setMonthlyItems(loadedMonthly || []);
 
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
       console.warn('Workspace sync notice:', err.message);
       setSyncStatus({
         state: 'error',
-        errorMessage: err.message || 'Running in local preview mode',
+        errorMessage: err.message || 'Running in local mode',
       });
-      // Fallback
-      if (expenses.length === 0) setExpenses(INITIAL_SAMPLE_EXPENSES);
-      if (recurringExpenses.length === 0) setRecurringExpenses(INITIAL_RECURRING_EXPENSES);
-      if (monthlyItems.length === 0) setMonthlyItems(DEFAULT_MONTHLY_ITEMS);
     }
   };
 

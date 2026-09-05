@@ -2,7 +2,9 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./auth/routes.js";
+import { authenticateJWT } from "./auth/jwt.js";
 import { dataStore } from "./services/dataStore.js";
+import { googleSheetsService } from "./google/sheetsService.js";
 import { familyWorkspaceService } from "./services/familyWorkspaceService.js";
 import { geminiAssistantService } from "./services/geminiService.js";
 import { receiptVisionService } from "./services/receiptVisionService.js";
@@ -22,6 +24,9 @@ export function createExpressApp() {
 
   // Google authentication
   app.use("/api/auth", authRoutes);
+
+  // Authenticate JWT for all subsequent /api routes
+  app.use(authenticateJWT);
 
   // Workspace endpoints
   app.get("/api/workspace/status", (req, res) => {
@@ -56,30 +61,56 @@ export function createExpressApp() {
   });
 
   // Expenses CRUD
-  app.get("/api/expenses", (req, res) => {
-    res.json(dataStore.getExpenses());
+  app.get("/api/expenses", async (req, res) => {
+    try {
+      const token = (req as any).googleToken;
+      if (token) {
+        const expenses = await googleSheetsService.getExpenses(token);
+        return res.json(expenses);
+      }
+      res.json(dataStore.getExpenses());
+    } catch (err: any) {
+      console.warn("Sheets sync warning (getExpenses):", err.message);
+      res.json(dataStore.getExpenses());
+    }
   });
 
-  app.post("/api/expenses", (req, res) => {
+  app.post("/api/expenses", async (req, res) => {
     try {
-      const created = dataStore.createExpense(req.body);
+      const token = (req as any).googleToken;
+      let created;
+      if (token) {
+        created = await googleSheetsService.createExpense(token, req.body);
+      } else {
+        created = dataStore.createExpense(req.body);
+      }
       res.json(created);
     } catch (err: any) {
       res.status(400).json({ error: err.message || "Failed to create expense" });
     }
   });
 
-  app.put("/api/expenses/:id", (req, res) => {
+  app.put("/api/expenses/:id", async (req, res) => {
     try {
-      const updated = dataStore.updateExpense(req.params.id, req.body);
+      const token = (req as any).googleToken;
+      let updated;
+      if (token) {
+        updated = await googleSheetsService.updateExpense(token, req.params.id, req.body);
+      } else {
+        updated = dataStore.updateExpense(req.params.id, req.body);
+      }
       res.json(updated);
     } catch (err: any) {
       res.status(400).json({ error: err.message || "Failed to update expense" });
     }
   });
 
-  app.delete("/api/expenses/:id", (req, res) => {
+  app.delete("/api/expenses/:id", async (req, res) => {
     try {
+      const token = (req as any).googleToken;
+      if (token) {
+        await googleSheetsService.deleteExpense(token, req.params.id);
+      }
       dataStore.deleteExpense(req.params.id);
       res.json({ success: true });
     } catch (err: any) {
@@ -88,30 +119,56 @@ export function createExpressApp() {
   });
 
   // Monthly Items CRUD
-  app.get("/api/monthly-items", (req, res) => {
-    res.json(dataStore.getMonthlyItems());
+  app.get("/api/monthly-items", async (req, res) => {
+    try {
+      const token = (req as any).googleToken;
+      if (token) {
+        const items = await googleSheetsService.getMonthlyItems(token);
+        return res.json(items);
+      }
+      res.json(dataStore.getMonthlyItems());
+    } catch (err: any) {
+      console.warn("Sheets sync warning (getMonthlyItems):", err.message);
+      res.json(dataStore.getMonthlyItems());
+    }
   });
 
-  app.post("/api/monthly-items", (req, res) => {
+  app.post("/api/monthly-items", async (req, res) => {
     try {
-      const created = dataStore.createMonthlyItem(req.body);
+      const token = (req as any).googleToken;
+      let created;
+      if (token) {
+        created = await googleSheetsService.createMonthlyItem(token, req.body);
+      } else {
+        created = dataStore.createMonthlyItem(req.body);
+      }
       res.json(created);
     } catch (err: any) {
       res.status(400).json({ error: err.message || "Failed to create monthly item" });
     }
   });
 
-  app.put("/api/monthly-items/:id", (req, res) => {
+  app.put("/api/monthly-items/:id", async (req, res) => {
     try {
-      const updated = dataStore.updateMonthlyItem(req.params.id, req.body);
+      const token = (req as any).googleToken;
+      let updated;
+      if (token) {
+        updated = await googleSheetsService.updateMonthlyItem(token, req.params.id, req.body);
+      } else {
+        updated = dataStore.updateMonthlyItem(req.params.id, req.body);
+      }
       res.json(updated);
     } catch (err: any) {
       res.status(400).json({ error: err.message || "Failed to update monthly item" });
     }
   });
 
-  app.delete("/api/monthly-items/:id", (req, res) => {
+  app.delete("/api/monthly-items/:id", async (req, res) => {
     try {
+      const token = (req as any).googleToken;
+      if (token) {
+        await googleSheetsService.deleteMonthlyItem(token, req.params.id);
+      }
       dataStore.deleteMonthlyItem(req.params.id);
       res.json({ success: true });
     } catch (err: any) {
@@ -120,13 +177,29 @@ export function createExpressApp() {
   });
 
   // Categories
-  app.get("/api/categories", (req, res) => {
-    res.json(dataStore.getCategories());
+  app.get("/api/categories", async (req, res) => {
+    try {
+      const token = (req as any).googleToken;
+      if (token) {
+        const cats = await googleSheetsService.getCategories(token);
+        return res.json(cats);
+      }
+      res.json(dataStore.getCategories());
+    } catch (err: any) {
+      console.warn("Sheets sync warning (getCategories):", err.message);
+      res.json(dataStore.getCategories());
+    }
   });
 
-  app.post("/api/categories", (req, res) => {
+  app.post("/api/categories", async (req, res) => {
     try {
-      const saved = dataStore.saveCategories(req.body);
+      const token = (req as any).googleToken;
+      let saved;
+      if (token) {
+        saved = await googleSheetsService.saveCategories(token, req.body);
+      } else {
+        saved = dataStore.saveCategories(req.body);
+      }
       res.json(saved);
     } catch (err: any) {
       res.status(400).json({ error: err.message || "Failed to save categories" });
@@ -134,30 +207,56 @@ export function createExpressApp() {
   });
 
   // Recurring Expenses CRUD
-  app.get("/api/recurring", (req, res) => {
-    res.json(dataStore.getRecurringExpenses());
+  app.get("/api/recurring", async (req, res) => {
+    try {
+      const token = (req as any).googleToken;
+      if (token) {
+        const list = await googleSheetsService.getRecurringExpenses(token);
+        return res.json(list);
+      }
+      res.json(dataStore.getRecurringExpenses());
+    } catch (err: any) {
+      console.warn("Sheets sync warning (getRecurring):", err.message);
+      res.json(dataStore.getRecurringExpenses());
+    }
   });
 
-  app.post("/api/recurring", (req, res) => {
+  app.post("/api/recurring", async (req, res) => {
     try {
-      const created = dataStore.createRecurringExpense(req.body);
+      const token = (req as any).googleToken;
+      let created;
+      if (token) {
+        created = await googleSheetsService.createRecurringExpense(token, req.body);
+      } else {
+        created = dataStore.createRecurringExpense(req.body);
+      }
       res.json(created);
     } catch (err: any) {
       res.status(400).json({ error: err.message || "Failed to create recurring expense" });
     }
   });
 
-  app.put("/api/recurring/:id", (req, res) => {
+  app.put("/api/recurring/:id", async (req, res) => {
     try {
-      const updated = dataStore.updateRecurringExpense(req.params.id, req.body);
+      const token = (req as any).googleToken;
+      let updated;
+      if (token) {
+        updated = await googleSheetsService.updateRecurringExpense(token, req.params.id, req.body);
+      } else {
+        updated = dataStore.updateRecurringExpense(req.params.id, req.body);
+      }
       res.json(updated);
     } catch (err: any) {
       res.status(400).json({ error: err.message || "Failed to update recurring expense" });
     }
   });
 
-  app.delete("/api/recurring/:id", (req, res) => {
+  app.delete("/api/recurring/:id", async (req, res) => {
     try {
+      const token = (req as any).googleToken;
+      if (token) {
+        await googleSheetsService.deleteRecurringExpense(token, req.params.id);
+      }
       dataStore.deleteRecurringExpense(req.params.id);
       res.json({ success: true });
     } catch (err: any) {

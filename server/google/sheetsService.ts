@@ -5,7 +5,7 @@ import {
   RecurringExpenseRepository,
   MonthlyItemRepository,
 } from '../services/interfaces.js';
-import { DEFAULT_CATEGORIES, DEFAULT_MONTHLY_ITEMS } from '../../src/data/defaults.js';
+import { DEFAULT_CATEGORIES } from '../../src/data/defaults.js';
 
 const SHEETS_API = 'https://sheets.googleapis.com/v4/spreadsheets';
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
@@ -136,27 +136,11 @@ export class GoogleSheetsService
       JSON.stringify(c.subcategories),
     ]);
 
-    const defaultItemRows = DEFAULT_MONTHLY_ITEMS.map((m) => [
-      m.id,
-      m.name,
-      m.category,
-      m.subcategory || '',
-      m.typicalPrice !== undefined ? m.typicalPrice : '',
-      m.typicalQuantity !== undefined ? m.typicalQuantity : '',
-      m.unit,
-      m.usageTrackingEnabled ? 'TRUE' : 'FALSE',
-      m.notes || '',
-      m.isEnabled ? 'TRUE' : 'FALSE',
-      m.createdAt,
-      m.updatedAt,
-    ]);
-
     const batchData = [
       { range: 'Expenses!A1:U1', values: [expenseHeaders] },
       { range: 'Categories!A1:C1', values: [categoryHeaders] },
       { range: `Categories!A2:C${1 + defaultCategoryRows.length}`, values: defaultCategoryRows },
       { range: '\'Monthly Items\'!A1:L1', values: [itemHeaders] },
-      { range: `'Monthly Items'!A2:L${1 + defaultItemRows.length}`, values: defaultItemRows },
       { range: '\'Recurring Bills\'!A1:N1', values: [recurringHeaders] },
       { range: 'Settings!A1:B1', values: [settingsHeaders] },
       {
@@ -272,20 +256,23 @@ export class GoogleSheetsService
 
   async updateExpense(token: string, id: string, expenseUpdate: Partial<Expense>): Promise<Expense> {
     const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
-    const expenses = await this.getExpenses(token);
-    const index = expenses.findIndex((e) => e.id === id);
+    const res = await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/Expenses!A2:U`, token);
+    const rawRows = res.values || [];
+    const rowIndex = rawRows.findIndex((r: any[]) => r && r[0] === id);
 
-    if (index === -1) {
+    if (rowIndex === -1) {
       throw new Error(`Expense with ID ${id} not found.`);
     }
 
+    const currentExpense = (await this.getExpenses(token)).find((e) => e.id === id) || { id };
+
     const updatedExpense: Expense = {
-      ...expenses[index],
+      ...currentExpense as Expense,
       ...expenseUpdate,
       updatedAt: new Date().toISOString(),
     };
 
-    const rowNumber = index + 2; // header is row 1
+    const rowNumber = rowIndex + 2; // header is row 1
     const row = [
       updatedExpense.id,
       updatedExpense.purchaseDate || '',
@@ -325,10 +312,11 @@ export class GoogleSheetsService
 
   async deleteExpense(token: string, id: string): Promise<boolean> {
     const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
-    const expenses = await this.getExpenses(token);
-    const index = expenses.findIndex((e) => e.id === id);
+    const res = await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/Expenses!A2:U`, token);
+    const rawRows = res.values || [];
+    const rowIndex = rawRows.findIndex((r: any[]) => r && r[0] === id);
 
-    if (index === -1) {
+    if (rowIndex === -1) {
       return false;
     }
 
@@ -337,7 +325,7 @@ export class GoogleSheetsService
     const expenseSheet = meta.sheets.find((s: any) => s.properties.title === 'Expenses');
     const sheetId = expenseSheet ? expenseSheet.properties.sheetId : 0;
 
-    const rowNumber = index + 1; // 0-indexed for batchUpdate deleteDimension
+    const rowNumber = rowIndex + 1; // 0-indexed for batchUpdate deleteDimension (row 2 is index 1)
     await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, token, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -499,20 +487,25 @@ export class GoogleSheetsService
     data: Partial<RecurringExpense>
   ): Promise<RecurringExpense> {
     const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
-    const list = await this.getRecurringExpenses(token);
-    const index = list.findIndex((r) => r.id === id);
+    const res = await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/'Recurring Bills'!A2:N`, token).catch(async () => {
+      return this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/'Recurring Expenses'!A2:N`, token);
+    });
+    const rawRows = res.values || [];
+    const rowIndex = rawRows.findIndex((r: any[]) => r && r[0] === id);
 
-    if (index === -1) {
+    if (rowIndex === -1) {
       throw new Error(`Recurring expense with ID ${id} not found.`);
     }
 
+    const current = (await this.getRecurringExpenses(token)).find((r) => r.id === id) || { id };
+
     const updated: RecurringExpense = {
-      ...list[index],
+      ...current as RecurringExpense,
       ...data,
       updatedAt: new Date().toISOString(),
     };
 
-    const rowNumber = index + 2;
+    const rowNumber = rowIndex + 2;
     const row = [
       updated.id,
       updated.name,
@@ -555,10 +548,13 @@ export class GoogleSheetsService
 
   async deleteRecurringExpense(token: string, id: string): Promise<boolean> {
     const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
-    const list = await this.getRecurringExpenses(token);
-    const index = list.findIndex((r) => r.id === id);
+    const res = await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/'Recurring Bills'!A2:N`, token).catch(async () => {
+      return this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/'Recurring Expenses'!A2:N`, token);
+    });
+    const rawRows = res.values || [];
+    const rowIndex = rawRows.findIndex((r: any[]) => r && r[0] === id);
 
-    if (index === -1) {
+    if (rowIndex === -1) {
       return false;
     }
 
@@ -566,7 +562,7 @@ export class GoogleSheetsService
     const recurringSheet = meta.sheets.find((s: any) => s.properties.title === 'Recurring Bills' || s.properties.title === 'Recurring Expenses');
     const sheetId = recurringSheet ? recurringSheet.properties.sheetId : 0;
 
-    const rowNumber = index + 1; // 0-indexed row deletion
+    const rowNumber = rowIndex + 1; // 0-indexed row deletion
     await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, token, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -599,7 +595,7 @@ export class GoogleSheetsService
 
     const rows = res.values || [];
     if (rows.length === 0) {
-      return DEFAULT_MONTHLY_ITEMS;
+      return [];
     }
 
     return rows.map((row: any[]) => ({
@@ -677,20 +673,25 @@ export class GoogleSheetsService
     data: Partial<MonthlyItem>
   ): Promise<MonthlyItem> {
     const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
-    const list = await this.getMonthlyItems(token);
-    const index = list.findIndex((m) => m.id === id);
+    const res = await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/'Monthly Items'!A2:L`, token).catch(async () => {
+      return this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/Items!A2:L`, token);
+    });
+    const rawRows = res.values || [];
+    const rowIndex = rawRows.findIndex((r: any[]) => r && r[0] === id);
 
-    if (index === -1) {
+    if (rowIndex === -1) {
       throw new Error(`Monthly item with ID ${id} not found.`);
     }
 
+    const current = (await this.getMonthlyItems(token)).find((m) => m.id === id) || { id };
+
     const updated: MonthlyItem = {
-      ...list[index],
+      ...current as MonthlyItem,
       ...data,
       updatedAt: new Date().toISOString(),
     };
 
-    const rowNumber = index + 2;
+    const rowNumber = rowIndex + 2;
     const row = [
       updated.id,
       updated.name,
@@ -731,10 +732,13 @@ export class GoogleSheetsService
 
   async deleteMonthlyItem(token: string, id: string): Promise<boolean> {
     const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
-    const list = await this.getMonthlyItems(token);
-    const index = list.findIndex((m) => m.id === id);
+    const res = await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/'Monthly Items'!A2:L`, token).catch(async () => {
+      return this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/Items!A2:L`, token);
+    });
+    const rawRows = res.values || [];
+    const rowIndex = rawRows.findIndex((r: any[]) => r && r[0] === id);
 
-    if (index === -1) {
+    if (rowIndex === -1) {
       return false;
     }
 
@@ -742,7 +746,7 @@ export class GoogleSheetsService
     const itemSheet = meta.sheets.find((s: any) => s.properties.title === 'Monthly Items' || s.properties.title === 'Items');
     const sheetId = itemSheet ? itemSheet.properties.sheetId : 0;
 
-    const rowNumber = index + 1; // 0-indexed row deletion
+    const rowNumber = rowIndex + 1; // 0-indexed row deletion
     await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, token, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -765,3 +769,5 @@ export class GoogleSheetsService
     return true;
   }
 }
+
+export const googleSheetsService = new GoogleSheetsService();
