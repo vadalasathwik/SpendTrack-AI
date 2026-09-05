@@ -100,12 +100,29 @@ export interface AppNotification {
 
 export interface UserSettings {
   currencySymbol: string;
+  currency?: string;
   dateFormat: string;
+  monthlyBudget?: number;
+  budgetStartDay?: number;
   spreadsheetId?: string;
   driveFolderId?: string;
   receiptsFolderId?: string;
   backupsFolderId?: string;
   exportsFolderId?: string;
+}
+
+export interface BudgetMetrics {
+  totalBudget: number;
+  totalSpent: number;
+  remainingBudget: number;
+  progressPercentage: number;
+  colorState: 'green' | 'orange' | 'red';
+  dailySafeSpend: number;
+  dailyBurnRate: number;
+  predictedMonthEndSpend: number;
+  budgetHealthScore: number;
+  daysElapsed: number;
+  daysRemaining: number;
 }
 
 export type DateRangePreset =

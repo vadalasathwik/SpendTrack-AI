@@ -406,6 +406,35 @@ export function createExpressApp() {
     }
   });
 
+  // User Settings Routes (Google Sheets Settings Tab)
+  app.get("/api/settings", async (req, res) => {
+    try {
+      const token = getGoogleToken(req);
+      if (!token) {
+        return res.status(401).json({ error: "Google authentication required" });
+      }
+      const settings = await googleSheetsService.getSettings(token);
+      res.json(settings);
+    } catch (err: any) {
+      console.error("GET /api/settings error:", err);
+      res.status(500).json({ error: err.message || "Failed to fetch settings from Google Sheets" });
+    }
+  });
+
+  app.post("/api/settings", async (req, res) => {
+    try {
+      const token = getGoogleToken(req);
+      if (!token) {
+        return res.status(401).json({ error: "Google authentication required" });
+      }
+      const updated = await googleSheetsService.saveSettings(token, req.body || {});
+      res.json(updated);
+    } catch (err: any) {
+      console.error("POST /api/settings error:", err);
+      res.status(500).json({ error: err.message || "Failed to save settings to Google Sheets" });
+    }
+  });
+
   // Budget AI
   app.get("/api/budget/summary", (req, res) => {
     res.json({ success: true, summary: "Monthly budget tracking is active." });

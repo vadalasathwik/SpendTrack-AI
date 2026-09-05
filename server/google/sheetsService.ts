@@ -146,7 +146,7 @@ export class GoogleSheetsService
       return spreadsheetId;
     }
 
-    // Ensure ConsumptionLog tab exists in existing spreadsheet
+    // Ensure ConsumptionLog & Settings tabs exist in existing spreadsheet
     try {
       const meta = await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}?fields=sheets.properties.title`, token);
       const existingTitles = (meta.sheets || []).map((s: any) => s.properties.title);
@@ -163,6 +163,23 @@ export class GoogleSheetsService
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             values: [['id', 'itemId', 'itemName', 'consumedQuantity', 'unit', 'consumedDate', 'notes', 'createdAt', 'updatedAt']],
+          }),
+        });
+      }
+
+      if (!existingTitles.includes('Settings')) {
+        await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}:batchUpdate`, token, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requests: [{ addSheet: { properties: { title: 'Settings', gridProperties: { frozenRowCount: 1 } } } }],
+          }),
+        });
+        await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/Settings!A1:B1?valueInputOption=USER_ENTERED`, token, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            values: [['key', 'value']],
           }),
         });
       }
@@ -908,6 +925,54 @@ export class GoogleSheetsService
     });
 
     return true;
+  }
+
+  // ==================== SETTINGS ====================
+
+  async getSettings(token: string): Promise<Record<string, string>> {
+    const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
+    const url = `${SHEETS_API}/${spreadsheetId}/values/Settings!A2:B`;
+    try {
+      const res = await this.fetchWithAuth(url, token);
+      const rows = res.values || [];
+      const settings: Record<string, string> = {};
+      for (const row of rows) {
+        if (row && row[0]) {
+          settings[row[0].trim()] = (row[1] || '').trim();
+        }
+      }
+      return settings;
+    } catch (err) {
+      console.warn('Failed to read Settings tab from Google Sheets:', err);
+      return {};
+    }
+  }
+
+  async saveSettings(token: string, settings: Record<string, string>): Promise<Record<string, string>> {
+    const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
+    const current = await this.getSettings(token);
+    const updatedMap = { ...current, ...settings };
+
+    const rows: string[][] = Object.entries(updatedMap).map(([k, v]) => [k, String(v)]);
+
+    // Clear existing Settings!A2:B rows
+    const clearUrl = `${SHEETS_API}/${spreadsheetId}/values/Settings!A2:B:clear`;
+    try {
+      await this.fetchWithAuth(clearUrl, token, { method: 'POST' });
+    } catch (e) {
+      console.warn('Clear settings notice:', e);
+    }
+
+    if (rows.length > 0) {
+      const updateUrl = `${SHEETS_API}/${spreadsheetId}/values/Settings!A2:B${rows.length + 1}?valueInputOption=USER_ENTERED`;
+      await this.fetchWithAuth(updateUrl, token, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: rows }),
+      });
+    }
+
+    return updatedMap;
   }
 }
 

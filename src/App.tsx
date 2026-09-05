@@ -28,6 +28,7 @@ import {
   MonthlyItem,
   ConsumptionLog,
   AppNotification,
+  UserSettings,
 } from './types.js';
 import {
   DEFAULT_CATEGORIES,
@@ -47,6 +48,7 @@ import { ReceiptScannerModal } from './components/ReceiptScannerModal.js';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt.js';
 import { NotificationDrawer } from './components/NotificationDrawer.js';
 import { ConsumeQuantityModal } from './components/ConsumeQuantityModal.js';
+import { BudgetOnboardingModal } from './components/BudgetOnboardingModal.js';
 
 // Pages
 import { DashboardPage } from './pages/DashboardPage.js';
@@ -88,6 +90,15 @@ export function App() {
   const [consumptionLogs, setConsumptionLogs] = useState<ConsumptionLog[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>(DEFAULT_CATEGORIES);
 
+  // User & Budget Settings Store
+  const [userSettings, setUserSettings] = useState<UserSettings>({
+    currencySymbol: '₹',
+    currency: 'INR',
+    dateFormat: 'YYYY-MM-DD',
+    monthlyBudget: undefined,
+    budgetStartDay: 1,
+  });
+
   // Sync / Workspace status
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({ state: 'idle' });
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -98,6 +109,7 @@ export function App() {
   const [isScanReceiptOpen, setIsScanReceiptOpen] = useState(false);
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
   const [isConsumeModalOpen, setIsConsumeModalOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [selectedConsumeItem, setSelectedConsumeItem] = useState<MonthlyItem | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [initialMonthlyItem, setInitialMonthlyItem] = useState<MonthlyItem | null>(null);
@@ -172,12 +184,13 @@ export function App() {
       const status = await SpendTrackApi.checkWorkspaceStatus();
       setWorkspaceStatus(status);
 
-      const [loadedExpenses, loadedRecurring, loadedCategories, loadedMonthly, loadedLogs] = await Promise.all([
+      const [loadedExpenses, loadedRecurring, loadedCategories, loadedMonthly, loadedLogs, loadedSettings] = await Promise.all([
         SpendTrackApi.getExpenses(),
         SpendTrackApi.getRecurringExpenses(),
         SpendTrackApi.getCategories(),
         SpendTrackApi.getMonthlyItems(),
         SpendTrackApi.getConsumptionLogs(),
+        SpendTrackApi.getSettings().catch(() => ({} as Record<string, string>)),
       ]);
 
       setExpenses(loadedExpenses || []);
@@ -187,6 +200,20 @@ export function App() {
       }
       setMonthlyItems(loadedMonthly || []);
       setConsumptionLogs(loadedLogs || []);
+
+      const parsedSettings: UserSettings = {
+        currencySymbol: loadedSettings.currencySymbol || '₹',
+        currency: loadedSettings.currency || 'INR',
+        dateFormat: loadedSettings.dateFormat || 'YYYY-MM-DD',
+        monthlyBudget: loadedSettings.monthlyBudget ? parseFloat(loadedSettings.monthlyBudget) : undefined,
+        budgetStartDay: loadedSettings.budgetStartDay ? parseInt(loadedSettings.budgetStartDay, 10) : 1,
+      };
+
+      setUserSettings(parsedSettings);
+
+      if (!parsedSettings.monthlyBudget || parsedSettings.monthlyBudget <= 0) {
+        setIsOnboardingOpen(true);
+      }
 
       // Trigger auto expense generation for due recurring bills on workspace load
       try {
@@ -208,6 +235,33 @@ export function App() {
         state: 'error',
         errorMessage: err.message || 'Running in local mode',
       });
+    }
+  };
+
+  // Save User / Budget Settings
+  const handleSaveUserSettings = async (newSettings: Partial<UserSettings>) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      const payload: Record<string, string> = {};
+      if (newSettings.monthlyBudget !== undefined) payload.monthlyBudget = String(newSettings.monthlyBudget);
+      if (newSettings.budgetStartDay !== undefined) payload.budgetStartDay = String(newSettings.budgetStartDay);
+      if (newSettings.currency !== undefined) payload.currency = newSettings.currency;
+      if (newSettings.currencySymbol !== undefined) payload.currencySymbol = newSettings.currencySymbol;
+
+      const updatedMap = await SpendTrackApi.saveSettings(payload);
+      setUserSettings((prev) => ({
+        ...prev,
+        currencySymbol: updatedMap.currencySymbol || prev?.currencySymbol || '₹',
+        currency: updatedMap.currency || prev?.currency || 'INR',
+        monthlyBudget: updatedMap.monthlyBudget ? parseFloat(updatedMap.monthlyBudget) : prev?.monthlyBudget,
+        budgetStartDay: updatedMap.budgetStartDay ? parseInt(updatedMap.budgetStartDay, 10) : prev?.budgetStartDay,
+      }));
+
+      setIsOnboardingOpen(false);
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
     }
   };
 
@@ -747,6 +801,7 @@ export function App() {
             monthlyItems={monthlyItems}
             recurringExpenses={recurringExpenses}
             consumptionLogs={consumptionLogs}
+            userSettings={userSettings}
             onOpenAddExpense={() => {
               setEditingExpense(null);
               setInitialMonthlyItem(null);
@@ -766,6 +821,7 @@ export function App() {
               setSelectedConsumeItem(item);
               setIsConsumeModalOpen(true);
             }}
+            onOpenSettings={() => setActiveTab('settings')}
           />
         )}
 
@@ -880,10 +936,12 @@ export function App() {
         {activeTab === 'settings' && (
           <SettingsPage
             categories={categories}
+            userSettings={userSettings}
             onSaveCategories={async (cats) => {
               setCategories(cats);
               await SpendTrackApi.saveCategories(cats);
             }}
+            onSaveUserSettings={handleSaveUserSettings}
             onExportCsv={handleExportCsv}
             onImportCsv={handleImportCsv}
             onSignOut={signOutApp}
@@ -1039,6 +1097,12 @@ export function App() {
         monthlyItems={monthlyItems}
         initialItem={selectedConsumeItem}
         onSaveConsumption={handleSaveConsumptionLog}
+      />
+
+      {/* Monthly Budget Onboarding Modal */}
+      <BudgetOnboardingModal
+        isOpen={isOnboardingOpen}
+        onSave={handleSaveUserSettings}
       />
 
       {/* PWA Install Banner */}

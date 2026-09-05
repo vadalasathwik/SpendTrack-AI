@@ -38,7 +38,7 @@ import {
   FileSpreadsheet,
   Camera,
 } from 'lucide-react';
-import { Expense, DateRange, CategorySpending, ItemAnalyticsSummary, MonthlyItem, RecurringExpense, ConsumptionLog } from '../types.js';
+import { Expense, DateRange, CategorySpending, ItemAnalyticsSummary, MonthlyItem, RecurringExpense, ConsumptionLog, UserSettings } from '../types.js';
 import { useUser } from '../context/UserContext.js';
 import {
   calculateCategoryTotals,
@@ -49,6 +49,7 @@ import {
   getCurrentlyInUseStatus,
   formatConsumptionVelocity,
   calculateMonthlyItemIntelligence,
+  calculateBudgetMetrics,
 } from '../utils/calculations.js';
 import { formatDisplayDate } from '../utils/dateRanges.js';
 import { CATEGORY_COLORS } from '../data/defaults.js';
@@ -59,6 +60,7 @@ interface DashboardPageProps {
   monthlyItems?: MonthlyItem[];
   recurringExpenses?: RecurringExpense[];
   consumptionLogs?: ConsumptionLog[];
+  userSettings?: UserSettings;
   onOpenAddExpense: () => void;
   onOpenScanReceipt?: () => void;
   onViewExpenseHistory: () => void;
@@ -68,6 +70,7 @@ interface DashboardPageProps {
   onOpenAIWithQuestion?: (question: string) => void;
   onQuickAddFromItem?: (item: MonthlyItem) => void;
   onOpenConsumeModal?: (item: MonthlyItem) => void;
+  onOpenSettings?: () => void;
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
@@ -76,6 +79,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   monthlyItems = [],
   recurringExpenses = [],
   consumptionLogs = [],
+  userSettings,
   onOpenAddExpense,
   onOpenScanReceipt,
   onViewExpenseHistory,
@@ -85,6 +89,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   onOpenAIWithQuestion,
   onQuickAddFromItem,
   onOpenConsumeModal,
+  onOpenSettings,
 }) => {
   const { user, workspace, refreshWorkspace } = useUser();
   const [isRefreshing, setIsRefreshing] = React.useState(false);
@@ -224,6 +229,25 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       .slice(0, 5);
   }, [filteredExpenses]);
 
+  // Budget Overview Metrics - Memoized
+  const budgetMetrics = React.useMemo(() => {
+    return calculateBudgetMetrics(expenses, userSettings, dateRange);
+  }, [expenses, userSettings, dateRange]);
+
+  const progressBarColor =
+    budgetMetrics.colorState === 'red'
+      ? 'bg-rose-500'
+      : budgetMetrics.colorState === 'orange'
+      ? 'bg-amber-500'
+      : 'bg-emerald-500';
+
+  const badgeBgColor =
+    budgetMetrics.colorState === 'red'
+      ? 'bg-rose-50 text-rose-700 border-rose-200'
+      : budgetMetrics.colorState === 'orange'
+      ? 'bg-amber-50 text-amber-700 border-amber-200'
+      : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+
   return (
     <div className="space-y-6 pb-12" id="dashboard-container">
       {/* 0. User Profile Section & Workspace Connection Status Card */}
@@ -335,6 +359,108 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             <Plus className="w-4 h-4" />
             <span>Add Expense</span>
           </button>
+        </div>
+      </div>
+
+      {/* 1.5. Monthly Budget Overview Card */}
+      <div className="bg-white p-6 rounded-3xl border border-slate-200/90 shadow-sm space-y-5" id="budget-overview-card">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-700">
+              <CreditCard className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-black text-base sm:text-lg text-slate-900 tracking-tight">
+                  Monthly Budget Overview
+                </h3>
+                <span className={`text-xs font-black px-2.5 py-0.5 rounded-full border ${badgeBgColor}`}>
+                  {budgetMetrics.progressPercentage}% Spent ({budgetMetrics.colorState.toUpperCase()})
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Cycle start day: <strong className="text-slate-800">{userSettings?.budgetStartDay || 1}st of month</strong> • {budgetMetrics.daysRemaining} days remaining
+              </p>
+            </div>
+          </div>
+
+          {onOpenSettings && (
+            <button
+              onClick={onOpenSettings}
+              className="text-xs font-bold text-emerald-600 hover:text-emerald-700 underline cursor-pointer self-start sm:self-auto"
+            >
+              Edit Budget Settings
+            </button>
+          )}
+        </div>
+
+        {/* Top 3 Summary Pill Boxes */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Budget</span>
+            <div className="text-xl font-black text-slate-900 mt-1">
+              {formatCurrency(budgetMetrics.totalBudget, userSettings?.currencySymbol || '₹')}
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Spent</span>
+            <div className="text-xl font-black text-slate-900 mt-1">
+              {formatCurrency(budgetMetrics.totalSpent, userSettings?.currencySymbol || '₹')}
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Remaining Budget</span>
+            <div className={`text-xl font-black mt-1 ${budgetMetrics.remainingBudget < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+              {formatCurrency(budgetMetrics.remainingBudget, userSettings?.currencySymbol || '₹')}
+            </div>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-600">
+            <span>Budget Progress ({budgetMetrics.progressPercentage}%)</span>
+            <span>{formatCurrency(budgetMetrics.totalSpent, userSettings?.currencySymbol || '₹')} / {formatCurrency(budgetMetrics.totalBudget, userSettings?.currencySymbol || '₹')}</span>
+          </div>
+          <div className="w-full h-3.5 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${progressBarColor}`}
+              style={{ width: `${Math.min(100, budgetMetrics.progressPercentage)}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Additional AI Budget Metrics */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-3 border-t border-slate-100 text-xs">
+          <div>
+            <span className="text-slate-400 font-semibold block">Daily Safe Spend</span>
+            <span className="font-bold text-slate-900 text-sm">
+              {formatCurrency(budgetMetrics.dailySafeSpend, userSettings?.currencySymbol || '₹')}/day
+            </span>
+          </div>
+
+          <div>
+            <span className="text-slate-400 font-semibold block">Daily Burn Rate</span>
+            <span className="font-bold text-slate-900 text-sm">
+              {formatCurrency(budgetMetrics.dailyBurnRate, userSettings?.currencySymbol || '₹')}/day
+            </span>
+          </div>
+
+          <div>
+            <span className="text-slate-400 font-semibold block">Predicted Month-End Spend</span>
+            <span className={`font-bold text-sm ${budgetMetrics.predictedMonthEndSpend > budgetMetrics.totalBudget ? 'text-rose-600' : 'text-slate-900'}`}>
+              {formatCurrency(budgetMetrics.predictedMonthEndSpend, userSettings?.currencySymbol || '₹')}
+            </span>
+          </div>
+
+          <div>
+            <span className="text-slate-400 font-semibold block">Budget Health Score</span>
+            <span className="font-black text-emerald-600 text-sm">
+              {budgetMetrics.budgetHealthScore} / 100
+            </span>
+          </div>
         </div>
       </div>
 

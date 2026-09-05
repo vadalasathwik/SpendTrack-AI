@@ -340,4 +340,16 @@ export const SpendTrackApi = {
       }),
     });
   },
+
+  // User Settings (Google Sheets Settings Tab)
+  async getSettings(): Promise<Record<string, string>> {
+    return apiFetch<Record<string, string>>("/api/settings");
+  },
+
+  async saveSettings(settings: Record<string, string>): Promise<Record<string, string>> {
+    return apiFetch<Record<string, string>>("/api/settings", {
+      method: "POST",
+      body: JSON.stringify(settings),
+    });
+  },
 };

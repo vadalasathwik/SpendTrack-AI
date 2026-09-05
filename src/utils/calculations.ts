@@ -1,4 +1,4 @@
-import { Expense, CategorySpending, PeriodComparisonResult, ItemAnalyticsSummary, MonthlyItem, ConsumptionLog } from '../types.js';
+import { Expense, CategorySpending, PeriodComparisonResult, ItemAnalyticsSummary, MonthlyItem, ConsumptionLog, BudgetMetrics, UserSettings, DateRange } from '../types.js';
 import { CATEGORY_COLORS } from '../data/defaults.js';
 
 /**
@@ -656,4 +656,96 @@ export function calculateMonthlyItemIntelligence(
     isLowStock,
   };
 }
+
+/**
+ * Calculates budget overview metrics (total budget, spent, remaining, burn rate, safe daily spend, predicted month-end spend, health score)
+ */
+export function calculateBudgetMetrics(
+  expenses: Expense[],
+  userSettings?: UserSettings,
+  dateRange?: DateRange
+): BudgetMetrics {
+  const totalBudget = Number(userSettings?.monthlyBudget) || 0;
+  const startDay = Number(userSettings?.budgetStartDay) || 1;
+
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
+  const currentDate = today.getDate();
+
+  let cycleStartDate: Date;
+  let cycleEndDate: Date;
+
+  if (currentDate >= startDay) {
+    cycleStartDate = new Date(currentYear, currentMonth, startDay);
+    cycleEndDate = new Date(currentYear, currentMonth + 1, startDay - 1, 23, 59, 59);
+  } else {
+    cycleStartDate = new Date(currentYear, currentMonth - 1, startDay);
+    cycleEndDate = new Date(currentYear, currentMonth, startDay - 1, 23, 59, 59);
+  }
+
+  const cycleStartMs = cycleStartDate.getTime();
+  const cycleEndMs = cycleEndDate.getTime();
+  const todayMs = today.getTime();
+
+  const cycleExpenses = expenses.filter((exp) => {
+    if (!exp.purchaseDate) return false;
+    const expMs = parseDateToUTC(exp.purchaseDate);
+    if (expMs === undefined) return false;
+    return expMs >= cycleStartMs && expMs <= cycleEndMs;
+  });
+
+  const totalSpent = Number(cycleExpenses.reduce((s, e) => s + (Number(e.totalPrice) || 0), 0).toFixed(2));
+  const remainingBudget = Number((totalBudget - totalSpent).toFixed(2));
+
+  const progressPercentage = totalBudget > 0
+    ? Number(Math.min(100, Math.max(0, (totalSpent / totalBudget) * 100)).toFixed(1))
+    : 0;
+
+  let colorState: 'green' | 'orange' | 'red' = 'green';
+  if (progressPercentage >= 90) {
+    colorState = 'red';
+  } else if (progressPercentage >= 70) {
+    colorState = 'orange';
+  } else {
+    colorState = 'green';
+  }
+
+  const totalDaysInCycle = Math.max(1, Math.round((cycleEndMs - cycleStartMs) / (1000 * 60 * 60 * 24)) + 1);
+  const daysElapsed = Math.max(1, Math.round((todayMs - cycleStartMs) / (1000 * 60 * 60 * 24)) + 1);
+  const daysRemaining = Math.max(0, totalDaysInCycle - daysElapsed);
+
+  const dailyBurnRate = Number((totalSpent / daysElapsed).toFixed(2));
+  const dailySafeSpend = daysRemaining > 0 && remainingBudget > 0
+    ? Number((remainingBudget / daysRemaining).toFixed(2))
+    : 0;
+
+  const predictedMonthEndSpend = Number((totalSpent + dailyBurnRate * daysRemaining).toFixed(2));
+
+  let budgetHealthScore = 100;
+  if (totalBudget > 0) {
+    if (predictedMonthEndSpend <= totalBudget) {
+      const marginRatio = (totalBudget - predictedMonthEndSpend) / totalBudget;
+      budgetHealthScore = Math.min(100, Math.round(80 + marginRatio * 20));
+    } else {
+      const overspendRatio = (predictedMonthEndSpend - totalBudget) / totalBudget;
+      budgetHealthScore = Math.max(0, Math.round(80 - overspendRatio * 100));
+    }
+  }
+
+  return {
+    totalBudget,
+    totalSpent,
+    remainingBudget,
+    progressPercentage,
+    colorState,
+    dailySafeSpend,
+    dailyBurnRate,
+    predictedMonthEndSpend,
+    budgetHealthScore,
+    daysElapsed,
+    daysRemaining,
+  };
+}
+
 
