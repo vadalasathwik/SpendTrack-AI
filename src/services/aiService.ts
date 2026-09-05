@@ -1,5 +1,6 @@
 import { Expense, RecurringExpense, CategoryItem, DateRange } from '../types.js';
 import { getStoredJWT } from './authService.js';
+import { BRAND_NAME } from '../constants/brand.js';
 
 export interface AIChatMessage {
   id: string;
@@ -60,7 +61,7 @@ export const SpendTrackAIService = {
 
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || 'SpendTrack AI is temporarily unavailable.');
+      throw new Error(errorData.error || `${BRAND_NAME} is temporarily unavailable.`);
     }
 
     const data = await res.json();

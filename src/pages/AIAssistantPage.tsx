@@ -17,6 +17,7 @@ import {
 import { Expense, RecurringExpense, CategoryItem, DateRange } from '../types.js';
 import { SpendTrackAIService, AIChatMessage } from '../services/aiService.js';
 import { filterExpensesByDateRange, formatCurrency } from '../utils/calculations.js';
+import { BRAND_NAME } from '../constants/brand.js';
 
 interface AIAssistantPageProps {
   expenses: Expense[];
@@ -55,7 +56,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
       id: 'welcome-msg',
       role: 'assistant',
       content:
-        "Hello! I'm **SpendTrack AI**. I analyze your real expense history, category trends, item inflation, and daily household consumption rates.\n\nAsk me anything about your spending or select a suggested topic below.",
+        `Hello! I'm **${BRAND_NAME}**. I analyze your real expense history, category trends, item inflation, and daily household consumption rates.\n\nAsk me anything about your spending or select a suggested topic below.`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -132,7 +133,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
       setMessages((prev) => [...prev, aiMessage]);
     } catch (err: any) {
       console.error('AI chat error:', err);
-      const errMsg = err.message || 'SpendTrack AI is temporarily unavailable.';
+      const errMsg = err.message || `${BRAND_NAME} is temporarily unavailable.`;
       setErrorMessage(errMsg);
 
       const errorFallbackMsg: AIChatMessage = {
@@ -235,7 +236,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="font-bold text-sm sm:text-base text-white tracking-tight">
-                SpendTrack AI
+                {BRAND_NAME}
               </h2>
               <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 Live Data Grounded
@@ -428,7 +429,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
         </form>
 
         <p className="text-[10px] text-center text-slate-400 mt-2">
-          SpendTrack AI analyzes your synchronized Google Sheets expenses and consumption duration.
+          {BRAND_NAME} analyzes your synchronized Google Sheets expenses and consumption duration.
         </p>
       </div>
     </div>

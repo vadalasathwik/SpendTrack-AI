@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { CategoryItem, UserSettings } from '../types.js';
 import { formatCurrency } from '../utils/calculations.js';
+import { BRAND_NAME } from '../constants/brand.js';
 
 interface SettingsPageProps {
   categories: CategoryItem[];
@@ -186,7 +187,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:underline text-[11px] pt-1"
               >
-                <span>Open "SpendTrack" Spreadsheet</span>
+                <span>Open "{BRAND_NAME}" Spreadsheet</span>
                 <ExternalLink className="w-3 h-3" />
               </a>
             ) : (
@@ -201,7 +202,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               <span>Google Drive</span>
             </div>
             <p className="text-[11px] text-blue-800">
-              Dedicated <code>SpendTrack/Receipts/</code> directory for receipt images & exports.
+              Dedicated <code>{BRAND_NAME}/Receipts/</code> directory for receipt images & exports.
             </p>
             <span className="text-[11px] text-blue-700 font-medium">Secure private storage active</span>
           </div>

@@ -16,6 +16,7 @@ import {
   Layers,
   ChevronRight,
 } from 'lucide-react';
+import { BRAND_NAME } from '../constants/brand.js';
 
 interface WelcomePageProps {
   onSignIn: () => void | Promise<void>;
@@ -46,7 +47,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-black text-xl tracking-tight text-slate-900">SPENDTRACK</span>
+              <span className="font-black text-xl tracking-tight text-slate-900">{BRAND_NAME}</span>
               <span className="text-[10px] uppercase font-extrabold tracking-wider px-2 py-0.5 rounded-full bg-emerald-100/80 text-emerald-800 border border-emerald-200/60 hidden sm:inline-block">
                 Workspace Edition
               </span>
@@ -94,7 +95,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-slate-900 tracking-tight leading-[1.15]">
-            Welcome to <span className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 bg-clip-text text-transparent">SpendTrack</span>
+            Welcome to <span className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 bg-clip-text text-transparent">{BRAND_NAME}</span>
           </h1>
 
           <p className="mt-5 text-base sm:text-lg md:text-xl text-slate-600 font-medium leading-relaxed max-w-2xl mx-auto">
@@ -157,7 +158,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
               </div>
 
               <p className="text-sm text-slate-600 leading-relaxed font-normal">
-                Upload receipts and invoices directly to your personal Google Drive folder. SpendTrack extracts purchase details automatically without third-party storage.
+                Upload receipts and invoices directly to your personal Google Drive folder. {BRAND_NAME} extracts purchase details automatically without third-party storage.
               </p>
             </div>
 
@@ -288,7 +289,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
 
           {/* Under Button Notice */}
           <p className="mt-4 text-xs sm:text-sm text-slate-500 max-w-md leading-relaxed font-normal">
-            By continuing, you allow SpendTrack to create and sync your own Google Sheets, Drive and Calendar.
+            By continuing, you allow {BRAND_NAME} to create and sync your own Google Sheets, Drive and Calendar.
           </p>
 
           {/* Demo Fallback link */}
@@ -307,7 +308,7 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
       {/* Footer Section */}
       <footer className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 border-t border-slate-200/70 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 z-10">
         <div className="flex items-center gap-2">
-          <span>&copy; 2026 SpendTrack. Personal AI Finance Workspace.</span>
+          <span>&copy; 2026 {BRAND_NAME}. Personal AI Finance Workspace.</span>
         </div>
 
         {/* Footer Navigation Links */}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Wallet, Calendar, DollarSign, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { UserSettings } from '../types.js';
+import { BRAND_NAME } from '../constants/brand.js';
 
 interface BudgetOnboardingModalProps {
   isOpen: boolean;
@@ -68,7 +69,7 @@ export const BudgetOnboardingModal: React.FC<BudgetOnboardingModalProps> = ({
             <Wallet className="w-7 h-7" />
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            Welcome to SpendTrack!
+            Welcome to {BRAND_NAME}!
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
             Set up your household monthly budget foundation. This will power your burn rate and predictions.

@@ -1,4 +1,5 @@
 import React from 'react';
+import { BRAND_NAME } from '../constants/brand.js';
 
 export default function PrivacyPolicy() {
   return (
@@ -13,22 +14,22 @@ export default function PrivacyPolicy() {
             href="/"
             className="inline-flex items-center text-xs font-bold text-slate-600 hover:text-emerald-700 bg-slate-100 hover:bg-emerald-50 px-3.5 py-2 rounded-xl transition-colors self-start sm:self-auto"
           >
-            &larr; Back to SpendTrack
+            &larr; Back to {BRAND_NAME}
           </a>
         </header>
 
         <div className="space-y-8 text-slate-600 leading-relaxed text-sm sm:text-base">
           <section>
-            <h2 className="text-xl font-extrabold text-slate-900 mb-3">About SpendTrack</h2>
+            <h2 className="text-xl font-extrabold text-slate-900 mb-3">About {BRAND_NAME}</h2>
             <p>
-              SpendTrack is an AI-powered personal finance workspace designed to help users track expenses, budgets, recurring subscriptions, catalog purchases, and receipt images directly within their user-owned Google Workspace (Google Sheets, Google Drive, and Google Calendar).
+              {BRAND_NAME} is an AI-powered personal finance workspace designed to help users track expenses, budgets, recurring subscriptions, catalog purchases, and receipt images directly within their user-owned Google Workspace (Google Sheets, Google Drive, and Google Calendar).
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-extrabold text-slate-900 mb-3">Information We Collect</h2>
             <p className="mb-3">
-              SpendTrack accesses and processes only the data necessary to provide and operate personal financial management features:
+              {BRAND_NAME} accesses and processes only the data necessary to provide and operate personal financial management features:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-slate-700 font-medium">
               <li><strong>Google account information:</strong> Name, email address, and profile photo (optional).</li>
@@ -48,28 +49,28 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className="text-xl font-extrabold text-slate-900 mb-3">Data Storage</h2>
             <p>
-              Your financial data and uploaded files reside inside your own personal Google Account (Google Drive and Google Sheets). SpendTrack operates on a data sovereignty architecture and does not host or store your financial records on external database servers.
+              Your financial data and uploaded files reside inside your own personal Google Account (Google Drive and Google Sheets). {BRAND_NAME} operates on a data sovereignty architecture and does not host or store your financial records on external database servers.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-extrabold text-slate-900 mb-3">Data Sharing</h2>
             <p className="p-4 bg-emerald-50 border border-emerald-200/80 rounded-2xl text-emerald-950 font-bold">
-              SpendTrack does not sell or share personal information with third parties.
+              {BRAND_NAME} does not sell or share personal information with third parties.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-extrabold text-slate-900 mb-3">Google API Services</h2>
             <div className="p-5 bg-slate-100/80 border border-slate-200 rounded-2xl text-slate-800 font-semibold italic">
-              SpendTrack's use of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements.
+              {BRAND_NAME}'s use of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements.
             </div>
           </section>
 
           <section>
             <h2 className="text-xl font-extrabold text-slate-900 mb-3">Your Rights</h2>
             <p>
-              You maintain full ownership of your data at all times. You can revoke SpendTrack’s OAuth access at any time through your Google Account Permissions. You may also delete your financial records and uploaded files directly from your Google Drive and Google Sheets workspace whenever you choose.
+              You maintain full ownership of your data at all times. You can revoke {BRAND_NAME}’s OAuth access at any time through your Google Account Permissions. You may also delete your financial records and uploaded files directly from your Google Drive and Google Sheets workspace whenever you choose.
             </p>
           </section>
 

@@ -38,6 +38,7 @@ import {
   FileSpreadsheet,
   Camera,
 } from 'lucide-react';
+import { BRAND_NAME } from '../constants/brand.js';
 import { Expense, DateRange, CategorySpending, ItemAnalyticsSummary, MonthlyItem, RecurringExpense, ConsumptionLog, UserSettings } from '../types.js';
 import { useUser } from '../context/UserContext.js';
 import {
@@ -270,7 +271,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-lg sm:text-xl font-black tracking-tight text-white">
-                {user?.name || 'SpendTrack User'}
+                {user?.name || `${BRAND_NAME} User`}
               </h2>
               <span className="px-2 py-0.5 rounded-full text-[10px] uppercase font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 Workspace Member
@@ -1012,9 +1013,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             <Sparkles className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-bold text-base text-white tracking-tight">Ask SpendTrack AI</h3>
+            <h3 className="font-bold text-base text-white tracking-tight">Ask {BRAND_NAME}</h3>
             <p className="text-xs text-slate-300 mt-0.5 max-w-lg leading-relaxed">
-              Have questions about your burn rate, price shifts, or recurring bills? SpendTrack AI calculates answers with zero hallucinations.
+              Have questions about your burn rate, price shifts, or recurring bills? {BRAND_NAME} calculates answers with zero hallucinations.
             </p>
           </div>
         </div>

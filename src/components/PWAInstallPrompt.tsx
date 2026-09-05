@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download, X, Sparkles } from 'lucide-react';
+import { BRAND_NAME } from '../constants/brand.js';
 
 export const PWAInstallPrompt: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -58,7 +59,7 @@ export const PWAInstallPrompt: React.FC = () => {
             <Sparkles className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-sm font-extrabold text-white">Install SpendTrack App</h4>
+            <h4 className="text-sm font-extrabold text-white">Install {BRAND_NAME} App</h4>
             <p className="text-xs text-slate-300">Add to home screen for full-screen PWA access</p>
           </div>
         </div>

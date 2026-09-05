@@ -14,6 +14,7 @@ import {
   FileSpreadsheet,
   TrendingUp,
 } from 'lucide-react';
+import { BRAND_NAME } from '../constants/brand.js';
 
 interface MobileMoreDrawerProps {
   isOpen: boolean;
@@ -63,7 +64,7 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
     },
     {
       id: 'ai',
-      title: 'SpendTrack AI',
+      title: BRAND_NAME,
       subtitle: 'Instant answers on spending & household burn',
       icon: Bot,
       color: 'text-purple-600 bg-purple-50',
@@ -96,7 +97,7 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
           <div>
             <h3 className="font-bold text-base text-slate-900 tracking-tight">More Features</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              {userEmail ? `Connected as ${userEmail}` : 'SpendTrack Command Center'}
+              {userEmail ? `Connected as ${userEmail}` : `${BRAND_NAME} Command Center`}
             </p>
           </div>
           <button
@@ -155,7 +156,7 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
 
         {/* Footer info */}
         <div className="p-3 bg-slate-50 border-t border-slate-100 text-center text-[11px] text-slate-400">
-          SpendTrack • Futuristic because it is effortless.
+          {BRAND_NAME} • Futuristic because it is effortless.
         </div>
       </div>
     </div>

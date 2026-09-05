@@ -10,6 +10,7 @@ import {
   TrendingUp,
   LayoutDashboard,
 } from 'lucide-react';
+import { BRAND_NAME } from '../constants/brand.js';
 
 interface ProvisioningProgressModalProps {
   isOpen: boolean;
@@ -24,12 +25,12 @@ const PROVISIONING_STEPS = [
   },
   {
     label: 'Creating Google Sheets…',
-    description: 'Initializing "SpendTrack Database" & workspace tabs',
+    description: `Initializing "${BRAND_NAME} Database" & workspace tabs`,
     icon: FileSpreadsheet,
   },
   {
     label: 'Preparing Drive…',
-    description: 'Configuring "SpendTrack/Receipts" cloud storage',
+    description: `Configuring "${BRAND_NAME}/Receipts" cloud storage`,
     icon: HardDrive,
   },
   {

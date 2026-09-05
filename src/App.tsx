@@ -37,6 +37,7 @@ import { getDateRangeFromPreset } from './utils/dateRanges.js';
 import { calculateMonthlyItemIntelligence } from './utils/calculations.js';
 import { SpendTrackApi } from './services/api.js';
 import { signInWithGoogle, signOutApp, onAuthStateChange } from './services/authService.js';
+import { BRAND_NAME } from './constants/brand.js';
 
 // UI Components
 import { SyncStatusBadge } from './components/SyncStatusBadge.js';
@@ -600,7 +601,7 @@ export function App() {
                 <TrendingUp className="w-6 h-6" />
               </div>
               <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mb-2" />
-              <p className="text-sm font-semibold text-slate-500">Initializing SpendTrack Workspace...</p>
+              <p className="text-sm font-semibold text-slate-500">Initializing {BRAND_NAME} Workspace...</p>
             </div>
           ) : !user && !isDemoMode ? (
             <WelcomePage
@@ -613,7 +614,7 @@ export function App() {
             <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800" id="spendtrack-root">
       {!user && isDemoMode && (
         <div className="bg-emerald-900 text-emerald-100 text-xs sm:text-sm py-2 px-4 text-center font-medium flex items-center justify-center gap-2 shadow-inner z-50">
-          <span>💡 Previewing SpendTrack in Demo Mode. Connect your own Google Workspace for live sync.</span>
+          <span>💡 Previewing {BRAND_NAME} in Demo Mode. Connect your own Google Workspace for live sync.</span>
           <button
             onClick={handleGoogleSignIn}
             className="underline font-bold hover:text-white cursor-pointer ml-1"
@@ -642,7 +643,7 @@ export function App() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-black text-lg tracking-tight text-slate-900">SPENDTRACK</span>
+                <span className="font-black text-lg tracking-tight text-slate-900">{BRAND_NAME}</span>
                 <span className="hidden sm:inline text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
                   Consumption Intelligence
                 </span>
@@ -714,7 +715,7 @@ export function App() {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
               <TrendingUp className="w-5 h-5" />
             </div>
-            <span className="font-black text-lg tracking-tight text-slate-900">SPENDTRACK</span>
+            <span className="font-black text-lg tracking-tight text-slate-900">{BRAND_NAME}</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -765,7 +766,7 @@ export function App() {
               { key: 'monthly-items', label: 'Monthly Items', icon: ShoppingCart },
               { key: 'items', label: 'Item Intelligence', icon: Sparkles },
               { key: 'recurring', label: 'Recurring Bills', icon: Repeat },
-              { key: 'ai', label: 'SpendTrack AI', icon: Bot, highlight: true },
+              { key: 'ai', label: BRAND_NAME, icon: Bot, highlight: true },
               { key: 'settings', label: 'Settings', icon: Settings },
             ].map((tab) => {
               const Icon = tab.icon;

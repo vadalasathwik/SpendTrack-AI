@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useUser } from '../context/UserContext.js';
 import { SpendTrackApi } from '../services/api.js';
+import { BRAND_NAME } from '../constants/brand.js';
 
 interface MemberItem {
   uid: string;
@@ -221,7 +222,7 @@ export const FamilyWorkspacePage: React.FC = () => {
               <div className="min-w-0">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">Google Sheet</span>
                 <p className="text-xs font-extrabold text-slate-800 truncate">
-                  {workspace?.spreadsheetId ? 'Connected' : 'SpendTrack DB'}
+                  {workspace?.spreadsheetId ? 'Connected' : `${BRAND_NAME} DB`}
                 </p>
               </div>
             </div>
@@ -231,7 +232,7 @@ export const FamilyWorkspacePage: React.FC = () => {
               <div className="min-w-0">
                 <span className="text-[10px] font-bold text-slate-400 uppercase">Drive Receipts</span>
                 <p className="text-xs font-extrabold text-slate-800 truncate">
-                  SpendTrack/Receipts
+                  {BRAND_NAME}/Receipts
                 </p>
               </div>
             </div>
