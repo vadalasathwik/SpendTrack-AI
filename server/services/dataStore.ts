@@ -140,6 +140,10 @@ class DataStore {
 
   private load() {
     if (this.isLoaded) return;
+    if (process.env.VERCEL === '1') {
+      this.isLoaded = true;
+      return;
+    }
     try {
       if (!fs.existsSync(DATA_DIR)) {
         fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -163,6 +167,7 @@ class DataStore {
   }
 
   private save() {
+    if (process.env.VERCEL === '1') return;
     try {
       if (!fs.existsSync(DATA_DIR)) {
         fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -175,6 +180,7 @@ class DataStore {
 
   // Expenses
   getExpenses(): ExpenseRecord[] {
+    if (process.env.VERCEL === '1') return [];
     this.load();
     return this.state.expenses;
   }
@@ -243,6 +249,7 @@ class DataStore {
 
   // Monthly Items
   getMonthlyItems(): MonthlyItemRecord[] {
+    if (process.env.VERCEL === '1') return [];
     this.load();
     return this.state.monthlyItems;
   }
@@ -287,6 +294,7 @@ class DataStore {
 
   // Categories
   getCategories(): CategoryRecord[] {
+    if (process.env.VERCEL === '1') return DEFAULT_CATEGORIES;
     this.load();
     return this.state.categories;
   }
@@ -300,6 +308,7 @@ class DataStore {
 
   // Recurring Expenses
   getRecurringExpenses(): RecurringRecord[] {
+    if (process.env.VERCEL === '1') return [];
     this.load();
     return this.state.recurringExpenses;
   }
