@@ -68,17 +68,8 @@ export const FamilyWorkspacePage: React.FC = () => {
       setCurrentRole(res.currentRole || 'owner');
     } catch (err: any) {
       console.warn('Workspace members fetch notice:', err);
-      // Fallback UI data
-      setMembers([
-        {
-          uid: user?.uid || 'owner_1',
-          email: user?.email || 'owner@spendtrack.com',
-          name: user?.name || 'Workspace Owner',
-          photoURL: user?.photoURL,
-          role: 'owner',
-          joinedAt: new Date().toISOString(),
-        },
-      ]);
+      setErrorMessage(err.message || 'Failed to load workspace members.');
+      setMembers([]);
     } finally {
       setLoading(false);
     }

@@ -43,7 +43,8 @@ export function createExpressApp() {
   });
 
   app.get("/api/workspace/members", (req, res) => {
-    const details = familyWorkspaceService.getWorkspaceDetails("default-user");
+    const user = (req as any).user;
+    const details = familyWorkspaceService.getWorkspaceDetails(user?.uid || "");
     res.json(details);
   });
 

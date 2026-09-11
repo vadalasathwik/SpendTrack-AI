@@ -78,7 +78,6 @@ export function App() {
   // Auth & Workspace Provisioning State
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [isDemoMode, setIsDemoMode] = useState(false);
   const [isProvisioning, setIsProvisioning] = useState(false);
   const [provisioningStep, setProvisioningStep] = useState(0);
 
@@ -144,7 +143,6 @@ export function App() {
     const handleUnauthorized = () => {
       clearAuthSession();
       setUser(null);
-      setIsDemoMode(false);
       setSyncStatus({ state: 'idle' });
     };
     window.addEventListener('spendtrack_401_unauthorized', handleUnauthorized);
@@ -201,15 +199,13 @@ export function App() {
         setUser(res.user);
         await loadDataFromWorkspace();
       } else {
-        // Firebase is not configured or user cancelled: cleanly switch to Demo Mode
-        setIsDemoMode(true);
         setSyncStatus({ state: 'idle' });
       }
     } catch (err: any) {
       console.error('Google Sign In failed:', err);
       let errorMsg = err.message || 'Google Sign-In failed';
       if (errorMsg.includes('auth/api-key-not-valid') || errorMsg.includes('api-key-not-valid')) {
-        errorMsg = 'Invalid Firebase API Key in .env.local. Please update VITE_FIREBASE_API_KEY with a valid Firebase Web API Key or explore Demo Mode.';
+        errorMsg = 'Invalid Firebase API Key in .env.local. Please update VITE_FIREBASE_API_KEY with a valid Firebase Web API Key.';
       }
       setSyncStatus({
         state: 'error',
@@ -292,7 +288,6 @@ export function App() {
       ) {
         clearAuthSession();
         setUser(null);
-        setIsDemoMode(false);
         setSyncStatus({ state: 'idle' });
         return;
       }
@@ -715,32 +710,32 @@ export function App() {
               <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mb-2" />
               <p className="text-sm font-semibold text-slate-500">Initializing {BRAND_NAME} Workspace...</p>
             </div>
-          ) : !user && !isDemoMode ? (
+          ) : !isFirebaseConfigured ? (
+            <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center font-sans text-slate-800 p-4">
+              <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-200 shadow-xl text-center">
+                <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4 font-bold text-xl">
+                  !
+                </div>
+                <h2 className="text-xl font-bold text-slate-900 mb-2">Firebase Configuration Required</h2>
+                <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+                  Spend Track AI requires valid Firebase Authentication configuration. Please ensure <code className="bg-slate-100 px-1.5 py-0.5 rounded text-rose-600 font-mono text-xs">VITE_FIREBASE_API_KEY</code>, <code className="bg-slate-100 px-1.5 py-0.5 rounded text-rose-600 font-mono text-xs">VITE_FIREBASE_AUTH_DOMAIN</code>, and <code className="bg-slate-100 px-1.5 py-0.5 rounded text-rose-600 font-mono text-xs">VITE_FIREBASE_PROJECT_ID</code> are configured.
+                </p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition-all cursor-pointer shadow-md active:scale-95"
+                >
+                  Retry Configuration
+                </button>
+              </div>
+            </div>
+          ) : !user ? (
             <WelcomePage
               onSignIn={handleGoogleSignIn}
-              onExploreDemo={() => setIsDemoMode(true)}
               isSigningIn={syncStatus.state === 'syncing'}
               errorMessage={syncStatus.state === 'error' ? syncStatus.errorMessage : null}
             />
           ) : (
             <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800" id="spendtrack-root">
-      {!user && isDemoMode && (
-        <div className="bg-emerald-900 text-emerald-100 text-xs sm:text-sm py-2 px-4 text-center font-medium flex items-center justify-center gap-2 shadow-inner z-50">
-          <span>💡 Previewing {BRAND_NAME} in Demo Mode. Connect your own Google Workspace for live sync.</span>
-          <button
-            onClick={handleGoogleSignIn}
-            className="underline font-bold hover:text-white cursor-pointer ml-1"
-          >
-            Continue with Google &rarr;
-          </button>
-          <button
-            onClick={() => setIsDemoMode(false)}
-            className="ml-3 text-emerald-300 hover:text-white text-xs underline cursor-pointer"
-          >
-            Back to Welcome Page
-          </button>
-        </div>
-      )}
       {/* Top Application Header */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs">
         {/* Desktop Header (>= 768px) */}

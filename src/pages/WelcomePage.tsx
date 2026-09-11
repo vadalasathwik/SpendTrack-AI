@@ -20,14 +20,12 @@ import { BRAND_NAME } from '../constants/brand.js';
 
 interface WelcomePageProps {
   onSignIn: () => void | Promise<void>;
-  onExploreDemo?: () => void;
   isSigningIn?: boolean;
   errorMessage?: string | null;
 }
 
 export const WelcomePage: React.FC<WelcomePageProps> = ({
   onSignIn,
-  onExploreDemo,
   isSigningIn = false,
   errorMessage = null,
 }) => {
@@ -57,14 +55,6 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
-          {onExploreDemo && (
-            <button
-              onClick={onExploreDemo}
-              className="text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 px-3.5 py-2 rounded-xl hover:bg-slate-200/60 transition-all cursor-pointer"
-            >
-              Explore Demo Mode
-            </button>
-          )}
           <button
             onClick={onSignIn}
             disabled={isSigningIn}
@@ -86,14 +76,6 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
               <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
               <p className="font-semibold text-xs sm:text-sm leading-relaxed">{errorMessage}</p>
             </div>
-            {onExploreDemo && (
-              <button
-                onClick={onExploreDemo}
-                className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shrink-0 transition-all cursor-pointer shadow-xs active:scale-95 self-end sm:self-auto"
-              >
-                Use Demo Mode
-              </button>
-            )}
           </div>
         )}
 
@@ -301,16 +283,6 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
           <p className="mt-4 text-xs sm:text-sm text-slate-500 max-w-md leading-relaxed font-normal">
             By continuing, you allow {BRAND_NAME} to create and sync your own Google Sheets, Drive and Calendar.
           </p>
-
-          {/* Demo Fallback link */}
-          {onExploreDemo && (
-            <button
-              onClick={onExploreDemo}
-              className="mt-4 text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer"
-            >
-              Or preview app with sample data first &rarr;
-            </button>
-          )}
         </div>
 
       </main>

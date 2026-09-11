@@ -150,32 +150,15 @@ export class BudgetPlannerService {
           latestPrice,
           increasePercentage: Math.max(0, increasePercentage),
         });
-      } else {
-        // Fallback realistic benchmarks for Indian grocery items
-        const defaults: Record<string, { unit: string; prev: number; latest: number }> = {
-          Milk: { unit: 'L', prev: 60, latest: 65 },
-          Rice: { unit: 'kg', prev: 65, latest: 72 },
-          Vegetables: { unit: 'kg', prev: 45, latest: 49 },
-          'Cooking Oil': { unit: 'L', prev: 140, latest: 152 },
-        };
-        const def = defaults[targetName];
-        const inc = Number((((def.latest - def.prev) / def.prev) * 100).toFixed(1));
-        inflationTracker.push({
-          item: targetName,
-          unit: def.unit,
-          previousPrice: def.prev,
-          latestPrice: def.latest,
-          increasePercentage: inc,
-        });
       }
     }
 
-    const avgInflation = Number(
-      (inflationTracker.reduce((s, i) => s + i.increasePercentage, 0) / inflationTracker.length).toFixed(1)
-    );
+    const avgInflation = inflationTracker.length > 0
+      ? Number((inflationTracker.reduce((s, i) => s + i.increasePercentage, 0) / inflationTracker.length).toFixed(1))
+      : 0;
 
     // Calculate budget health score (0 to 100)
-    const spendRatio = currentSpent / estimatedBudgetLimit;
+    const spendRatio = estimatedBudgetLimit > 0 ? currentSpent / estimatedBudgetLimit : 0;
     let budgetScore = Math.round(100 - spendRatio * 40 - (avgInflation > 8 ? 10 : 0));
     budgetScore = Math.max(35, Math.min(98, budgetScore));
 
@@ -183,15 +166,17 @@ export class BudgetPlannerService {
     const savingsOpportunity = Math.round(currentSpent * 0.08 + totalRecurringMonthly * 0.05);
 
     // Generate intelligent alerts
-    const alerts: BudgetAlert[] = [
-      {
-        type: 'warning',
-        title: 'High Grocery Inflation Detected',
-        message: `Key staple prices (Milk, Rice, Vegetables) increased by an average of ${avgInflation}% compared to previous months.`,
-      },
-    ];
+    const alerts: BudgetAlert[] = [];
 
-    if (currentSpent > estimatedBudgetLimit * 0.8) {
+    if (avgInflation > 0) {
+      alerts.push({
+        type: 'warning',
+        title: 'Item Price Increase Detected',
+        message: `Tracked item prices increased by an average of ${avgInflation}% compared to previous purchases.`,
+      });
+    }
+
+    if (estimatedBudgetLimit > 0 && currentSpent > estimatedBudgetLimit * 0.8) {
       alerts.push({
         type: 'danger',
         title: 'Monthly Budget Limit Approaching',
@@ -204,8 +189,8 @@ export class BudgetPlannerService {
       const nextBill = recurringExpenses[0];
       alerts.push({
         type: 'info',
-        title: 'Recurring Bill Due Soon',
-        message: `${nextBill.name} (₹${nextBill.amount.toLocaleString('en-IN')}) is due in 3 days. Reminders synced to Google Calendar.`,
+        title: 'Recurring Bill Active',
+        message: `${nextBill.name} (₹${nextBill.amount.toLocaleString('en-IN')}) is registered in your workspace.`,
       });
     }
 
@@ -252,13 +237,7 @@ Grounded Data:
 
 RULES:
 1. Return ONLY a JSON array of 3 strings.
-2. Format amounts in ₹ (Indian Rupee).
-3. Example output:
-[
-  "Buying milk in 5L bulk packs every 26 days saves ₹180/month.",
-  "Vegetable prices increased by 8% this month; setting a Weekly Fresh Cap of ₹650 keeps your budget on track.",
-  "Your recommended monthly budget for Groceries should be ₹8,500 based on recent consumption trends."
-]`;
+2. Format amounts in ₹ (Indian Rupee).`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3.6-flash',
@@ -281,11 +260,11 @@ RULES:
       console.warn('Gemini Budget AI explanation notice:', e);
     }
 
-    // Fallback deterministic AI suggestions
+    // Fallback deterministic AI suggestions grounded in real stats
     return [
-      `Buying milk every 26 days in multi-packs saves approximately ₹180/month.`,
-      `Staple item inflation is currently at ${summary.inflationRate}%; setting a weekly vegetable cap of ₹650 prevents budget creep.`,
-      `Your recommended monthly budget for Groceries is ₹${Math.round(summary.currentMonth.spent * 0.55).toLocaleString('en-IN')}.`,
+      `Your current monthly spend is ₹${summary.currentMonth.spent.toLocaleString('en-IN')}.`,
+      `Predicted spend for next month is ₹${summary.predictedMonth.expectedSpend.toLocaleString('en-IN')}.`,
+      `Potential monthly savings opportunity estimated at ₹${summary.savingsOpportunity.toLocaleString('en-IN')}.`,
     ];
   }
 }

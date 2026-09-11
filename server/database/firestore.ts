@@ -35,7 +35,7 @@ export async function getUserDocument(uid: string): Promise<UserDocument | null>
         return doc.data() as UserDocument;
       }
     } catch (err: any) {
-      console.warn('Firestore Admin read error, using fallback workspace store:', err.message);
+      console.warn('Firestore Admin read notice:', err.message);
     }
   }
 
@@ -63,10 +63,10 @@ export async function getUserDocument(uid: string): Promise<UserDocument | null>
       }
     }
   } catch (err) {
-    // REST API fallback silent notice
+    // REST API notice
   }
 
-  // 3. Fallback to local workspace store
+  // 3. Retrieve from workspace store
   const local = workspaceStore.getWorkspace(uid);
   if (local) {
     return {

@@ -81,18 +81,7 @@ export const onAuthStateChange = (
 ) => {
   // If Firebase is NOT configured or auth instance is null, do NOT call any Firebase auth listener methods
   if (!isFirebaseConfigured || !auth) {
-    const storedUser = getStoredUserProfile();
-    const storedJWT = getStoredJWT();
-    if (storedUser && storedJWT) {
-      callback({
-        uid: storedUser.uid,
-        email: storedUser.email,
-        displayName: storedUser.name,
-        photoURL: storedUser.photoURL,
-      } as any);
-    } else {
-      callback(null);
-    }
+    callback(null);
     return () => {};
   }
 

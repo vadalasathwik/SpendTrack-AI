@@ -60,59 +60,9 @@ export const BudgetAIPage: React.FC<BudgetAIPageProps> = ({
       const result = await SpendTrackApi.predictBudget(safeExpenses, safeRecurring);
       setBudgetData(result);
     } catch (err: any) {
-      console.warn('Budget AI fetch fallback to local calculation:', err);
-      // Fallback calculation locally
-      const now = new Date();
-      const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      const currentExpenses = expenses.filter((e) => e.purchaseDate && e.purchaseDate.startsWith(currentMonthPrefix));
-      const currentSpent = currentExpenses.reduce((s, e) => s + (Number(e.totalPrice) || 0), 0);
-
-      setBudgetData({
-        budgetScore: 84,
-        currentMonth: {
-          spent: currentSpent || 14500,
-          budgetLimit: 22000,
-          remaining: Math.max(0, 22000 - currentSpent),
-          dailyAllowance: 416.67,
-          daysElapsed: now.getDate(),
-          daysRemaining: 30 - now.getDate(),
-        },
-        predictedMonth: {
-          expectedSpend: Math.round((currentSpent || 14500) * 1.05),
-          confidencePercentage: 92,
-        },
-        savingsOpportunity: 1850,
-        inflationRate: 7.2,
-        categoryForecasts: [
-          { category: 'Groceries', current: 6500, predicted: 6950, changePercentage: 6.9 },
-          { category: 'Utilities', current: 3200, predicted: 3400, changePercentage: 6.25 },
-          { category: 'Dining', current: 2800, predicted: 2950, changePercentage: 5.3 },
-          { category: 'Shopping', current: 2000, predicted: 2100, changePercentage: 5.0 },
-        ],
-        inflationTracker: [
-          { item: 'Milk', unit: 'L', previousPrice: 60, latestPrice: 65, increasePercentage: 8.3 },
-          { item: 'Rice', unit: 'kg', previousPrice: 65, latestPrice: 72, increasePercentage: 10.7 },
-          { item: 'Vegetables', unit: 'kg', previousPrice: 45, latestPrice: 49, increasePercentage: 8.9 },
-          { item: 'Cooking Oil', unit: 'L', previousPrice: 140, latestPrice: 152, increasePercentage: 8.6 },
-        ],
-        aiSuggestions: [
-          'Buying milk every 26 days in 5L multi-packs saves ₹180/month.',
-          'Vegetable prices increased by 8% this month; setting a weekly cap of ₹650 maintains budget stability.',
-          'Your recommended monthly budget for Groceries is ₹6,500.',
-        ],
-        alerts: [
-          {
-            type: 'warning',
-            title: 'High Grocery Inflation Detected',
-            message: 'Staple prices (Milk, Rice, Vegetables) increased by an average of 7.2% compared to previous months.',
-          },
-          {
-            type: 'info',
-            title: 'Recurring Bill Due Soon',
-            message: 'Electricity bill (₹2,100) due in 3 days. Reminders synced to Google Calendar.',
-          },
-        ],
-      });
+      console.warn('Budget AI fetch notice:', err);
+      setError(err.message || 'Failed to calculate budget AI metrics.');
+      setBudgetData(null);
     } finally {
       setLoading(false);
     }
@@ -122,24 +72,48 @@ export const BudgetAIPage: React.FC<BudgetAIPageProps> = ({
     fetchBudgetMetrics();
   }, [expenses, recurringExpenses]);
 
-  const score = budgetData?.budgetScore || 85;
+  const score = budgetData?.budgetScore || 0;
 
-  // Chart Data: Monthly Spending Trend
-  const monthlyTrendData = [
-    { month: 'May', actual: 16200, predicted: 16000 },
-    { month: 'Jun', actual: 17800, predicted: 17500 },
-    { month: 'Jul', actual: 15400, predicted: 15800 },
-    { month: 'Aug', actual: budgetData?.currentMonth?.spent || 14500, predicted: 15000 },
-    { month: 'Sep (Forecast)', actual: null, predicted: budgetData?.predictedMonth?.expectedSpend || 18200 },
-  ];
+  // Chart Data: Monthly Spending Trend calculated from real expenses
+  const monthlyTrendData = React.useMemo(() => {
+    const months: { month: string; actual: number | null; predicted: number | null }[] = [];
+    const now = new Date();
+    for (let i = 3; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthStr = d.toLocaleString('en-US', { month: 'short' });
+      const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const sum = safeExpenses
+        .filter((e) => e.purchaseDate && e.purchaseDate.startsWith(prefix))
+        .reduce((acc, e) => acc + (Number(e.totalPrice) || 0), 0);
+      months.push({
+        month: monthStr,
+        actual: sum,
+        predicted: i === 0 ? budgetData?.predictedMonth?.expectedSpend || sum : sum,
+      });
+    }
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    months.push({
+      month: `${nextMonth.toLocaleString('en-US', { month: 'short' })} (Forecast)`,
+      actual: null,
+      predicted: budgetData?.predictedMonth?.expectedSpend || 0,
+    });
+    return months;
+  }, [safeExpenses, budgetData]);
 
-  // Inflation Line Chart Data
-  const inflationChartData = [
-    { month: 'May', Milk: 58, Rice: 62, Vegetables: 40, Oil: 135 },
-    { month: 'Jun', Milk: 60, Rice: 64, Vegetables: 42, Oil: 138 },
-    { month: 'Jul', Milk: 60, Rice: 65, Vegetables: 45, Oil: 140 },
-    { month: 'Aug', Milk: 65, Rice: 72, Vegetables: 49, Oil: 152 },
-  ];
+  // Inflation Chart Data from real inflationTracker items if available
+  const inflationChartData = React.useMemo(() => {
+    const tracker = budgetData?.inflationTracker || [];
+    if (tracker.length === 0) return [];
+    return [
+      {
+        month: 'Current Month',
+        ...tracker.reduce((acc: any, t: any) => {
+          acc[t.item] = t.latestPrice;
+          return acc;
+        }, {}),
+      },
+    ];
+  }, [budgetData]);
 
   if (loading) {
     return (
