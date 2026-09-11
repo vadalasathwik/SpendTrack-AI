@@ -57,8 +57,8 @@ export const ProvisioningProgressModal: React.FC<ProvisioningProgressModalProps>
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-4 selection:bg-emerald-100">
-      <div className="bg-white rounded-3xl max-w-lg w-full p-8 sm:p-10 shadow-2xl border border-slate-100 flex flex-col items-center relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md flex items-center justify-center p-3 selection:bg-emerald-100">
+      <div className="bg-white dark:bg-slate-900 rounded-[20px] max-w-[420px] w-[calc(100vw-24px)] p-6 sm:p-8 shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col items-center relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Background Accent Glow */}
         <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-100/50 rounded-bl-full pointer-events-none -z-10 blur-2xl" />
 

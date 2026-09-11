@@ -56,7 +56,7 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
       <div
         className="fixed inset-0"
         onClick={onClose}
@@ -64,7 +64,7 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
       />
       <div
         id="mobile-more-drawer"
-        className="relative bg-white dark:bg-slate-900 w-full sm:max-w-md rounded-t-[24px] sm:rounded-[20px] shadow-2xl border border-slate-200/90 dark:border-slate-800 max-h-[85vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200"
+        className="relative bg-white dark:bg-slate-900 w-[calc(100vw-24px)] max-w-[420px] rounded-[20px] shadow-2xl border border-slate-200/90 dark:border-slate-800 max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
       >
         {/* Drawer Handle on mobile */}
         <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mt-3 mb-1 sm:hidden" />

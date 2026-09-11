@@ -206,10 +206,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         </div>
       )}
       {/* SECTION 1: REMAINING BUDGET HERO */}
-      <section id="section-remaining-budget-hero" className="hero-emerald-gradient text-white rounded-[20px] p-6 sm:p-8 shadow-xl relative overflow-hidden flex flex-col md:flex-row items-stretch justify-between gap-6 border border-emerald-500/30">
+      <section id="section-remaining-budget-hero" className="hero-emerald-gradient text-white rounded-[20px] p-4 sm:p-6 lg:p-8 shadow-xl relative overflow-hidden flex flex-col justify-between gap-5 border border-emerald-500/30 w-full">
         <div className="absolute top-0 right-0 w-80 h-80 bg-teal-400/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="flex flex-col justify-between space-y-4 z-10">
+        <div className="flex flex-col space-y-4 z-10 w-full">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-300">
@@ -219,18 +219,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 {dateRange.label}
               </span>
             </div>
-            <div className="text-4xl sm:text-5xl font-black tracking-tight text-white mt-1">
+            <div className="text-[28px] sm:text-4xl lg:text-5xl font-black tracking-tight text-white mt-1">
               {formatCurrency(budgetMetrics.remainingBudget, currencySymbol)}
             </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between items-center text-xs font-semibold text-slate-200 max-w-md">
+          <div className="space-y-2 w-full">
+            <div className="flex justify-between items-center text-xs font-semibold text-slate-200 w-full">
               <span>Spent {formatCurrency(budgetMetrics.totalSpent, currencySymbol)}</span>
-              <span>Target {formatCurrency(budgetMetrics.monthlyBudget, currencySymbol)}</span>
+              <span className="text-right">Target {formatCurrency(budgetMetrics.monthlyBudget, currencySymbol)}</span>
             </div>
             {/* Budget Progress Bar */}
-            <div className="w-full bg-emerald-950/60 h-3 rounded-full overflow-hidden p-0.5 border border-emerald-500/30 max-w-md">
+            <div className="w-full bg-emerald-950/60 h-3 rounded-full overflow-hidden p-0.5 border border-emerald-500/30">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
                   budgetMetrics.colorState === 'red'
@@ -249,51 +249,62 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         </div>
 
         {/* Circular Budget Health Score */}
-        <div className="flex items-center gap-4 z-10 self-start md:self-center bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 shrink-0">
-          <div className="relative w-16 h-16 flex items-center justify-center">
-            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-              <path
-                className="text-emerald-900/40"
-                strokeWidth="3.5"
-                stroke="currentColor"
-                fill="none"
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              />
-              <path
-                className="text-emerald-300 transition-all duration-700 ease-out"
-                strokeDasharray={`${budgetMetrics.budgetHealthScore}, 100`}
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                stroke="currentColor"
-                fill="none"
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              />
-            </svg>
-            <span className="absolute font-black text-lg text-white">
-              {budgetMetrics.budgetHealthScore}
-            </span>
+        <div className="flex items-center justify-between sm:justify-start gap-4 z-10 w-full bg-white/10 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-white/10 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="relative w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center shrink-0">
+              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                <path
+                  className="text-emerald-900/40"
+                  strokeWidth="3.5"
+                  stroke="currentColor"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <path
+                  className="text-emerald-300 transition-all duration-700 ease-out"
+                  strokeDasharray={`${budgetMetrics.budgetHealthScore}, 100`}
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  stroke="currentColor"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+              </svg>
+              <span className="absolute font-black text-base sm:text-lg text-white">
+                {budgetMetrics.budgetHealthScore}
+              </span>
+            </div>
+            <div>
+              <div className="text-[10px] font-extrabold text-emerald-300 uppercase tracking-wider">
+                Health Score
+              </div>
+              <div className="text-sm font-black text-white">
+                {budgetMetrics.budgetHealthScore >= 80 ? 'Excellent' : budgetMetrics.budgetHealthScore >= 60 ? 'On Track' : 'High Burn'}
+              </div>
+              <div className="text-[11px] text-slate-300">
+                Out of 100
+              </div>
+            </div>
           </div>
-          <div>
+
+          <div className="text-right sm:hidden">
             <div className="text-[10px] font-extrabold text-emerald-300 uppercase tracking-wider">
-              Health Score
+              Safe Today
             </div>
             <div className="text-sm font-black text-white">
-              {budgetMetrics.budgetHealthScore >= 80 ? 'Excellent' : budgetMetrics.budgetHealthScore >= 60 ? 'On Track' : 'High Burn'}
-            </div>
-            <div className="text-[11px] text-slate-300">
-              Out of 100
+              {formatCurrency(budgetMetrics.dailySafeSpend, currencySymbol)}
             </div>
           </div>
         </div>
       </section>
 
       {/* SECTION 2: SAFE TO SPEND TODAY */}
-      <section id="section-safe-to-spend" className="bg-white dark:bg-slate-900 p-5 rounded-[20px] border border-slate-200/80 dark:border-slate-800 soft-shadow flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
+      <section id="section-safe-to-spend" className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-[20px] border border-slate-200/80 dark:border-slate-800 soft-shadow flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 text-center sm:text-left">
+        <div className="flex flex-col sm:flex-row items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-100 dark:border-emerald-800/60">
             <ShieldCheck className="w-6 h-6" />
           </div>
-          <div>
+          <div className="space-y-0.5">
             <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">
               Safe to Spend Today
             </span>
@@ -304,9 +315,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-xs font-semibold text-slate-600 dark:text-slate-300">
-          <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-          <span>{budgetMetrics.daysRemaining ?? 30} days remaining in cycle</span>
+        <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60 text-xs font-semibold text-slate-600 dark:text-slate-300 w-full sm:w-auto justify-center">
+          <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <span className="whitespace-nowrap">{budgetMetrics.daysRemaining ?? 30} days remaining in cycle</span>
         </div>
       </section>
 

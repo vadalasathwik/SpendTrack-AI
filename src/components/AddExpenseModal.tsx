@@ -308,10 +308,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 overflow-hidden">
       <div
         id="add-expense-modal-dialog"
-        className="bg-white dark:bg-slate-900 rounded-t-[24px] sm:rounded-[24px] shadow-2xl border border-slate-200/90 dark:border-slate-800 w-full sm:max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 select-none"
+        className="bg-white dark:bg-slate-900 rounded-[20px] shadow-2xl border border-slate-200/90 dark:border-slate-800 w-[calc(100vw-24px)] max-w-[420px] max-h-[88vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 select-none"
       >
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900 z-10">

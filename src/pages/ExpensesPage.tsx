@@ -201,7 +201,7 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
       {/* Delete Confirmation Modal */}
       {expenseToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[24px] shadow-2xl border border-slate-100 dark:border-slate-800 p-6 space-y-4">
+          <div className="bg-white dark:bg-slate-900 w-[calc(100vw-24px)] max-w-[420px] rounded-[20px] shadow-2xl border border-slate-100 dark:border-slate-800 p-5 space-y-4">
             <h3 className="text-base font-bold text-slate-900 dark:text-white">Delete Expense?</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Are you sure you want to delete the expense{' '}
@@ -286,7 +286,7 @@ const TransactionCardRow: React.FC<{
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => onSelectItemAnalytics(exp.itemName)}
-              className="font-extrabold text-slate-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 text-sm sm:text-base text-left cursor-pointer truncate"
+              className="font-extrabold text-slate-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 text-xs sm:text-sm text-left cursor-pointer line-clamp-2 max-w-[180px] xs:max-w-[240px] sm:max-w-none"
             >
               {exp.itemName}
             </button>

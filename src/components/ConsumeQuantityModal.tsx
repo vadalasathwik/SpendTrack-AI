@@ -98,7 +98,7 @@ export const ConsumeQuantityModal: React.FC<ConsumeQuantityModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
       <div
         id="consume-quantity-modal-dialog"
-        className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 p-6 space-y-4 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        className="bg-white dark:bg-slate-900 w-[calc(100vw-24px)] max-w-[420px] rounded-[20px] shadow-2xl border border-slate-100 dark:border-slate-800 p-5 space-y-4 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
       >
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div>

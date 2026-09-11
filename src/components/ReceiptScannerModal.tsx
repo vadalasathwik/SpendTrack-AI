@@ -232,8 +232,8 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
   const totalCalculated = items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto selection:bg-emerald-100">
-      <div className="bg-white rounded-3xl max-w-3xl w-full p-5 sm:p-8 shadow-2xl border border-slate-100 relative my-6 max-h-[90vh] flex flex-col justify-between overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-md flex items-center justify-center p-3 overflow-hidden selection:bg-emerald-100">
+      <div className="bg-white dark:bg-slate-900 rounded-[20px] max-w-[420px] sm:max-w-2xl w-[calc(100vw-24px)] p-4 sm:p-6 shadow-2xl border border-slate-100 dark:border-slate-800 relative max-h-[88vh] flex flex-col justify-between overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">

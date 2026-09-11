@@ -69,7 +69,7 @@ export const QuickAddFAB: React.FC<QuickAddFABProps> = ({
   ];
 
   return (
-    <div className="fixed bottom-20 md:bottom-8 right-4 md:right-8 z-40 flex flex-col items-end">
+    <div className="fixed right-[20px] md:right-8 z-40 flex flex-col items-end [bottom:calc(env(safe-area-inset-bottom)+88px)] md:bottom-8">
       {/* Backdrop overlay when open */}
       {isOpen && (
         <div

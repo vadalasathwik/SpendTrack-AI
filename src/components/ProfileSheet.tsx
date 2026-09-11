@@ -39,12 +39,12 @@ export const ProfileSheet: React.FC<ProfileSheetProps> = ({
   const userInitials = userEmail ? userEmail.substring(0, 2).toUpperCase() : 'ST';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:justify-end p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center sm:justify-end p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
       <div className="fixed inset-0" onClick={onClose} aria-hidden="true" />
 
       <div
         id="profile-sheet-dialog"
-        className="relative bg-white dark:bg-slate-900 w-full sm:max-w-sm rounded-t-[24px] sm:rounded-[20px] shadow-2xl border border-slate-200/90 dark:border-slate-800 flex flex-col overflow-hidden animate-in slide-in-from-bottom sm:slide-in-from-right duration-200 max-h-[85vh] sm:max-h-[90vh]"
+        className="relative bg-white dark:bg-slate-900 w-[calc(100vw-24px)] sm:max-w-sm rounded-[20px] shadow-2xl border border-slate-200/90 dark:border-slate-800 flex flex-col overflow-hidden animate-in zoom-in-95 sm:slide-in-from-right duration-200 max-h-[85vh] sm:max-h-[90vh]"
       >
         {/* Handle bar on mobile */}
         <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mt-3 sm:hidden" />

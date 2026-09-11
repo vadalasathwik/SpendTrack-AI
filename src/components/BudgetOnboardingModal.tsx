@@ -58,10 +58,10 @@ export const BudgetOnboardingModal: React.FC<BudgetOnboardingModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-950/70 backdrop-blur-sm">
       <div
         id="budget-onboarding-modal-dialog"
-        className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 p-6 sm:p-8 space-y-6 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+        className="bg-white dark:bg-slate-900 w-[calc(100vw-24px)] max-w-[420px] rounded-[20px] shadow-2xl border border-slate-100 dark:border-slate-800 p-5 sm:p-6 space-y-5 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
       >
         {/* Header */}
         <div className="text-center space-y-2">

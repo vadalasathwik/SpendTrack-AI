@@ -1165,17 +1165,19 @@ export function App() {
 
       {/* Top Application Header */}
       <header className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-2xs">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          {/* Left: Logo & Current Month Pill */}
-          <div className="flex items-center gap-3 select-none">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-5 lg:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 overflow-hidden">
+          {/* Left: TrackPay Logo */}
+          <div className="flex items-center shrink-0 select-none">
             <div
               onClick={() => setActiveTab('dashboard')}
               className="cursor-pointer"
             >
               <TrackPayLogo size="md" showText />
             </div>
+          </div>
 
-            {/* Global Date Range Dropdown */}
+          {/* Center: Global Date Range Dropdown */}
+          <div className="flex-1 flex justify-center min-w-0 px-1">
             <DateRangePicker
               value={dateRange}
               onChange={handleDateRangeChange}
@@ -1183,7 +1185,7 @@ export function App() {
           </div>
 
           {/* Center (Desktop): Exactly 4 Primary Navigation Tabs (Home, Expenses, Payments, AI) */}
-          <nav className="hidden md:flex items-center space-x-1 bg-slate-100/80 dark:bg-slate-800/80 p-1 rounded-[16px] border border-slate-200/60 dark:border-slate-700/60">
+          <nav className="hidden md:flex items-center space-x-1 bg-slate-100/80 dark:bg-slate-800/80 p-1 rounded-[16px] border border-slate-200/60 dark:border-slate-700/60 shrink-0">
             {[
               { key: 'dashboard', label: 'Home', icon: Home },
               { key: 'expenses', label: 'Expenses', icon: Receipt },
@@ -1211,23 +1213,25 @@ export function App() {
           </nav>
 
           {/* Right: Sync Status + Bell + ☰ Hamburger Menu + Profile Avatar */}
-          <div className="flex items-center gap-2 shrink-0">
-            <SyncStatusBadge
-              status={syncStatus}
-              isOnline={isOnline}
-              onRetry={loadDataFromWorkspace}
-              compact={true}
-            />
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <div className="hidden xs:block">
+              <SyncStatusBadge
+                status={syncStatus}
+                isOnline={isOnline}
+                onRetry={loadDataFromWorkspace}
+                compact={true}
+              />
+            </div>
 
             {/* Notification Bell Button */}
             <button
               onClick={() => setIsNotificationDrawerOpen(true)}
-              className="p-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-[14px] hover:bg-slate-100 dark:hover:bg-slate-800 relative cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center border border-slate-200/80 dark:border-slate-800 transition-colors"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-[14px] hover:bg-slate-100 dark:hover:bg-slate-800 relative cursor-pointer flex items-center justify-center border border-slate-200/80 dark:border-slate-800 transition-colors"
               aria-label="Notifications"
             >
               <Bell className="w-4 h-4 text-slate-700 dark:text-slate-300" />
               {persistedNotifications.filter((n) => !n.read).length > 0 && (
-                <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black ring-2 ring-white dark:ring-slate-900">
+                <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black ring-2 ring-white dark:ring-slate-900">
                   {persistedNotifications.filter((n) => !n.read).length}
                 </span>
               )}
@@ -1237,7 +1241,7 @@ export function App() {
             <button
               id="header-hamburger-menu-btn"
               onClick={() => setIsMoreDrawerOpen(true)}
-              className="p-2 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white rounded-[14px] hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center border border-slate-200/80 dark:border-slate-800 transition-colors"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white rounded-[14px] hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-center border border-slate-200/80 dark:border-slate-800 transition-colors"
               aria-label="More Features Menu"
               title="More Features (☰)"
             >
@@ -1248,7 +1252,7 @@ export function App() {
             <button
               id="header-profile-avatar-btn"
               onClick={() => setIsProfileSheetOpen(true)}
-              className="w-10 h-10 rounded-[14px] bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 font-bold border-2 border-emerald-500 flex items-center justify-center text-xs cursor-pointer shadow-xs overflow-hidden transition-transform hover:scale-105 active:scale-95 shrink-0"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-[14px] bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 font-bold border-2 border-emerald-500 flex items-center justify-center text-xs cursor-pointer shadow-xs overflow-hidden transition-transform hover:scale-105 active:scale-95 shrink-0"
               aria-label="Profile and Account Settings"
               title="Profile & Account"
             >
@@ -1452,17 +1456,17 @@ export function App() {
       {/* STREAMLINED 5-TAB MOBILE BOTTOM NAVIGATION */}
       <nav
         id="mobile-bottom-nav"
-        className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/90 dark:border-slate-800/90 z-40 px-2 py-1.5 shadow-xl flex justify-around items-center h-16"
+        className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/90 dark:border-slate-800/90 z-40 grid grid-cols-5 items-center h-16 pb-[env(safe-area-inset-bottom)] shadow-xl w-full max-w-[100vw]"
       >
         {/* 1. Home */}
         <button
           id="mobile-nav-dashboard"
           onClick={() => setActiveTab('dashboard')}
-          className={`flex flex-col items-center justify-center py-1 px-3 text-[10px] font-bold transition-all duration-200 cursor-pointer min-w-[44px] min-h-[44px] ${
+          className={`flex flex-col items-center justify-center py-1 text-[11px] font-bold transition-all duration-200 cursor-pointer w-full h-full min-h-[44px] ${
             activeTab === 'dashboard' ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-slate-500 dark:text-slate-400'
           }`}
         >
-          <Home className="w-5 h-5 mb-0.5 stroke-[2]" />
+          <Home className="w-[22px] h-[22px] mb-0.5 stroke-[2]" />
           <span>Home</span>
         </button>
 
@@ -1470,16 +1474,16 @@ export function App() {
         <button
           id="mobile-nav-expenses"
           onClick={() => setActiveTab('expenses')}
-          className={`flex flex-col items-center justify-center py-1 px-3 text-[10px] font-bold transition-all duration-200 cursor-pointer min-w-[44px] min-h-[44px] ${
+          className={`flex flex-col items-center justify-center py-1 text-[11px] font-bold transition-all duration-200 cursor-pointer w-full h-full min-h-[44px] ${
             activeTab === 'expenses' ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-slate-500 dark:text-slate-400'
           }`}
         >
-          <Receipt className="w-5 h-5 mb-0.5 stroke-[2]" />
+          <Receipt className="w-[22px] h-[22px] mb-0.5 stroke-[2]" />
           <span>Expenses</span>
         </button>
 
         {/* 3. Center Elevated + Add Button */}
-        <div className="flex justify-center -mt-6">
+        <div className="flex items-center justify-center w-full h-full">
           <button
             id="mobile-nav-add-btn"
             onClick={() => {
@@ -1487,7 +1491,7 @@ export function App() {
               setInitialMonthlyItem(null);
               setIsAddExpenseOpen(true);
             }}
-            className="w-13 h-13 rounded-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white flex items-center justify-center shadow-lg shadow-emerald-600/35 border-4 border-slate-50 dark:border-slate-900 active:scale-95 transition-all duration-200 cursor-pointer"
+            className="w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white flex items-center justify-center shadow-lg shadow-emerald-600/35 border-4 border-slate-50 dark:border-slate-900 active:scale-95 transition-all duration-200 cursor-pointer -mt-5 shrink-0"
             title="Add Expense"
             aria-label="Add Expense"
           >
@@ -1499,11 +1503,11 @@ export function App() {
         <button
           id="mobile-nav-payments"
           onClick={() => setActiveTab('recurring')}
-          className={`flex flex-col items-center justify-center py-1 px-3 text-[10px] font-bold transition-all duration-200 cursor-pointer min-w-[44px] min-h-[44px] ${
+          className={`flex flex-col items-center justify-center py-1 text-[11px] font-bold transition-all duration-200 cursor-pointer w-full h-full min-h-[44px] ${
             activeTab === 'recurring' ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-slate-500 dark:text-slate-400'
           }`}
         >
-          <CreditCard className="w-5 h-5 mb-0.5 stroke-[2]" />
+          <CreditCard className="w-[22px] h-[22px] mb-0.5 stroke-[2]" />
           <span>Payments</span>
         </button>
 
@@ -1511,11 +1515,11 @@ export function App() {
         <button
           id="mobile-nav-ai"
           onClick={() => setActiveTab('ai')}
-          className={`flex flex-col items-center justify-center py-1 px-3 text-[10px] font-bold transition-all duration-200 cursor-pointer min-w-[44px] min-h-[44px] ${
+          className={`flex flex-col items-center justify-center py-1 text-[11px] font-bold transition-all duration-200 cursor-pointer w-full h-full min-h-[44px] ${
             activeTab === 'ai' ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-slate-500 dark:text-slate-400'
           }`}
         >
-          <Sparkles className="w-5 h-5 mb-0.5 stroke-[2]" />
+          <Sparkles className="w-[22px] h-[22px] mb-0.5 stroke-[2]" />
           <span>AI</span>
         </button>
       </nav>

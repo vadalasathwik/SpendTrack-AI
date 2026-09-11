@@ -419,8 +419,8 @@ export const MonthlyItemsPage: React.FC<MonthlyItemsPageProps> = ({
 
       {/* Add / Edit Monthly Item Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-100 p-6 space-y-4 my-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white w-[calc(100vw-24px)] max-w-[420px] rounded-[20px] shadow-2xl border border-slate-100 dark:border-slate-800 p-5 space-y-4 max-h-[88vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">
@@ -631,7 +631,7 @@ export const MonthlyItemsPage: React.FC<MonthlyItemsPageProps> = ({
       {/* Delete Confirmation Modal */}
       {itemToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl border border-slate-100 p-6 space-y-4">
+          <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white w-[calc(100vw-24px)] max-w-[420px] rounded-[20px] shadow-2xl border border-slate-100 dark:border-slate-800 p-5 space-y-4">
             <h3 className="text-base font-bold text-slate-900">Remove Consumable Item?</h3>
             <p className="text-xs text-slate-500">
               Are you sure you want to remove <strong className="text-slate-900">{itemToDelete.name}</strong> from your regular catalog?
