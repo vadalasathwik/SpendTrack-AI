@@ -76,17 +76,46 @@ export const clearAuthSession = () => {
 
 /* ---------------- Auth Listener ---------------- */
 
+const authListeners = new Set<(user: User | null) => void>();
+
+export const notifyAuthListeners = (user: User | null) => {
+  authListeners.forEach((cb) => {
+    try {
+      cb(user);
+    } catch (err) {
+      console.warn("Auth listener notification error:", err);
+    }
+  });
+};
+
 export const onAuthStateChange = (
   callback: (user: User | null) => void
 ) => {
-  // If Firebase is NOT configured or auth instance is null, do NOT call any Firebase auth listener methods
+  authListeners.add(callback);
+
+  // If Firebase is NOT configured or auth instance is null, check stored session
   if (!isFirebaseConfigured || !auth) {
-    callback(null);
-    return () => {};
+    const user = getStoredUserProfile();
+    const storedJWT = getStoredJWT();
+    if (user && storedJWT) {
+      callback({
+        uid: user.uid,
+        email: user.email,
+        displayName: user.name,
+        photoURL: user.photoURL,
+      } as any);
+    } else {
+      callback(null);
+    }
+    return () => {
+      authListeners.delete(callback);
+    };
   }
 
+  let firebaseUnsubscribe = () => {};
+
   try {
-    return onAuthStateChanged(
+    firebaseUnsubscribe = onAuthStateChanged(
       auth,
       (firebaseUser) => {
         const storedJWT = getStoredJWT();
@@ -125,8 +154,12 @@ export const onAuthStateChange = (
   } catch (err) {
     console.warn("Firebase Auth listener notice:", err);
     callback(null);
-    return () => {};
   }
+
+  return () => {
+    authListeners.delete(callback);
+    firebaseUnsubscribe();
+  };
 };
 
 /* ---------------- Google Sign In ---------------- */
@@ -200,8 +233,14 @@ export const signInWithGoogle = async (
 /* ---------------- Sign Out ---------------- */
 
 export const signOutApp = async () => {
+  // 1. Remove stored JWT, user profile, and cached workspace state
+  clearAuthSession();
+
+  // 2. Perform Firebase signOut if configured
   if (isFirebaseConfigured && auth) {
     await signOut(auth).catch(() => {});
   }
-  clearAuthSession();
+
+  // 3. Emit auth change immediately
+  notifyAuthListeners(null);
 };

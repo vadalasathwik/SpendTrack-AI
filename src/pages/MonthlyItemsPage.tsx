@@ -272,42 +272,33 @@ export const MonthlyItemsPage: React.FC<MonthlyItemsPageProps> = ({
               <div
                 key={item.id}
                 id={`monthly-item-card-${item.id}`}
-                className={`bg-white rounded-2xl border p-5 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between ${
-                  isLowStock ? 'border-amber-300 ring-2 ring-amber-400/20' : 'border-slate-200/80'
+                className={`bg-white dark:bg-slate-900 rounded-[20px] border p-5 soft-shadow hover:shadow-md transition-all flex flex-col justify-between ${
+                  isLowStock ? 'border-amber-300 dark:border-amber-800 ring-2 ring-amber-400/20' : 'border-slate-200/80 dark:border-slate-800'
                 }`}
               >
                 <div>
-                  {/* Card Top Row */}
+                  {/* Card Header: Icon, Name, Category, Small Amber Low Stock Badge */}
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-3">
                       <div
-                        className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shadow-2xs flex-shrink-0"
+                        className="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-bold text-xs shadow-2xs flex-shrink-0"
                         style={{ backgroundColor: CATEGORY_COLORS[item.category] || '#64748B' }}
                       >
                         {item.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-tight">
+                          <h3 className="font-bold text-slate-900 dark:text-white text-base leading-tight">
                             {item.name}
                           </h3>
                           {isLowStock && (
-                            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
-                              <AlertTriangle className="w-3 h-3" />
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
                               Low Stock
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[11px] font-medium text-slate-500">
-                            {item.category}
-                          </span>
-                          {item.subcategory && (
-                            <>
-                              <span className="text-slate-300">•</span>
-                              <span className="text-[11px] text-slate-400">{item.subcategory}</span>
-                            </>
-                          )}
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          {item.category} {item.subcategory ? `• ${item.subcategory}` : ''}
                         </div>
                       </div>
                     </div>
@@ -315,102 +306,94 @@ export const MonthlyItemsPage: React.FC<MonthlyItemsPageProps> = ({
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => openEditModal(item)}
-                        className="p-1 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
+                        className="p-1.5 text-slate-400 hover:text-blue-600 rounded-xl hover:bg-blue-50 dark:hover:bg-slate-800 cursor-pointer"
                         title="Edit Item"
                       >
-                        <Edit2 className="w-3.5 h-3.5" />
+                        <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => setItemToDelete(item)}
-                        className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 cursor-pointer"
+                        className="p-1.5 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-800 cursor-pointer"
                         title="Delete Item"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
 
-                  {/* Stock Remaining & Progress Bar */}
-                  <div className="my-3.5 p-3.5 rounded-2xl bg-slate-50 border border-slate-100 space-y-2.5">
-                    <div className="flex items-center justify-between text-xs">
+                  {/* Stock Remaining & Color Progress Bar */}
+                  <div className="my-4 p-4 rounded-[16px] bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
                       <div>
-                        <span className="text-[10px] text-slate-400 block font-semibold uppercase">
-                          Remaining Quantity
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">
+                          Remaining Stock
                         </span>
-                        <span className={`font-black text-base sm:text-lg ${isLowStock ? 'text-amber-700' : 'text-slate-900'}`}>
+                        <span className={`text-xl font-black ${isLowStock ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'}`}>
                           {remaining} {item.unit}
-                          {opening > 0 && (
-                            <span className="text-xs font-normal text-slate-400 ml-1">/ {opening} {item.unit}</span>
-                          )}
+                          {opening > 0 && <span className="text-xs font-normal text-slate-400 ml-1">/ {opening} {item.unit}</span>}
                         </span>
                       </div>
 
                       <div className="text-right">
-                        <span className="text-[10px] text-slate-400 block font-semibold uppercase">Min Threshold</span>
-                        <span className="font-bold text-slate-700">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Min Threshold</span>
+                        <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
                           {minThreshold} {item.unit}
                         </span>
                       </div>
                     </div>
 
                     {/* Stock Progress Bar */}
-                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                    <div className="w-full bg-slate-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
                       <div
-                        className={`h-full transition-all duration-300 ${
+                        className={`h-full transition-all duration-300 rounded-full ${
                           isLowStock ? 'bg-amber-500' : 'bg-emerald-500'
                         }`}
                         style={{ width: `${percentageStock}%` }}
                       />
                     </div>
 
-                    {/* Consumption Intelligence: Daily Usage, Depletion Date, Reorder Date */}
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/60 text-[11px]">
+                    {/* Usage, Depletion & Reorder */}
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 text-xs">
                       <div>
-                        <span className="text-slate-400 block text-[10px] font-semibold">Daily Usage</span>
-                        <strong className="text-slate-800 font-bold block truncate">
+                        <span className="text-[10px] font-semibold text-slate-400 block">Daily Usage</span>
+                        <strong className="text-slate-900 dark:text-white font-bold block truncate">
                           {intel.dailyUsage > 0 ? `${intel.dailyUsage} ${item.unit}/d` : '—'}
                         </strong>
                       </div>
                       <div>
-                        <span className="text-slate-400 block text-[10px] font-semibold">Est. Depletion</span>
-                        <strong className="text-slate-800 font-bold block truncate">
+                        <span className="text-[10px] font-semibold text-slate-400 block">Depletion Date</span>
+                        <strong className="text-slate-900 dark:text-white font-bold block truncate">
                           {intel.estimatedDepletionDate ? formatDisplayDate(intel.estimatedDepletionDate) : '—'}
                         </strong>
                       </div>
                       <div>
-                        <span className="text-slate-400 block text-[10px] font-semibold">Reorder Date</span>
-                        <strong className="text-emerald-700 font-bold block truncate">
+                        <span className="text-[10px] font-semibold text-slate-400 block">Reorder Date</span>
+                        <strong className="text-emerald-600 dark:text-emerald-400 font-bold block truncate">
                           {intel.recommendedReorderDate ? formatDisplayDate(intel.recommendedReorderDate) : '—'}
                         </strong>
                       </div>
                     </div>
                   </div>
-
-                  {item.notes && (
-                    <p className="text-xs text-slate-500 italic mb-3 line-clamp-2">
-                      "{item.notes}"
-                    </p>
-                  )}
                 </div>
 
-                {/* Action Buttons: Consume Qty & Log Purchase */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                {/* Bottom Action Buttons: Consume & Purchase */}
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
                   <button
                     onClick={() => onOpenConsumeModal(item)}
                     id={`btn-consume-${item.id}`}
-                    className="px-3.5 py-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    className="flex-1 py-2 text-xs font-bold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-200 dark:border-amber-800 rounded-[14px] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Minus className="w-3.5 h-3.5" />
-                    <span>Consume Qty</span>
+                    <span>Consume</span>
                   </button>
 
                   <button
                     onClick={() => onQuickAddPurchase(item)}
                     id={`btn-log-purchase-${item.id}`}
-                    className="px-3.5 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    className="flex-1 py-2 text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 rounded-[14px] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Log Purchase</span>
+                    <span>Purchase</span>
                   </button>
                 </div>
               </div>

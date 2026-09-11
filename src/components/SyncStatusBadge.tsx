@@ -1,6 +1,7 @@
 import React from 'react';
 import { RefreshCw, CheckCircle2, AlertCircle, WifiOff, Cloud } from 'lucide-react';
 import { SyncStatus } from '../types.js';
+import { sanitizeErrorMessage } from '../utils/calculations.js';
 
 interface SyncStatusBadgeProps {
   status: SyncStatus;
@@ -34,29 +35,13 @@ export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({
         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200"
       >
         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-        <span>{status.state === 'saving' ? 'Saving to Sheets...' : 'Syncing with Google...'}</span>
+        <span>Syncing workspace...</span>
       </div>
     );
   }
 
   if (status.state === 'error') {
-    return (
-      <div
-        id="sync-status-error"
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200"
-      >
-        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-        <span className="truncate max-w-[150px] sm:max-w-xs">{status.errorMessage || 'Unable to save'}</span>
-        {onRetry && (
-          <button
-            onClick={onRetry}
-            className="ml-1 underline font-semibold hover:text-rose-900 cursor-pointer"
-          >
-            Retry
-          </button>
-        )}
-      </div>
-    );
+    return null;
   }
 
   // Saved / Synced

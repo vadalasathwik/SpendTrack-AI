@@ -409,4 +409,72 @@ export const SpendTrackApi = {
       method: "POST",
     });
   },
+
+  // Google Calendar Integration
+  async createCalendarEvent(eventDetails: {
+    title?: string;
+    summary?: string;
+    description?: string;
+    startDate?: string;
+    startTime?: string;
+    date?: string;
+    time?: string;
+    dueDate?: string;
+    notifyBefore?: string;
+    minutesBefore?: number;
+    frequency?: string;
+    recurring?: boolean;
+    amount?: number;
+    currencySymbol?: string;
+    colorId?: string;
+  }) {
+    return apiFetch<{ success: boolean; eventId: string; htmlLink?: string }>("/api/calendar/event", {
+      method: "POST",
+      body: JSON.stringify(eventDetails),
+    });
+  },
+
+  async updateCalendarEvent(
+    eventId: string,
+    eventDetails: {
+      title?: string;
+      summary?: string;
+      description?: string;
+      startDate?: string;
+      startTime?: string;
+      date?: string;
+      time?: string;
+      dueDate?: string;
+      notifyBefore?: string;
+      minutesBefore?: number;
+      frequency?: string;
+      recurring?: boolean;
+      amount?: number;
+      currencySymbol?: string;
+      colorId?: string;
+    }
+  ) {
+    return apiFetch<{ success: boolean; eventId: string; htmlLink?: string }>(`/api/calendar/event/${eventId}`, {
+      method: "PUT",
+      body: JSON.stringify(eventDetails),
+    });
+  },
+
+  async deleteCalendarEvent(eventId: string) {
+    return apiFetch<{ success: boolean }>(`/api/calendar/event/${eventId}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getUpcomingCalendarEvents(maxResults = 5) {
+    const res = await apiFetch<any>(`/api/calendar/upcoming?maxResults=${maxResults}`);
+    if (res && Array.isArray(res.events)) return res.events;
+    return [];
+  },
+
+  async syncCalendarNow() {
+    return apiFetch<{ success: boolean; lastSyncedAt: string; eventsCount: number }>("/api/calendar/sync", {
+      method: "POST",
+    });
+  },
 };

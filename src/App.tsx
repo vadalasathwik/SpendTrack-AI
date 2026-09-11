@@ -1,21 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
-  LayoutDashboard,
+  Home,
   Receipt,
-  BarChart3,
-  Repeat,
-  Settings,
+  CreditCard,
+  Sparkles,
   Plus,
   TrendingUp,
-  Sparkles,
-  Layers,
-  LogOut,
-  LogIn,
-  RefreshCw,
-  ShoppingCart,
-  Bot,
   Menu,
-  Users,
   Bell,
   User,
 } from 'lucide-react';
@@ -34,13 +25,15 @@ import {
   DEFAULT_CATEGORIES,
 } from './data/defaults.js';
 import { getDateRangeFromPreset } from './utils/dateRanges.js';
-import { calculateMonthlyItemIntelligence } from './utils/calculations.js';
+import { calculateMonthlyItemIntelligence, sanitizeErrorMessage, findMatchingRecurringBill } from './utils/calculations.js';
 import { SpendTrackApi } from './services/api.js';
 import { signInWithGoogle, signOutApp, onAuthStateChange, clearAuthSession, getStoredJWT } from './services/authService.js';
 import { isFirebaseConfigured } from './services/firebase.js';
 import { BRAND_NAME } from './constants/brand.js';
 
 // UI Components
+import { TrackPayLogo } from './components/TrackPayLogo.js';
+import { SplashScreen } from './components/SplashScreen.js';
 import { SyncStatusBadge } from './components/SyncStatusBadge.js';
 import { DateRangePicker } from './components/DateRangePicker.js';
 import { AddExpenseModal } from './components/AddExpenseModal.js';
@@ -51,6 +44,8 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt.js';
 import { NotificationDrawer } from './components/NotificationDrawer.js';
 import { ConsumeQuantityModal } from './components/ConsumeQuantityModal.js';
 import { BudgetOnboardingModal } from './components/BudgetOnboardingModal.js';
+import { QuickAddFAB } from './components/QuickAddFAB.js';
+import { ProfileSheet } from './components/ProfileSheet.js';
 
 // Pages
 import { DashboardPage } from './pages/DashboardPage.js';
@@ -68,12 +63,51 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Terms from "./pages/Terms";
 import { FamilyWorkspacePage } from './pages/FamilyWorkspacePage.js';
 
+const DATE_RANGE_STORAGE_KEY = 'spendtrack_date_range';
+const ACTIVE_TAB_STORAGE_KEY = 'spendtrack_active_tab';
+
+const getInitialDateRange = (): DateRange => {
+  try {
+    const stored = localStorage.getItem(DATE_RANGE_STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (parsed && parsed.preset) {
+        if (parsed.preset === 'custom' && parsed.startDate && parsed.endDate) {
+          return getDateRangeFromPreset('custom', parsed.startDate, parsed.endDate);
+        }
+        return getDateRangeFromPreset(parsed.preset);
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to read saved date range:', err);
+  }
+  return getDateRangeFromPreset('currentMonth');
+};
+
+const getInitialActiveTab = (): any => {
+  try {
+    const stored = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
+    if (stored) return stored;
+  } catch (err) {}
+  return 'dashboard';
+};
+
 export function App() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<
     'dashboard' | 'budget' | 'expenses' | 'monthly-items' | 'items' | 'analytics' | 'recurring' | 'ai' | 'family' | 'settings'
-  >('dashboard');
+  >(getInitialActiveTab);
   const [isMoreDrawerOpen, setIsMoreDrawerOpen] = useState(false);
+
+  const handleSelectTab = (tab: string) => {
+    setActiveTab(tab as any);
+    try {
+      localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, tab);
+    } catch (err) {}
+  };
+
+  // Splash Screen State
+  const [showSplash, setShowSplash] = useState(true);
 
   // Auth & Workspace Provisioning State
   const [user, setUser] = useState<any>(null);
@@ -81,8 +115,24 @@ export function App() {
   const [isProvisioning, setIsProvisioning] = useState(false);
   const [provisioningStep, setProvisioningStep] = useState(0);
 
-  // Date Range State
-  const [dateRange, setDateRange] = useState<DateRange>(getDateRangeFromPreset('currentMonth'));
+  // Date Range State with Persistence
+  const [dateRange, setDateRange] = useState<DateRange>(getInitialDateRange);
+
+  const handleDateRangeChange = (newRange: DateRange) => {
+    setDateRange(newRange);
+    try {
+      localStorage.setItem(
+        DATE_RANGE_STORAGE_KEY,
+        JSON.stringify({
+          preset: newRange.preset,
+          startDate: newRange.startDate,
+          endDate: newRange.endDate,
+        })
+      );
+    } catch (err) {
+      console.warn('Failed to persist date range:', err);
+    }
+  };
 
   // Data Store
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -108,8 +158,10 @@ export function App() {
 
   // Modals & Assistant State
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [autoOpenRecurringModal, setAutoOpenRecurringModal] = useState(false);
   const [isScanReceiptOpen, setIsScanReceiptOpen] = useState(false);
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
+  const [isProfileSheetOpen, setIsProfileSheetOpen] = useState(false);
   const [isConsumeModalOpen, setIsConsumeModalOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [selectedConsumeItem, setSelectedConsumeItem] = useState<MonthlyItem | null>(null);
@@ -151,6 +203,27 @@ export function App() {
     };
   }, []);
 
+  // Sign Out handler:Immediately clears local app state and executes signOutApp
+  const handleSignOut = async () => {
+    setIsMoreDrawerOpen(false);
+    setIsProfileSheetOpen(false);
+    setIsNotificationDrawerOpen(false);
+    setIsAddExpenseOpen(false);
+    setIsScanReceiptOpen(false);
+    setIsConsumeModalOpen(false);
+
+    setUser(null);
+    setExpenses([]);
+    setRecurringExpenses([]);
+    setMonthlyItems([]);
+    setConsumptionLogs([]);
+    setPersistedNotifications([]);
+    setSyncStatus({ state: 'idle' });
+    setActiveTab('dashboard');
+
+    await signOutApp();
+  };
+
   // Auth Listener: Resolves auth state before triggering any workspace data loading
   useEffect(() => {
     const unsubscribe = onAuthStateChange((firebaseUser) => {
@@ -159,6 +232,16 @@ export function App() {
         setUser(firebaseUser);
       } else {
         setUser(null);
+        setExpenses([]);
+        setRecurringExpenses([]);
+        setMonthlyItems([]);
+        setConsumptionLogs([]);
+        setPersistedNotifications([]);
+        setIsMoreDrawerOpen(false);
+        setIsProfileSheetOpen(false);
+        setIsNotificationDrawerOpen(false);
+        setSyncStatus({ state: 'idle' });
+        setActiveTab('dashboard');
         clearAuthSession();
       }
       setAuthLoading(false);
@@ -562,8 +645,59 @@ export function App() {
   ) => {
     setSyncStatus({ state: 'saving' });
     try {
-      const created = await SpendTrackApi.createRecurringExpense(itemData);
-      setRecurringExpenses((prev) => [...prev, created]);
+      // 1. Create recurring payment first
+      const savedPayment = await SpendTrackApi.createRecurringExpense(itemData);
+
+      // 2. Immediately after creating payment, if calendar sync is enabled, create calendar event
+      if (itemData.calendarReminderEnabled !== false) {
+        const reminderDate = itemData.reminderDate || itemData.dueDate || new Date().toISOString().split('T')[0];
+        const reminderTime = itemData.reminderTime || '20:00';
+        const dueDate = itemData.dueDate || reminderDate;
+        const notifyBefore = itemData.notifyBefore || '1 day';
+
+        console.log("Creating calendar for:", itemData.name);
+
+        const calPayload = {
+          title: `💳 Pay ${itemData.name}`,
+          summary: `💳 Pay ${itemData.name}`,
+          description: `Amount: ₹${itemData.amount}\nCategory: ${itemData.category}\nDue Date: ${dueDate}${itemData.notes ? '\nNotes: ' + itemData.notes : ''}\n\nCreated by TrackPay.`,
+          startDate: reminderDate,
+          startTime: reminderTime,
+          date: reminderDate,
+          time: reminderTime,
+          dueDate: dueDate,
+          notifyBefore,
+          recurring: false,
+          amount: itemData.amount,
+          colorId: "5", // 🟡 Yellow / Upcoming
+        };
+
+        try {
+          const cal = await SpendTrackApi.createCalendarEvent(calPayload);
+          if (cal && cal.success && cal.eventId) {
+            console.log("Calendar Event ID:", cal.eventId);
+            savedPayment.calendarEventId = cal.eventId;
+            savedPayment.calendarHtmlLink = cal.htmlLink;
+            savedPayment.calendarSyncStatus = 'synced';
+
+            // Persist calendar fields to Google Sheets
+            await SpendTrackApi.updateRecurringExpense(savedPayment.id, {
+              calendarEventId: cal.eventId,
+              calendarHtmlLink: cal.htmlLink,
+              calendarSyncStatus: 'synced',
+            }).catch((err) => {
+              console.warn('Non-fatal: Error updating calendar fields on payment:', err);
+            });
+          } else {
+            savedPayment.calendarSyncStatus = 'error';
+          }
+        } catch (calErr) {
+          console.error("Unable to create calendar reminder:", calErr);
+          savedPayment.calendarSyncStatus = 'error';
+        }
+      }
+
+      setRecurringExpenses((prev) => [...prev, savedPayment]);
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
       setSyncStatus({ state: 'error', errorMessage: err.message });
@@ -574,11 +708,70 @@ export function App() {
   const handleUpdateRecurring = async (id: string, itemData: Partial<RecurringExpense>) => {
     setSyncStatus({ state: 'saving' });
     try {
+      const existing = recurringExpenses.find((r) => r.id === id);
       const updated = await SpendTrackApi.updateRecurringExpense(id, itemData);
+
+      if (itemData.calendarReminderEnabled !== false && existing) {
+        const targetCalId = itemData.calendarEventId || existing.calendarEventId || updated.calendarEventId;
+        const name = itemData.name || existing.name || 'Bill';
+        const amount = itemData.amount || existing.amount || 0;
+        const category = itemData.category || existing.category || 'Utilities';
+        const reminderDate = itemData.reminderDate || existing.reminderDate || itemData.dueDate || existing.dueDate || new Date().toISOString().split('T')[0];
+        const reminderTime = itemData.reminderTime || existing.reminderTime || '20:00';
+        const dueDate = itemData.dueDate || existing.dueDate || reminderDate;
+        const notifyBefore = itemData.notifyBefore || existing.notifyBefore || '1 day';
+
+        console.log("Updating calendar for:", name);
+
+        const calPayload = {
+          title: `💳 Pay ${name}`,
+          summary: `💳 Pay ${name}`,
+          description: `Amount: ₹${amount}\nCategory: ${category}\nDue Date: ${dueDate}${itemData.notes || existing.notes ? '\nNotes: ' + (itemData.notes || existing.notes) : ''}\n\nCreated by TrackPay.`,
+          startDate: reminderDate,
+          startTime: reminderTime,
+          date: reminderDate,
+          time: reminderTime,
+          dueDate: dueDate,
+          notifyBefore,
+          recurring: false,
+          amount,
+          colorId: "5", // 🟡 Yellow / Upcoming
+        };
+
+        try {
+          if (targetCalId) {
+            const calRes = await SpendTrackApi.updateCalendarEvent(targetCalId, calPayload);
+            updated.calendarEventId = targetCalId;
+            if (calRes && calRes.htmlLink) {
+              updated.calendarHtmlLink = calRes.htmlLink;
+            }
+            updated.calendarSyncStatus = 'synced';
+            console.log("Updated Calendar Event ID:", targetCalId);
+          } else {
+            const cal = await SpendTrackApi.createCalendarEvent(calPayload);
+            if (cal && cal.success && cal.eventId) {
+              console.log("Calendar Event ID:", cal.eventId);
+              updated.calendarEventId = cal.eventId;
+              updated.calendarHtmlLink = cal.htmlLink;
+              updated.calendarSyncStatus = 'synced';
+              await SpendTrackApi.updateRecurringExpense(id, {
+                calendarEventId: cal.eventId,
+                calendarHtmlLink: cal.htmlLink,
+                calendarSyncStatus: 'synced',
+              }).catch(() => {});
+            }
+          }
+        } catch (calErr) {
+          console.error("Unable to update calendar reminder:", calErr);
+          updated.calendarSyncStatus = 'error';
+        }
+      }
+
       setRecurringExpenses((prev) => prev.map((r) => (r.id === id ? updated : r)));
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
-      setSyncStatus({ state: 'error', errorMessage: err.message });
+      const cleanMsg = sanitizeErrorMessage(err.message);
+      setSyncStatus({ state: 'error', errorMessage: cleanMsg });
       throw err;
     }
   };
@@ -590,7 +783,8 @@ export function App() {
       setRecurringExpenses((prev) => prev.filter((r) => r.id !== item.id));
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
-      setSyncStatus({ state: 'error', errorMessage: err.message });
+      const cleanMsg = sanitizeErrorMessage(err.message);
+      setSyncStatus({ state: 'error', errorMessage: cleanMsg });
       throw err;
     }
   };
@@ -609,6 +803,237 @@ export function App() {
       updatedAt: '',
     });
     setIsAddExpenseOpen(true);
+  };
+
+  const handleMarkRecurringAsPaid = async (targetRecurring: RecurringExpense) => {
+    const today = new Date().toISOString().split('T')[0];
+    const currentMonthStr = today.slice(0, 7);
+
+    // Match bill locally using priority order (ID -> Name + Category + Due Day + Amount -> Name + Category)
+    const activeBill = findMatchingRecurringBill(targetRecurring, recurringExpenses) || targetRecurring;
+
+    // Prevent duplicate payment for the same month
+    if (activeBill.lastGeneratedMonth === currentMonthStr) {
+      return;
+    }
+
+    // Capture previous state for rollback
+    const prevExpenses = [...expenses];
+    const prevRecurring = [...recurringExpenses];
+
+    // 1. Optimistic UI updates
+    const tempExpenseId = `exp-rec-${Date.now()}`;
+    const optimisticExpense: Expense = {
+      id: tempExpenseId,
+      itemName: activeBill.name || activeBill.title || 'Recurring Bill',
+      category: activeBill.category,
+      subcategory: activeBill.subcategory,
+      totalPrice: activeBill.amount,
+      purchaseDate: today,
+      usageStartDate: today,
+      usageEndDate: today,
+      durationDays: 30,
+      dailyCost: Number((activeBill.amount / 30).toFixed(2)),
+      dailyQuantity: 1,
+      notes: activeBill.notes ? `Recurring Bill: ${activeBill.notes}` : 'Recurring Bill Payment',
+      source: 'recurring',
+      recurringId: activeBill.id,
+      calendarEventId: activeBill.calendarEventId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Update local React state immediately for instant feedback
+    setExpenses((prev) => [optimisticExpense, ...prev]);
+    setRecurringExpenses((prev) =>
+      prev.map((r) =>
+        r.id === activeBill.id ||
+        (r.name === activeBill.name && r.category === activeBill.category)
+          ? { ...r, lastGeneratedMonth: currentMonthStr, isPaid: true, paidDate: today }
+          : r
+      )
+    );
+
+    setSyncStatus({ state: 'syncing' });
+
+    try {
+      // 2. Create monthly expense on server
+      const expensePayload = {
+        itemName: activeBill.name || activeBill.title || 'Recurring Bill',
+        category: activeBill.category,
+        subcategory: activeBill.subcategory,
+        totalPrice: activeBill.amount,
+        purchaseDate: today,
+        notes: activeBill.notes ? `Recurring Bill: ${activeBill.notes}` : 'Recurring Bill Payment',
+        source: 'recurring' as const,
+        recurringId: activeBill.id,
+        calendarEventId: activeBill.calendarEventId,
+      };
+
+      const createdExpense = await SpendTrackApi.createExpense(expensePayload);
+
+      setExpenses((prev) =>
+        prev.map((e) => (e.id === tempExpenseId ? createdExpense : e))
+      );
+
+      // 3. Update existing row on Google Sheets (never create duplicate)
+      let updateSuccess = false;
+      let targetIdToUpdate = activeBill.id;
+
+      try {
+        const updatedBill = await SpendTrackApi.updateRecurringExpense(targetIdToUpdate, {
+          rowIndex: activeBill.rowIndex,
+          name: activeBill.name || activeBill.title,
+          category: activeBill.category,
+          dueDay: activeBill.dueDay,
+          amount: activeBill.amount,
+          lastGeneratedMonth: currentMonthStr,
+          isPaid: true,
+          paidDate: today,
+        });
+        setRecurringExpenses((prev) =>
+          prev.map((r) => (r.id === targetIdToUpdate || r.id === updatedBill.id ? updatedBill : r))
+        );
+        updateSuccess = true;
+      } catch (firstErr) {
+        // Silent Recovery: fetch latest recurring bills & re-match using fallback strategy
+        setSyncStatus({ state: 'syncing' });
+        try {
+          const freshBills = await SpendTrackApi.getRecurringExpenses();
+          setRecurringExpenses(freshBills);
+
+          const matchedFreshBill = findMatchingRecurringBill(activeBill, freshBills);
+
+          if (matchedFreshBill) {
+            targetIdToUpdate = matchedFreshBill.id;
+            const retriedBill = await SpendTrackApi.updateRecurringExpense(targetIdToUpdate, {
+              rowIndex: matchedFreshBill.rowIndex,
+              name: matchedFreshBill.name || matchedFreshBill.title,
+              category: matchedFreshBill.category,
+              dueDay: matchedFreshBill.dueDay,
+              amount: matchedFreshBill.amount,
+              lastGeneratedMonth: currentMonthStr,
+              isPaid: true,
+              paidDate: today,
+            });
+            setRecurringExpenses((prev) =>
+              prev.map((r) => (r.id === targetIdToUpdate || r.id === retriedBill.id ? retriedBill : r))
+            );
+            updateSuccess = true;
+          }
+        } catch (retryErr) {
+          console.error('Silent recovery retry failed:', retryErr);
+        }
+      }
+
+      if (!updateSuccess) {
+        throw new Error("Couldn't sync changes. Tap Retry.");
+      }
+
+      // 4. Update Google Calendar event to "✅ Paid • WiFi" with Green color (colorId: "2")
+      if (activeBill.calendarReminderEnabled !== false && activeBill.calendarEventId) {
+        const paidDescription = `Amount: ₹${activeBill.amount}\nCategory: ${activeBill.category}\nDue Date: ${activeBill.dueDate || today}\nPaid Date: ${today}${activeBill.notes ? '\nNotes: ' + activeBill.notes : ''}\n\nCreated by TrackPay.`;
+        const updatedPaidCal = await SpendTrackApi.updateCalendarEvent(activeBill.calendarEventId, {
+          title: `✅ Paid • ${activeBill.name || activeBill.title}`,
+          summary: `✅ Paid • ${activeBill.name || activeBill.title}`,
+          description: paidDescription,
+          date: today,
+          startDate: today,
+          amount: activeBill.amount,
+          colorId: "2", // 🟢 Green / Paid
+        }).catch((err) => {
+          console.warn('Non-fatal: Failed to mark calendar event as paid:', err);
+          return null;
+        });
+      }
+
+      // Automatically calculate next cycle's due date & reminder date (+1 month for monthly)
+      const baseDueDate = activeBill.dueDate ? new Date(activeBill.dueDate + 'T00:00:00') : new Date();
+      if (isNaN(baseDueDate.getTime())) baseDueDate.setTime(Date.now());
+
+      const nextDueDateObj = new Date(baseDueDate);
+      if (activeBill.frequency === 'weekly') {
+        nextDueDateObj.setDate(nextDueDateObj.getDate() + 7);
+      } else if (activeBill.frequency === 'yearly') {
+        nextDueDateObj.setFullYear(nextDueDateObj.getFullYear() + 1);
+      } else {
+        // monthly default
+        nextDueDateObj.setMonth(nextDueDateObj.getMonth() + 1);
+      }
+      const nextDueDateStr = nextDueDateObj.toISOString().split('T')[0];
+      const nextReminderDateObj = new Date(nextDueDateObj);
+      nextReminderDateObj.setDate(nextReminderDateObj.getDate() - 1);
+      const nextReminderDateStr = nextReminderDateObj.toISOString().split('T')[0];
+
+      // Schedule next cycle's Google Calendar reminder automatically with Yellow color (colorId: "5")
+      let nextCalEventId = activeBill.calendarEventId;
+      let nextCalHtmlLink = activeBill.calendarHtmlLink;
+      let calendarSyncStatus: 'synced' | 'error' = 'synced';
+
+      if (activeBill.calendarReminderEnabled !== false) {
+        try {
+          const nextCalPayload = {
+            title: `💳 Pay ${activeBill.name || activeBill.title}`,
+            summary: `💳 Pay ${activeBill.name || activeBill.title}`,
+            description: `Amount: ₹${activeBill.amount}\nCategory: ${activeBill.category}\nDue Date: ${nextDueDateStr}${activeBill.notes ? '\nNotes: ' + activeBill.notes : ''}\n\nCreated by TrackPay.`,
+            startDate: nextReminderDateStr,
+            startTime: activeBill.reminderTime || '20:00',
+            date: nextReminderDateStr,
+            time: activeBill.reminderTime || '20:00',
+            dueDate: nextDueDateStr,
+            notifyBefore: activeBill.notifyBefore || '1 day',
+            recurring: false,
+            amount: activeBill.amount,
+            colorId: "5", // 🟡 Yellow / Upcoming
+          };
+
+          const nextCalResult = await SpendTrackApi.createCalendarEvent(nextCalPayload);
+          if (nextCalResult && nextCalResult.success && nextCalResult.eventId) {
+            nextCalEventId = nextCalResult.eventId;
+            nextCalHtmlLink = nextCalResult.htmlLink;
+            calendarSyncStatus = 'synced';
+            console.log("Scheduled next cycle's Calendar Event ID:", nextCalEventId);
+          }
+        } catch (calErr) {
+          console.warn('Auto next month calendar creation warning:', calErr);
+          calendarSyncStatus = 'error';
+        }
+      }
+
+      // Update recurring payment record in Google Sheets and React state for next cycle
+      try {
+        const finalUpdatedBill = await SpendTrackApi.updateRecurringExpense(targetIdToUpdate, {
+          lastGeneratedMonth: currentMonthStr,
+          isPaid: true,
+          paidDate: today,
+          dueDate: nextDueDateStr,
+          reminderDate: nextReminderDateStr,
+          dueDay: nextDueDateObj.getDate(),
+          calendarEventId: nextCalEventId,
+          calendarHtmlLink: nextCalHtmlLink,
+          calendarSyncStatus,
+        });
+
+        setRecurringExpenses((prev) =>
+          prev.map((r) =>
+            r.id === targetIdToUpdate || r.id === finalUpdatedBill.id ? finalUpdatedBill : r
+          )
+        );
+      } catch (nextCycleErr) {
+        console.warn('Next cycle update warning:', nextCycleErr);
+      }
+
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      console.error('Failed to mark bill as paid:', err);
+      // Rollback optimistic state if both attempts fail
+      setExpenses(prevExpenses);
+      setRecurringExpenses(prevRecurring);
+
+      const cleanMessage = sanitizeErrorMessage(err?.message);
+      setSyncStatus({ state: 'error', errorMessage: cleanMessage });
+      throw new Error(cleanMessage);
+    }
   };
 
   // Export / Import CSV
@@ -736,35 +1161,57 @@ export function App() {
             />
           ) : (
             <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800" id="spendtrack-root">
+              {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} durationMs={800} />}
+
       {/* Top Application Header */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-2xs">
-        {/* Desktop Header (>= 768px) */}
-        <div className="hidden md:flex max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 items-center justify-between gap-3">
-          {/* Logo & Brand */}
-          <div
-            onClick={() => setActiveTab('dashboard')}
-            className="flex items-center gap-3 cursor-pointer select-none"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
-              <TrendingUp className="w-5 h-5" />
+      <header className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-2xs">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+          {/* Left: Logo & Current Month Pill */}
+          <div className="flex items-center gap-3 select-none">
+            <div
+              onClick={() => setActiveTab('dashboard')}
+              className="cursor-pointer"
+            >
+              <TrackPayLogo size="md" showText />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-black text-lg tracking-tight text-slate-900">{BRAND_NAME}</span>
-                <span className="hidden sm:inline text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                  Consumption Intelligence
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 leading-none hidden md:block">
-                Understand where your money goes.
-              </p>
-            </div>
+
+            {/* Global Date Range Dropdown */}
+            <DateRangePicker
+              value={dateRange}
+              onChange={handleDateRangeChange}
+            />
           </div>
 
-          {/* Center / Right controls */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <DateRangePicker value={dateRange} onChange={setDateRange} />
+          {/* Center (Desktop): Exactly 4 Primary Navigation Tabs (Home, Expenses, Payments, AI) */}
+          <nav className="hidden md:flex items-center space-x-1 bg-slate-100/80 dark:bg-slate-800/80 p-1 rounded-[16px] border border-slate-200/60 dark:border-slate-700/60">
+            {[
+              { key: 'dashboard', label: 'Home', icon: Home },
+              { key: 'expenses', label: 'Expenses', icon: Receipt },
+              { key: 'recurring', label: 'Payments', icon: CreditCard },
+              { key: 'ai', label: 'AI', icon: Sparkles },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  id={`header-nav-${tab.key}`}
+                  onClick={() => handleSelectTab(tab.key)}
+                  className={`px-3.5 py-1.5 rounded-[12px] text-xs font-bold flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${
+                    isActive
+                      ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-xs font-black'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 stroke-[2]" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
 
+          {/* Right: Sync Status + Bell + ☰ Hamburger Menu + Profile Avatar */}
+          <div className="flex items-center gap-2 shrink-0">
             <SyncStatusBadge
               status={syncStatus}
               isOnline={isOnline}
@@ -775,81 +1222,35 @@ export function App() {
             {/* Notification Bell Button */}
             <button
               onClick={() => setIsNotificationDrawerOpen(true)}
-              className="p-2 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 relative cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center border border-slate-200"
+              className="p-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-[14px] hover:bg-slate-100 dark:hover:bg-slate-800 relative cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center border border-slate-200/80 dark:border-slate-800 transition-colors"
               aria-label="Notifications"
             >
-              <Bell className="w-4 h-4 text-slate-700" />
+              <Bell className="w-4 h-4 text-slate-700 dark:text-slate-300" />
               {persistedNotifications.filter((n) => !n.read).length > 0 && (
-                <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black ring-2 ring-white">
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black ring-2 ring-white dark:ring-slate-900">
                   {persistedNotifications.filter((n) => !n.read).length}
                 </span>
               )}
             </button>
 
-            {!user || syncStatus.state === 'error' ? (
-              <button
-                id="header-sign-in-btn"
-                onClick={handleGoogleSignIn}
-                className="px-3.5 py-2 text-xs sm:text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>Sign In with Google</span>
-              </button>
-            ) : null}
-
-            {/* Quick Add Expense Action Button */}
+            {/* ☰ Hamburger Menu Button (Opens More Drawer) */}
             <button
-              id="header-quick-add-btn"
-              onClick={() => {
-                setEditingExpense(null);
-                setInitialMonthlyItem(null);
-                setIsAddExpenseOpen(true);
-              }}
-              className="px-3.5 py-2 text-xs sm:text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap active:scale-95"
+              id="header-hamburger-menu-btn"
+              onClick={() => setIsMoreDrawerOpen(true)}
+              className="p-2 text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white rounded-[14px] hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center border border-slate-200/80 dark:border-slate-800 transition-colors"
+              aria-label="More Features Menu"
+              title="More Features (☰)"
             >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Add Expense</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Header (< 768px) */}
-        <div className="flex md:hidden max-w-7xl mx-auto px-4 h-16 items-center justify-between">
-          <div
-            onClick={() => setActiveTab('dashboard')}
-            className="flex items-center gap-2.5 cursor-pointer select-none"
-          >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-            <span className="font-black text-lg tracking-tight text-slate-900">{BRAND_NAME}</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <SyncStatusBadge
-              status={syncStatus}
-              isOnline={isOnline}
-              onRetry={loadDataFromWorkspace}
-              compact={true}
-            />
-
-            <button
-              onClick={() => setIsNotificationDrawerOpen(true)}
-              className="p-2 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 relative cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
-              aria-label="Notifications"
-            >
-              <Bell className="w-5 h-5" />
-              {persistedNotifications.filter((n) => !n.read).length > 0 && (
-                <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-black ring-2 ring-white">
-                  {persistedNotifications.filter((n) => !n.read).length}
-                </span>
-              )}
+              <Menu className="w-4 h-4" />
             </button>
 
+            {/* User Profile Avatar (Opens Profile Sheet) */}
             <button
-              onClick={() => setActiveTab('settings')}
-              className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-800 font-bold border-2 border-emerald-500 flex items-center justify-center text-xs cursor-pointer shadow-xs overflow-hidden"
-              aria-label="Profile"
+              id="header-profile-avatar-btn"
+              onClick={() => setIsProfileSheetOpen(true)}
+              className="w-10 h-10 rounded-[14px] bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 font-bold border-2 border-emerald-500 flex items-center justify-center text-xs cursor-pointer shadow-xs overflow-hidden transition-transform hover:scale-105 active:scale-95 shrink-0"
+              aria-label="Profile and Account Settings"
+              title="Profile & Account"
             >
               {user?.photoURL ? (
                 <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
@@ -861,47 +1262,10 @@ export function App() {
             </button>
           </div>
         </div>
-
-        {/* Desktop Navigation Tabs */}
-        <div className="hidden md:flex max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-100">
-          <nav className="flex space-x-6 overflow-x-auto scrollbar-none">
-            {[
-              { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-              { key: 'budget', label: 'Budget AI', icon: TrendingUp, highlight: true },
-              { key: 'family', label: 'Family Workspace', icon: Users, highlight: true },
-              { key: 'expenses', label: 'Expenses', icon: Receipt },
-              { key: 'monthly-items', label: 'Monthly Items', icon: ShoppingCart },
-              { key: 'items', label: 'Item Intelligence', icon: Sparkles },
-              { key: 'recurring', label: 'Recurring Bills', icon: Repeat },
-              { key: 'ai', label: BRAND_NAME, icon: Bot, highlight: true },
-              { key: 'settings', label: 'Settings', icon: Settings },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  id={`nav-tab-${tab.key}`}
-                  onClick={() => setActiveTab(tab.key as any)}
-                  className={`py-3 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-                    isActive
-                      ? 'border-emerald-600 text-emerald-700'
-                      : tab.highlight
-                      ? 'border-transparent text-emerald-600 hover:text-emerald-800'
-                      : 'border-transparent text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  <Icon className={`w-4 h-4 ${tab.highlight && !isActive ? 'text-emerald-500' : ''}`} />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-24 md:pb-8">
+      <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-24 md:pb-12">
         {activeTab === 'dashboard' && (
           <DashboardPage
             expenses={expenses}
@@ -930,6 +1294,7 @@ export function App() {
               setIsConsumeModalOpen(true);
             }}
             onOpenSettings={() => setActiveTab('settings')}
+            onMarkAsPaid={handleMarkRecurringAsPaid}
           />
         )}
 
@@ -1026,7 +1391,10 @@ export function App() {
             onAddRecurring={handleAddRecurring}
             onUpdateRecurring={handleUpdateRecurring}
             onDeleteRecurring={handleDeleteRecurring}
-            onRecordAsExpense={handleRecordRecurringAsExpense}
+            onRecordAsExpense={handleMarkRecurringAsPaid}
+            onMarkAsPaid={handleMarkRecurringAsPaid}
+            onNavigateToExpenses={() => setActiveTab('expenses')}
+            openAddModalOnMount={autoOpenRecurringModal}
           />
         )}
 
@@ -1052,7 +1420,7 @@ export function App() {
             onSaveUserSettings={handleSaveUserSettings}
             onExportCsv={handleExportCsv}
             onImportCsv={handleImportCsv}
-            onSignOut={signOutApp}
+            onSignOut={handleSignOut}
             onGoogleSignIn={handleGoogleSignIn}
             userEmail={user?.email}
             workspaceStatus={workspaceStatus}
@@ -1061,20 +1429,40 @@ export function App() {
         )}
       </main>
 
-      {/* STREAMLINED MOBILE BOTTOM NAVIGATION */}
+      {/* EXPANDABLE QUICK ADD FAB */}
+      <QuickAddFAB
+        onOpenExpense={() => {
+          setEditingExpense(null);
+          setInitialMonthlyItem(null);
+          setIsAddExpenseOpen(true);
+        }}
+        onOpenStock={() => {
+          setSelectedConsumeItem(null);
+          setIsConsumeModalOpen(true);
+        }}
+        onOpenBill={() => {
+          setAutoOpenRecurringModal(true);
+          setActiveTab('recurring');
+        }}
+        onOpenScanReceipt={() => {
+          setIsScanReceiptOpen(true);
+        }}
+      />
+
+      {/* STREAMLINED 5-TAB MOBILE BOTTOM NAVIGATION */}
       <nav
         id="mobile-bottom-nav"
-        className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200/90 z-40 px-2 py-1.5 shadow-xl flex justify-around items-center"
+        className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/90 dark:border-slate-800/90 z-40 px-2 py-1.5 shadow-xl flex justify-around items-center h-16"
       >
         {/* 1. Home */}
         <button
           id="mobile-nav-dashboard"
           onClick={() => setActiveTab('dashboard')}
-          className={`flex flex-col items-center justify-center py-1 px-2 text-[10px] font-bold transition-all cursor-pointer min-w-[44px] min-h-[44px] ${
-            activeTab === 'dashboard' ? 'text-emerald-600 font-black' : 'text-slate-500 hover:text-slate-800'
+          className={`flex flex-col items-center justify-center py-1 px-3 text-[10px] font-bold transition-all duration-200 cursor-pointer min-w-[44px] min-h-[44px] ${
+            activeTab === 'dashboard' ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-slate-500 dark:text-slate-400'
           }`}
         >
-          <LayoutDashboard className="w-5 h-5 mb-0.5" />
+          <Home className="w-5 h-5 mb-0.5 stroke-[2]" />
           <span>Home</span>
         </button>
 
@@ -1082,15 +1470,15 @@ export function App() {
         <button
           id="mobile-nav-expenses"
           onClick={() => setActiveTab('expenses')}
-          className={`flex flex-col items-center justify-center py-1 px-2 text-[10px] font-bold transition-all cursor-pointer min-w-[44px] min-h-[44px] ${
-            activeTab === 'expenses' ? 'text-emerald-600 font-black' : 'text-slate-500 hover:text-slate-800'
+          className={`flex flex-col items-center justify-center py-1 px-3 text-[10px] font-bold transition-all duration-200 cursor-pointer min-w-[44px] min-h-[44px] ${
+            activeTab === 'expenses' ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-slate-500 dark:text-slate-400'
           }`}
         >
-          <Receipt className="w-5 h-5 mb-0.5" />
+          <Receipt className="w-5 h-5 mb-0.5 stroke-[2]" />
           <span>Expenses</span>
         </button>
 
-        {/* 3. Center Elevated Quick Add Button */}
+        {/* 3. Center Elevated + Add Button */}
         <div className="flex justify-center -mt-6">
           <button
             id="mobile-nav-add-btn"
@@ -1099,47 +1487,36 @@ export function App() {
               setInitialMonthlyItem(null);
               setIsAddExpenseOpen(true);
             }}
-            className="w-13 h-13 rounded-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white flex items-center justify-center shadow-lg shadow-emerald-600/35 border-4 border-slate-50 active:scale-95 transition-all cursor-pointer"
+            className="w-13 h-13 rounded-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white flex items-center justify-center shadow-lg shadow-emerald-600/35 border-4 border-slate-50 dark:border-slate-900 active:scale-95 transition-all duration-200 cursor-pointer"
             title="Add Expense"
+            aria-label="Add Expense"
           >
             <Plus className="w-6 h-6 stroke-[2.5]" />
           </button>
         </div>
 
-        {/* 4. AI */}
+        {/* 4. Payments */}
+        <button
+          id="mobile-nav-payments"
+          onClick={() => setActiveTab('recurring')}
+          className={`flex flex-col items-center justify-center py-1 px-3 text-[10px] font-bold transition-all duration-200 cursor-pointer min-w-[44px] min-h-[44px] ${
+            activeTab === 'recurring' ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          <CreditCard className="w-5 h-5 mb-0.5 stroke-[2]" />
+          <span>Payments</span>
+        </button>
+
+        {/* 5. AI */}
         <button
           id="mobile-nav-ai"
           onClick={() => setActiveTab('ai')}
-          className={`flex flex-col items-center justify-center py-1 px-2 text-[10px] font-bold transition-all cursor-pointer min-w-[44px] min-h-[44px] ${
-            activeTab === 'ai' ? 'text-emerald-600 font-black' : 'text-slate-500 hover:text-slate-800'
+          className={`flex flex-col items-center justify-center py-1 px-3 text-[10px] font-bold transition-all duration-200 cursor-pointer min-w-[44px] min-h-[44px] ${
+            activeTab === 'ai' ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-slate-500 dark:text-slate-400'
           }`}
         >
-          <Bot className="w-5 h-5 mb-0.5" />
+          <Sparkles className="w-5 h-5 mb-0.5 stroke-[2]" />
           <span>AI</span>
-        </button>
-
-        {/* 5. Receipts / Monthly Items */}
-        <button
-          id="mobile-nav-receipts"
-          onClick={() => setActiveTab('monthly-items')}
-          className={`flex flex-col items-center justify-center py-1 px-2 text-[10px] font-bold transition-all cursor-pointer min-w-[44px] min-h-[44px] ${
-            activeTab === 'monthly-items' ? 'text-emerald-600 font-black' : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <ShoppingCart className="w-5 h-5 mb-0.5" />
-          <span>Receipts</span>
-        </button>
-
-        {/* 6. Profile / Settings */}
-        <button
-          id="mobile-nav-profile"
-          onClick={() => setActiveTab('settings')}
-          className={`flex flex-col items-center justify-center py-1 px-2 text-[10px] font-bold transition-all cursor-pointer min-w-[44px] min-h-[44px] ${
-            activeTab === 'settings' ? 'text-emerald-600 font-black' : 'text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <User className="w-5 h-5 mb-0.5" />
-          <span>Profile</span>
         </button>
       </nav>
 
@@ -1149,7 +1526,18 @@ export function App() {
         onClose={() => setIsMoreDrawerOpen(false)}
         activeTab={activeTab}
         onSelectTab={(tab) => setActiveTab(tab as any)}
+      />
+
+      {/* Profile & Account Sheet */}
+      <ProfileSheet
+        isOpen={isProfileSheetOpen}
+        onClose={() => setIsProfileSheetOpen(false)}
         userEmail={user?.email}
+        userName={user?.displayName || undefined}
+        userPhotoUrl={user?.photoURL || undefined}
+        onNavigateToSettings={() => setActiveTab('settings')}
+        onSyncNow={loadDataFromWorkspace}
+        onSignOut={handleSignOut}
       />
 
       {/* Add / Edit Expense Modal */}
@@ -1163,8 +1551,6 @@ export function App() {
         onSave={handleSaveExpense}
         categories={categories}
         editExpense={editingExpense}
-        monthlyItems={monthlyItems}
-        initialMonthlyItem={initialMonthlyItem}
       />
 
       {/* Workspace Provisioning Progress Modal */}

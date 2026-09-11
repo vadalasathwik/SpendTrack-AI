@@ -54,6 +54,7 @@ export interface MonthlyItem {
 
 export interface RecurringExpense {
   id: string;
+  rowIndex?: number;
   name: string; // title
   title?: string;
   category: string;
@@ -65,10 +66,17 @@ export interface RecurringExpense {
   autopost?: boolean;
   reminderDays?: number;
   isActive?: boolean;
+  isPaid?: boolean;
+  paidDate?: string;
   lastGeneratedMonth?: string; // YYYY-MM
   notes?: string;
   calendarReminderEnabled?: boolean;
   calendarEventId?: string;
+  calendarHtmlLink?: string;
+  calendarSyncStatus?: 'synced' | 'syncing' | 'error';
+  reminderDate?: string; // YYYY-MM-DD
+  reminderTime?: string; // HH:mm
+  notifyBefore?: string; // 'At time' | '10 min' | '30 min' | '1 hour' | '1 day' | '3 days'
   lastRecordedDate?: string;
   createdAt: string;
   updatedAt: string;
@@ -149,10 +157,12 @@ export interface BudgetMetrics {
 
 export type DateRangePreset =
   | 'today'
+  | 'yesterday'
   | 'last7days'
   | 'last30days'
   | 'currentMonth'
   | 'previousMonth'
+  | 'currentQuarter'
   | 'last3months'
   | 'last6months'
   | 'currentYear'

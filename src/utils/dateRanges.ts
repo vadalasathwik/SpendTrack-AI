@@ -20,6 +20,18 @@ export function getDateRangeFromPreset(preset: DateRangePreset, customStart?: st
         label: 'Today',
       };
 
+    case 'yesterday': {
+      const y = new Date(today);
+      y.setDate(y.getDate() - 1);
+      const yStr = formatDateToYYYYMMDD(y);
+      return {
+        preset: 'yesterday',
+        startDate: yStr,
+        endDate: yStr,
+        label: 'Yesterday',
+      };
+    }
+
     case 'last7days': {
       const past = new Date(today);
       past.setDate(past.getDate() - 6);
@@ -49,7 +61,7 @@ export function getDateRangeFromPreset(preset: DateRangePreset, customStart?: st
         preset: 'currentMonth',
         startDate: formatDateToYYYYMMDD(start),
         endDate: formatDateToYYYYMMDD(end),
-        label: 'Current Month',
+        label: 'This Month',
       };
     }
 
@@ -60,7 +72,20 @@ export function getDateRangeFromPreset(preset: DateRangePreset, customStart?: st
         preset: 'previousMonth',
         startDate: formatDateToYYYYMMDD(start),
         endDate: formatDateToYYYYMMDD(end),
-        label: 'Previous Month',
+        label: 'Last Month',
+      };
+    }
+
+    case 'currentQuarter': {
+      const currentMonth = today.getMonth();
+      const quarterStartMonth = Math.floor(currentMonth / 3) * 3;
+      const start = new Date(today.getFullYear(), quarterStartMonth, 1);
+      const end = new Date(today.getFullYear(), quarterStartMonth + 3, 0);
+      return {
+        preset: 'currentQuarter',
+        startDate: formatDateToYYYYMMDD(start),
+        endDate: formatDateToYYYYMMDD(end),
+        label: 'This Quarter',
       };
     }
 
@@ -93,7 +118,7 @@ export function getDateRangeFromPreset(preset: DateRangePreset, customStart?: st
         preset: 'currentYear',
         startDate: formatDateToYYYYMMDD(start),
         endDate: formatDateToYYYYMMDD(end),
-        label: 'Current Year',
+        label: 'This Year',
       };
     }
 

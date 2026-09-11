@@ -7,6 +7,7 @@ import { googleSheetsService } from "./google/sheetsService.js";
 import { familyWorkspaceService } from "./services/familyWorkspaceService.js";
 import { geminiAssistantService } from "./services/geminiService.js";
 import { receiptVisionService } from "./services/receiptVisionService.js";
+import { googleCalendarService } from "./services/googleCalendarService.js";
 
 dotenv.config();
 
@@ -457,7 +458,8 @@ export function createExpressApp() {
       const data = await receiptVisionService.analyzeReceiptImage(base64Data, type);
       res.json(data);
     } catch (err: any) {
-      res.status(500).json({ error: err.message || "Failed to scan receipt" });
+      console.error("Server /api/receipt/scan caught error:", err?.message || err);
+      res.status(500).json({ error: "Receipt scanner unavailable" });
     }
   });
 
@@ -503,6 +505,114 @@ export function createExpressApp() {
     res.json({ success: true, predictedMonthlySpend: 15000 });
   });
 
+  // Google Calendar API routes
+  app.post("/api/calendar/event", async (req, res) => {
+    const accessToken = getGoogleToken(req);
+    const userEmail = (req as any).user?.email || "Unknown";
+
+    console.log("Calendar token exists:", !!accessToken);
+    console.log("User:", userEmail);
+    console.log("Creating Calendar Event...");
+
+    if (!accessToken) {
+      return res.status(200).json({
+        success: false,
+        message: "Google Calendar authorization missing",
+      });
+    }
+
+    try {
+      console.log("Creating Calendar Event Payload:", req.body);
+      const result = await googleCalendarService.createCalendarEvent(accessToken, req.body);
+      console.log("Created Calendar Event:", result.eventId);
+      return res.json({
+        success: true,
+        eventId: result.eventId,
+        htmlLink: result.htmlLink,
+      });
+    } catch (err: any) {
+      console.error("Google Calendar API Error:", err.message || err);
+      return res.status(500).json({
+        success: false,
+        error: err.message || "Failed to create Google Calendar event",
+        message: "Unable to create calendar reminder.",
+      });
+    }
+  });
+
+  app.put("/api/calendar/event/:id", async (req, res) => {
+    const accessToken = getGoogleToken(req);
+    const userEmail = (req as any).user?.email || "Unknown";
+
+    console.log("Calendar token exists:", !!accessToken);
+    console.log("User:", userEmail);
+
+    if (!accessToken) {
+      return res.status(200).json({
+        success: false,
+        message: "Google Calendar authorization missing",
+      });
+    }
+
+    try {
+      console.log("Updating Calendar Event Payload:", req.params.id, req.body);
+      const result = await googleCalendarService.updateCalendarEvent(accessToken, req.params.id, req.body);
+      console.log("Updated Calendar Event:", result.eventId);
+      return res.json({
+        success: true,
+        eventId: result.eventId,
+        htmlLink: result.htmlLink,
+      });
+    } catch (err: any) {
+      console.error("Google Calendar API Error:", err.message || err);
+      return res.status(500).json({
+        success: false,
+        error: err.message || "Failed to update Google Calendar event",
+        message: "Unable to update calendar reminder.",
+      });
+    }
+  });
+
+  app.delete("/api/calendar/event/:id", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
+    try {
+      await googleCalendarService.deleteCalendarEvent(token, req.params.id);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to delete Google Calendar event" });
+    }
+  });
+
+  app.get("/api/calendar/upcoming", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
+    try {
+      const maxResults = parseInt(req.query.maxResults as string, 10) || 5;
+      const events = await googleCalendarService.listUpcomingEvents(token, maxResults);
+      res.json({ success: true, events });
+    } catch (err: any) {
+      res.json({ success: true, events: [] });
+    }
+  });
+
+  app.post("/api/calendar/sync", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
+    try {
+      const events = await googleCalendarService.listUpcomingEvents(token, 10);
+      res.json({ success: true, lastSyncedAt: new Date().toISOString(), eventsCount: events.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to sync calendar" });
+    }
+  });
+
   // SpendTrack AI Chat
   app.post("/api/ai/chat", async (req, res) => {
     try {
@@ -511,6 +621,7 @@ export function createExpressApp() {
       const expenses = clientData?.expenses || (token ? await googleSheetsService.getExpenses(token).catch(() => []) : []);
       const recurringExpenses = clientData?.recurringExpenses || (token ? await googleSheetsService.getRecurringExpenses(token).catch(() => []) : []);
       const categories = clientData?.categories || (token ? await googleSheetsService.getCategories(token).catch(() => []) : []);
+      const upcomingCalendarEvents = token ? await googleCalendarService.listUpcomingEvents(token, 10).catch(() => []) : [];
       const reply = await geminiAssistantService.chat({
         message,
         history,
@@ -518,6 +629,7 @@ export function createExpressApp() {
         expenses,
         recurringExpenses,
         categories,
+        upcomingCalendarEvents,
       });
       res.json({ reply });
     } catch (err: any) {

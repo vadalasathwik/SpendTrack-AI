@@ -1,25 +1,49 @@
 import React, { useState } from 'react';
 import {
-  Calendar,
   Plus,
-  Edit2,
-  Trash2,
   CheckCircle2,
-  Bell,
   Clock,
-  ExternalLink,
   X,
-  AlertCircle,
-  Repeat,
-  DollarSign,
-  Zap,
-  RefreshCw,
-  Check,
+  Bell,
+  Loader2,
+  ExternalLink,
+  ChevronDown,
+  ChevronRight,
+  Edit2,
+  CreditCard,
 } from 'lucide-react';
 import { RecurringExpense, CategoryItem } from '../types.js';
 import { formatCurrency } from '../utils/calculations.js';
-import { formatDisplayDate } from '../utils/dateRanges.js';
 import { CATEGORY_COLORS } from '../data/defaults.js';
+import { getCalendarUrl } from '../utils/calendar.js';
+
+function renderSyncBadge(status?: 'synced' | 'syncing' | 'error') {
+  if (status === 'synced') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+        Synced
+      </span>
+    );
+  }
+  if (status === 'syncing') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+        Syncing
+      </span>
+    );
+  }
+  if (status === 'error') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded-full border border-rose-200 dark:border-rose-800/60">
+        <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+        Sync Failed
+      </span>
+    );
+  }
+  return null;
+}
 
 interface RecurringPageProps {
   recurringExpenses: RecurringExpense[];
@@ -27,8 +51,91 @@ interface RecurringPageProps {
   onAddRecurring: (item: Omit<RecurringExpense, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   onUpdateRecurring: (id: string, item: Partial<RecurringExpense>) => Promise<void>;
   onDeleteRecurring: (item: RecurringExpense) => Promise<void>;
-  onRecordAsExpense: (item: RecurringExpense) => void;
+  onRecordAsExpense?: (item: RecurringExpense) => void;
+  onMarkAsPaid?: (item: RecurringExpense) => Promise<void>;
+  onNavigateToExpenses?: () => void;
   onGenerateDueBills?: () => Promise<void>;
+  openAddModalOnMount?: boolean;
+}
+
+// Date & Time Utility Helpers
+function calculateReminderDateFromOffset(dueStr: string, notifyOffset: string): string {
+  if (!dueStr) return new Date().toISOString().split('T')[0];
+  const d = new Date(dueStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return new Date().toISOString().split('T')[0];
+
+  let daysBefore = 0;
+  if (notifyOffset === '1 day') daysBefore = 1;
+  else if (notifyOffset === '3 days') daysBefore = 3;
+
+  d.setDate(d.getDate() - daysBefore);
+  return d.toISOString().split('T')[0];
+}
+
+function formatTime12h(time24: string = '20:00'): string {
+  if (!time24) return '8:00 PM';
+  const [hStr, mStr] = time24.split(':');
+  let h = parseInt(hStr, 10);
+  if (isNaN(h)) return '8:00 PM';
+  const m = mStr || '00';
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${m} ${ampm}`;
+}
+
+function formatHumanReminder(reminderDateStr?: string, reminderTime24?: string): string {
+  if (!reminderDateStr) return 'Reminder set';
+
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  const tomorrowObj = new Date(today);
+  tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+  const tomorrowStr = tomorrowObj.toISOString().split('T')[0];
+
+  const timeStr = formatTime12h(reminderTime24 || '20:00');
+
+  if (reminderDateStr === todayStr) {
+    return `Today • ${timeStr}`;
+  }
+
+  if (reminderDateStr === tomorrowStr) {
+    return `Tomorrow • ${timeStr}`;
+  }
+
+  const remDate = new Date(reminderDateStr + 'T00:00:00');
+  const todayZero = new Date(todayStr + 'T00:00:00');
+  const diffTime = remDate.getTime() - todayZero.getTime();
+  const diffDays = Math.round(diffTime / (1000 * 3600 * 24));
+
+  if (diffDays > 1 && diffDays <= 7) {
+    return `In ${diffDays} days`;
+  }
+
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  if (!isNaN(remDate.getTime())) {
+    const day = remDate.getDate();
+    const month = monthNames[remDate.getMonth()];
+    return `${day} ${month} • ${timeStr}`;
+  }
+
+  return `${reminderDateStr} • ${timeStr}`;
+}
+
+function formatConsumerDate(dateStr?: string, dueDayFallback?: number, includeYear = true): string {
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  let d: Date;
+  if (dateStr && !isNaN(new Date(dateStr + 'T00:00:00').getTime())) {
+    d = new Date(dateStr + 'T00:00:00');
+  } else {
+    const today = new Date();
+    const day = Math.min(dueDayFallback || 1, 28);
+    d = new Date(today.getFullYear(), today.getMonth(), day);
+  }
+  const day = d.getDate();
+  const month = monthNames[d.getMonth()];
+  const year = d.getFullYear();
+  return includeYear ? `${day} ${month} ${year}` : `${day} ${month}`;
 }
 
 export const RecurringPage: React.FC<RecurringPageProps> = ({
@@ -36,48 +143,64 @@ export const RecurringPage: React.FC<RecurringPageProps> = ({
   categories,
   onAddRecurring,
   onUpdateRecurring,
-  onDeleteRecurring,
+  onMarkAsPaid,
   onRecordAsExpense,
-  onGenerateDueBills,
+  openAddModalOnMount = false,
 }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(openAddModalOnMount);
   const [editingItem, setEditingItem] = useState<RecurringExpense | null>(null);
-  const [itemToDelete, setItemToDelete] = useState<RecurringExpense | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [payingItemId, setPayingItemId] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  
+  // Paid Section Collapsed state by default
+  const [isPaidSectionOpen, setIsPaidSectionOpen] = useState(false);
 
-  // Form State
+  // Form State (Max 6 inputs total)
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Utilities');
-  const [subcategory, setSubcategory] = useState('');
   const [amount, setAmount] = useState('');
-  const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'>('monthly');
-  const [dueDay, setDueDay] = useState('1');
-  const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
-  const [autopost, setAutopost] = useState(true);
-  const [reminderDays, setReminderDays] = useState('3');
-  const [isActive, setIsActive] = useState(true);
+  const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
-  const [calendarReminderEnabled, setCalendarReminderEnabled] = useState(false);
+  
+  // Dedicated Reminder Card State
+  const [calendarReminderEnabled, setCalendarReminderEnabled] = useState(true);
+  const [reminderDate, setReminderDate] = useState('');
+  const [reminderTime, setReminderTime] = useState('20:00');
+  const [notifyBefore, setNotifyBefore] = useState('1 day');
+  const [isUserReminderModified, setIsUserReminderModified] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const currentMonthStr = new Date().toISOString().slice(0, 7);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const currentMonthStr = todayStr.slice(0, 7);
   const currentDay = new Date().getDate();
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
+  };
 
   const handleOpenAdd = () => {
     setEditingItem(null);
     setName('');
     setCategory('Utilities');
-    setSubcategory('');
     setAmount('');
-    setFrequency('monthly');
-    setDueDay('1');
-    setDueDate(new Date().toISOString().split('T')[0]);
-    setAutopost(true);
-    setReminderDays('3');
-    setIsActive(true);
     setNotes('');
-    setCalendarReminderEnabled(false);
+
+    // Default due date: 28th of current month or next month
+    const today = new Date();
+    const defaultDueObj = new Date(today.getFullYear(), today.getMonth() + (today.getDate() > 20 ? 1 : 0), 28);
+    const defaultDueStr = defaultDueObj.toISOString().split('T')[0];
+    setDueDate(defaultDueStr);
+
+    setNotifyBefore('1 day');
+    setReminderDate(calculateReminderDateFromOffset(defaultDueStr, '1 day'));
+    setReminderTime('20:00');
+    setCalendarReminderEnabled(true);
+    setIsUserReminderModified(false);
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -85,19 +208,43 @@ export const RecurringPage: React.FC<RecurringPageProps> = ({
   const handleOpenEdit = (item: RecurringExpense) => {
     setEditingItem(item);
     setName(item.name || item.title || '');
-    setCategory(item.category);
-    setSubcategory(item.subcategory || '');
-    setAmount(String(item.amount));
-    setFrequency(item.frequency);
-    setDueDay(String(item.dueDay || 1));
-    setDueDate(item.dueDate || new Date().toISOString().split('T')[0]);
-    setAutopost(item.autopost !== false);
-    setReminderDays(String(item.reminderDays !== undefined ? item.reminderDays : 3));
-    setIsActive(item.isActive !== false);
+    setCategory(item.category || 'Utilities');
+    setAmount(String(item.amount || ''));
     setNotes(item.notes || '');
-    setCalendarReminderEnabled(!!item.calendarReminderEnabled);
+
+    // Set Due Date
+    const calculatedDue = item.dueDate || `${currentMonthStr}-${String(item.dueDay || 1).padStart(2, '0')}`;
+    setDueDate(calculatedDue);
+
+    const chosenNotify = item.notifyBefore || '1 day';
+    setNotifyBefore(chosenNotify);
+
+    // Set Reminder Date & Time
+    const calculatedReminder = item.reminderDate || calculateReminderDateFromOffset(calculatedDue, chosenNotify);
+    setReminderDate(calculatedReminder);
+    setReminderTime(item.reminderTime || '20:00');
+    setCalendarReminderEnabled(item.calendarReminderEnabled !== false);
+    setIsUserReminderModified(Boolean(item.reminderDate));
     setFormError(null);
     setIsModalOpen(true);
+  };
+
+  const handleDueDateChange = (newDueDate: string) => {
+    setDueDate(newDueDate);
+    if (!isUserReminderModified) {
+      setReminderDate(calculateReminderDateFromOffset(newDueDate, notifyBefore));
+    }
+  };
+
+  const handleNotifyBeforeChange = (newNotify: string) => {
+    setNotifyBefore(newNotify);
+    setReminderDate(calculateReminderDateFromOffset(dueDate, newNotify));
+    setIsUserReminderModified(false);
+  };
+
+  const handleReminderDateChange = (newReminderDate: string) => {
+    setReminderDate(newReminderDate);
+    setIsUserReminderModified(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -106,501 +253,550 @@ export const RecurringPage: React.FC<RecurringPageProps> = ({
 
     const numAmount = parseFloat(amount);
     if (!name.trim()) {
-      setFormError('Please enter a recurring bill title.');
+      setFormError('Please enter a payment name.');
       return;
     }
     if (isNaN(numAmount) || numAmount <= 0) {
-      setFormError('Please enter a valid amount.');
+      setFormError('Please enter a valid positive amount.');
       return;
     }
 
     try {
       setIsSubmitting(true);
-      const payload = {
+      const parsedDueDate = new Date(dueDate + 'T00:00:00');
+      const calculatedDueDay = !isNaN(parsedDueDate.getTime()) ? parsedDueDate.getDate() : 1;
+
+      const payload: Partial<RecurringExpense> = {
         name: name.trim(),
         title: name.trim(),
         category,
-        subcategory: subcategory.trim() || undefined,
         amount: numAmount,
-        frequency,
-        dueDay: parseInt(dueDay, 10) || 1,
+        frequency: 'monthly',
+        dueDay: calculatedDueDay,
         dueDate,
-        autopost,
-        reminderDays: parseInt(reminderDays, 10) || 3,
-        isActive,
-        notes: notes.trim() || undefined,
+        reminderDate,
+        reminderTime,
+        notifyBefore,
         calendarReminderEnabled,
+        notes: notes.trim() || undefined,
+        isActive: true,
       };
 
       if (editingItem) {
         await onUpdateRecurring(editingItem.id, payload);
       } else {
-        await onAddRecurring(payload);
+        await onAddRecurring(payload as Omit<RecurringExpense, 'id' | 'createdAt' | 'updatedAt'>);
       }
       setIsModalOpen(false);
+      showToast(editingItem ? 'Payment updated ✓' : 'Payment added ✓');
     } catch (err: any) {
-      setFormError(err.message || 'Failed to save recurring bill.');
+      setFormError(err.message || 'Failed to save payment.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleTriggerAutoGenerate = async () => {
-    if (!onGenerateDueBills) return;
-    setIsGenerating(true);
+  const handleMarkAsPaidAction = async (item: RecurringExpense) => {
+    if (item.lastGeneratedMonth === currentMonthStr) return;
+    setPayingItemId(item.id);
     try {
-      await onGenerateDueBills();
+      if (onMarkAsPaid) {
+        await onMarkAsPaid(item);
+      } else if (onRecordAsExpense) {
+        onRecordAsExpense(item);
+      }
+      showToast('✓ Payment completed & next month scheduled');
+    } catch (err: any) {
+      console.error('Error marking as paid:', err);
+      showToast('Unable to update payment.');
     } finally {
-      setIsGenerating(false);
+      setPayingItemId(null);
     }
   };
 
-  const totalMonthlyCommitted = recurringExpenses.reduce((sum, r) => {
-    if (r.isActive === false) return sum;
-    let monthlyVal = r.amount;
-    if (r.frequency === 'yearly') monthlyVal = r.amount / 12;
-    if (r.frequency === 'quarterly') monthlyVal = r.amount / 3;
-    if (r.frequency === 'weekly') monthlyVal = r.amount * 4.33;
-    if (r.frequency === 'daily') monthlyVal = r.amount * 30.42;
-    return sum + monthlyVal;
-  }, 0);
+  // Active persistent payment items
+  const activePayments = recurringExpenses.filter((r) => r.isActive !== false);
+
+  // Upcoming vs Paid arrays
+  const upcomingPayments = activePayments
+    .filter((r) => r.lastGeneratedMonth !== currentMonthStr)
+    .sort((a, b) => {
+      const dayA = a.dueDay || 1;
+      const dayB = b.dueDay || 1;
+      const diffA = dayA >= currentDay ? dayA - currentDay : dayA + 31 - currentDay;
+      const diffB = dayB >= currentDay ? dayB - currentDay : dayB + 31 - currentDay;
+      return diffA - diffB;
+    });
+
+  const paidPayments = activePayments
+    .filter((r) => r.lastGeneratedMonth === currentMonthStr)
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+  const upcomingCount = upcomingPayments.length;
+  const paidCount = paidPayments.length;
 
   return (
-    <div className="space-y-6 pb-12" id="recurring-page-container">
-      {/* 1. Top Header Card */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">
-              Fixed Commitments & Auto-Posting
-            </span>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-0.5">
-              Recurring Bills & Subscriptions
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Auto-posts monthly expenses for Rent, WiFi, Netflix on due dates into Expenses & Dashboard
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {onGenerateDueBills && (
-              <button
-                id="generate-due-bills-btn"
-                onClick={handleTriggerAutoGenerate}
-                disabled={isGenerating}
-                className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs sm:text-sm rounded-xl transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap border border-slate-200 active:scale-95 disabled:opacity-75"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
-                <span>Process Due Bills</span>
-              </button>
-            )}
-            <button
-              id="add-recurring-btn"
-              onClick={handleOpenAdd}
-              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Bill</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Committed Monthly Total Banner */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-6 rounded-3xl border border-slate-700/60 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
-            Committed Monthly Obligations
-          </span>
-          <div className="text-3xl sm:text-4xl font-black tracking-tight text-white mt-1">
-            {formatCurrency(Math.round(totalMonthlyCommitted))}
-            <span className="text-sm font-normal text-slate-400 ml-1.5">/ month</span>
-          </div>
-          <p className="text-xs text-slate-300 mt-1">
-            Across {recurringExpenses.filter((r) => r.isActive !== false).length} active auto-posting contracts
-          </p>
-        </div>
-
-        <div className="p-4 bg-slate-800/80 rounded-2xl border border-slate-700 text-xs text-slate-300 space-y-1 self-stretch sm:self-auto">
-          <div className="flex items-center gap-2 text-emerald-300 font-bold">
-            <Zap className="w-4 h-4 text-emerald-400 fill-emerald-400" />
-            <span>Auto Expense Generation Active</span>
-          </div>
-          <p className="text-[11px] text-slate-400">
-            Due bills automatically post to Expenses on their due day each month without duplicates.
-          </p>
-        </div>
-      </div>
-
-      {/* 3. Recurring Bills Grid */}
-      {recurringExpenses.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {recurringExpenses.map((item) => {
-            const isGeneratedThisMonth = item.lastGeneratedMonth === currentMonthStr;
-            const dueDayNum = item.dueDay || 1;
-            const isDueToday = currentDay === dueDayNum;
-            const isOverdue = currentDay > dueDayNum && !isGeneratedThisMonth;
-
-            return (
-              <div
-                key={item.id}
-                id={`recurring-card-${item.id}`}
-                className={`bg-white rounded-2xl border p-5 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between ${
-                  item.isActive === false ? 'opacity-60 bg-slate-50/50 border-slate-200' : 'border-slate-200/80'
-                }`}
-              >
-                <div>
-                  {/* Header */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <div
-                        className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shadow-2xs flex-shrink-0"
-                        style={{ backgroundColor: CATEGORY_COLORS[item.category] || '#64748B' }}
-                      >
-                        {(item.name || item.title || 'B').charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-tight">
-                            {item.name || item.title}
-                          </h3>
-                          {item.autopost !== false && (
-                            <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200" title="Auto-posts on due date">
-                              Auto-Post
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[11px] font-medium text-slate-500">
-                            {item.category}
-                          </span>
-                          {item.subcategory && (
-                            <>
-                              <span className="text-slate-300">•</span>
-                              <span className="text-[11px] text-slate-400">{item.subcategory}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleOpenEdit(item)}
-                        className="p-1 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 cursor-pointer"
-                        title="Edit Bill"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setItemToDelete(item)}
-                        className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 cursor-pointer"
-                        title="Delete Bill"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Amount & Cadence */}
-                  <div className="my-3.5 p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
-                    <div>
-                      <span className="text-[10px] text-slate-400 block font-semibold uppercase">Amount</span>
-                      <span className="font-black text-slate-900 text-base sm:text-lg">
-                        {formatCurrency(item.amount)}
-                        <span className="text-[11px] font-medium text-slate-500 ml-1">/{item.frequency}</span>
-                      </span>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-400 block font-semibold uppercase">Due Cycle</span>
-                      <span className="font-bold text-slate-800">
-                        Day {item.dueDay || 1} of month
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Auto Generation Status Badge */}
-                  <div className="mb-3 text-[11px] flex items-center justify-between">
-                    {isGeneratedThisMonth ? (
-                      <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        Generated for {currentMonthStr}
-                      </span>
-                    ) : isDueToday ? (
-                      <span className="text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-amber-600" />
-                        Due Today!
-                      </span>
-                    ) : isOverdue ? (
-                      <span className="text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
-                        <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-                        Overdue for {currentMonthStr}
-                      </span>
-                    ) : (
-                      <span className="text-slate-500 font-medium">
-                        Next auto-post on {dueDayNum}th
-                      </span>
-                    )}
-                  </div>
-
-                  {item.notes && (
-                    <p className="text-xs text-slate-500 italic mb-3">"{item.notes}"</p>
-                  )}
-                </div>
-
-                {/* Action Button: Record as Expense */}
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                  <div className="text-[11px] text-slate-400 font-medium">
-                    {item.calendarReminderEnabled ? '📅 Calendar sync on' : 'Auto-posting'}
-                  </div>
-
-                  <button
-                    onClick={() => onRecordAsExpense(item)}
-                    id={`btn-record-recurring-${item.id}`}
-                    className="px-3.5 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Force Log Now</span>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="bg-white p-12 text-center rounded-2xl border border-slate-200/80 text-slate-400">
-          <Repeat className="w-10 h-10 mx-auto mb-3 stroke-1 text-slate-300" />
-          <h3 className="text-sm font-bold text-slate-700">No Recurring Bills Added</h3>
-          <p className="text-xs mt-1 text-slate-400 max-w-sm mx-auto">
-            Add recurring commitments like broadband, house rent, or streaming services to auto-generate expenses each month.
-          </p>
-          <button
-            onClick={handleOpenAdd}
-            className="mt-4 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add First Recurring Bill</span>
-          </button>
+    <div className="space-y-6 pb-16 max-w-[1440px] mx-auto" id="payments-page-container">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-20 right-4 sm:right-8 z-50 bg-slate-900 text-white px-4 py-3 rounded-[14px] shadow-xl border border-slate-800 flex items-center gap-2.5 animate-in slide-in-from-top-4 duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span className="text-xs font-bold">{toastMessage}</span>
         </div>
       )}
 
-      {/* Add / Edit Recurring Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 p-6 space-y-4 my-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900">
-                  {editingItem ? 'Edit Recurring Bill' : 'Add Recurring Bill'}
-                </h3>
-                <p className="text-xs text-slate-500">Auto-posts expenses to Dashboard & Expenses page</p>
+      {/* TOP CONSUMER HEADER: PAYMENTS */}
+      <div className="bg-white dark:bg-slate-900 p-5 rounded-[20px] border border-slate-200/80 dark:border-slate-800 soft-shadow flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+            Payments
+          </h1>
+          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">
+            {upcomingCount} upcoming • {paidCount} paid this month
+          </p>
+        </div>
+
+        <button
+          id="add-payment-btn"
+          onClick={handleOpenAdd}
+          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-[14px] shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap self-start sm:self-center"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Add Payment</span>
+        </button>
+      </div>
+
+      {/* SECTION 3: DUE SOON (UPCOMING PAYMENTS) */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+            <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>Due Soon</span>
+            <span className="text-xs font-bold text-slate-400">({upcomingCount})</span>
+          </h2>
+        </div>
+
+        {upcomingPayments.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {upcomingPayments.map((item) => {
+              const dueDayNum = item.dueDay || 1;
+              const isDueToday = currentDay === dueDayNum;
+              const isOverdue = currentDay > dueDayNum;
+
+              let statusText = 'Upcoming';
+              let statusBadgeClass = 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800/60';
+
+              if (isDueToday) {
+                statusText = 'Due Today';
+                statusBadgeClass = 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60';
+              } else if (isOverdue) {
+                statusText = 'Overdue';
+                statusBadgeClass = 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800/60';
+              }
+
+              const isPaying = payingItemId === item.id;
+              const formattedDueDateStr = formatConsumerDate(item.dueDate, item.dueDay, false);
+              const reminderLabel = formatHumanReminder(item.reminderDate || calculateReminderDateFromOffset(item.dueDate || '', item.notifyBefore || '1 day'), item.reminderTime);
+
+              return (
+                <div
+                  key={item.id}
+                  className={`bg-white dark:bg-slate-900 p-5 rounded-[20px] border transition-all duration-200 group flex flex-col justify-between space-y-4 ${
+                    isPaying
+                      ? 'border-emerald-500/80 shadow-lg shadow-emerald-500/10 ring-2 ring-emerald-500/20 scale-[1.01]'
+                      : 'border-slate-200/80 dark:border-slate-800 soft-shadow hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 active:scale-[0.98]'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-bold text-sm shadow-xs shrink-0"
+                        style={{ backgroundColor: CATEGORY_COLORS[item.category] || '#10B981' }}
+                      >
+                        {item.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white truncate">
+                          {item.name || item.title}
+                        </h3>
+                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
+                          Due <strong>{formattedDueDateStr}</strong>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                      <span className="text-lg font-black text-slate-900 dark:text-white block">
+                        {formatCurrency(item.amount)}
+                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                        {renderSyncBadge(item.calendarSyncStatus || (item.calendarEventId ? 'synced' : undefined))}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border inline-block ${statusBadgeClass}`}>
+                          {statusText}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* HUMAN-FRIENDLY REMINDER LINE */}
+                  <div className="text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-[12px] border border-slate-200/60 dark:border-slate-700/60 flex items-center gap-2">
+                    <Bell className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span className="truncate">
+                      Reminder <strong>{reminderLabel}</strong>
+                    </span>
+                  </div>
+
+                  {/* FOOTER BUTTONS */}
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      onClick={() => handleOpenEdit(item)}
+                      className="px-3.5 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-[12px] transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      onClick={() => handleMarkAsPaidAction(item)}
+                      disabled={isPaying}
+                      className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-[14px] shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all"
+                    >
+                      {isPaying ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      )}
+                      <span>Pay</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-slate-900 p-8 rounded-[20px] border border-slate-200/80 dark:border-slate-800 text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center">
+              <CreditCard className="w-6 h-6 stroke-[1.8]" />
+            </div>
+            <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
+              No upcoming payments
+            </h3>
+            <p className="text-xs text-slate-400 max-w-sm mx-auto">
+              All upcoming payments for this cycle have been completed or none are scheduled.
+            </p>
+            <button
+              onClick={handleOpenAdd}
+              className="mt-2 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-[14px] shadow-xs inline-flex items-center gap-1.5 cursor-pointer transition-all active:scale-[0.98]"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Payment</span>
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* SECTION 4: PAID THIS MONTH (COLLAPSED BY DEFAULT) */}
+      <section className="space-y-3 pt-2">
+        <button
+          onClick={() => setIsPaidSectionOpen(!isPaidSectionOpen)}
+          className="w-full flex items-center justify-between p-4 bg-white dark:bg-slate-900 rounded-[20px] border border-slate-200/80 dark:border-slate-800 soft-shadow hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all cursor-pointer"
+        >
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">
+              ✓ Paid This Month ({paidCount})
+            </h2>
+          </div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <span>{isPaidSectionOpen ? 'Hide' : 'Show'}</span>
+            {isPaidSectionOpen ? (
+              <ChevronDown className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
+          </div>
+        </button>
+
+        {isPaidSectionOpen && (
+          <div className="space-y-3 animate-in fade-in duration-200">
+            {paidPayments.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {paidPayments.map((item) => {
+                  const reminderLabel = formatHumanReminder(item.reminderDate || calculateReminderDateFromOffset(item.dueDate || '', item.notifyBefore || '1 day'), item.reminderTime);
+                  const formattedPaidDateStr = formatConsumerDate(item.paidDate || todayStr, undefined, false);
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-slate-50/60 dark:bg-slate-900/60 p-5 rounded-[20px] border border-slate-200/80 dark:border-slate-800 space-y-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-bold text-sm shadow-xs shrink-0 opacity-80"
+                            style={{ backgroundColor: CATEGORY_COLORS[item.category] || '#10B981' }}
+                          >
+                            {item.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white truncate">
+                              {item.name || item.title}
+                            </h3>
+                            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
+                              Paid on <strong>{formattedPaidDateStr}</strong>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                          <span className="text-lg font-black text-slate-900 dark:text-white block">
+                            {formatCurrency(item.amount)}
+                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                            {renderSyncBadge(item.calendarSyncStatus || (item.calendarEventId ? 'synced' : undefined))}
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60 inline-block">
+                              ✓ Paid
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* NEXT REMINDER LINE */}
+                      <div className="text-xs font-semibold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800/60 p-2.5 rounded-[12px] border border-slate-200/60 dark:border-slate-700/60 flex items-center gap-2">
+                        <Bell className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span className="truncate">
+                          Next reminder <strong>{reminderLabel}</strong>
+                        </span>
+                      </div>
+
+                      {/* FOOTER BUTTONS: OPEN CALENDAR LINK + ✓ PAID STATUS BADGE */}
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-800">
+                        <a
+                          href={getCalendarUrl(item)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3.5 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-[12px] transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <span>Open Calendar</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                        <span className="px-3.5 py-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-950/80 rounded-[14px] border border-emerald-300/60 dark:border-emerald-800 inline-flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <span>✓ Paid</span>
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+            ) : (
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-[20px] border border-slate-200/80 dark:border-slate-800 text-center text-xs font-semibold text-slate-400">
+                No payments completed yet this month.
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* SECTION 5: ADD / EDIT PAYMENT MODAL (MAX 6 VISIBLE INPUTS) */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-[20px] max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-5 my-8">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h2 className="text-lg font-black tracking-tight">
+                {editingItem ? 'Edit Payment' : 'Add Payment'}
+              </h2>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
+                className="p-1.5 rounded-[12px] text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {formError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium">
-                  {formError}
-                </div>
-              )}
+            {formError && (
+              <div className="p-3 bg-rose-50 text-rose-700 text-xs font-semibold rounded-[12px] border border-rose-200">
+                {formError}
+              </div>
+            )}
 
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* INPUT ROW 1: Payment Name */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Bill Title <span className="text-rose-500">*</span>
+                <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1">
+                  Payment Name *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Fiber WiFi, Netflix, House Rent"
+                  placeholder="e.g. WiFi, Rent, Electricity"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-semibold text-slate-900"
+                  className="w-full px-3.5 py-2.5 rounded-[12px] bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
+              {/* INPUT ROW 2: Amount & Category */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Category</label>
+                  <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1">
+                    Amount *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    placeholder="0.00"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-[12px] bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1">
+                    Category *
+                  </label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none text-slate-800"
+                    className="w-full px-3.5 py-2.5 rounded-[12px] bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
                   >
-                    {categories.map((c) => (
-                      <option key={c.name} value={c.name}>
-                        {c.name}
+                    {categories.map((cat) => (
+                      <option key={cat.name} value={cat.name}>
+                        {cat.name}
                       </option>
                     ))}
                   </select>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Subcategory</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 100Mbps Plan"
-                    value={subcategory}
-                    onChange={(e) => setSubcategory(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  />
-                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Amount (₹) <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    required
-                    placeholder="999"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-bold text-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Frequency</label>
-                  <select
-                    value={frequency}
-                    onChange={(e) => setFrequency(e.target.value as any)}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none font-medium"
-                  >
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
-                    <option value="quarterly">Quarterly</option>
-                    <option value="weekly">Weekly</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Due Day of Month (1-31)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
-                    value={dueDay}
-                    onChange={(e) => setDueDay(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Reminder Days Before</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="14"
-                    value={reminderDays}
-                    onChange={(e) => setReminderDays(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-medium"
-                  />
-                </div>
-              </div>
-
-              {/* Toggles */}
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block">Auto Expense Generation</span>
-                    <span className="text-[11px] text-slate-500">Auto-create Expense on due date</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={autopost}
-                    onChange={(e) => setAutopost(e.target.checked)}
-                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between border-t border-slate-200/60 pt-2">
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block">Active Status</span>
-                    <span className="text-[11px] text-slate-500">Enable recurring bill tracking</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={isActive}
-                    onChange={(e) => setIsActive(e.target.checked)}
-                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500"
-                  />
-                </div>
-              </div>
-
+              {/* INPUT ROW 3: Due Date */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Notes</label>
+                <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1">
+                  Due Date *
+                </label>
                 <input
-                  type="text"
-                  placeholder="Account number, payment link..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  type="date"
+                  required
+                  value={dueDate}
+                  onChange={(e) => handleDueDateChange(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-[12px] bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              {/* INPUT ROW 4: Notes (Optional) */}
+              <div>
+                <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-1">
+                  Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Account number, provider link"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-[12px] bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              {/* INPUT ROW 5: REMINDER & GOOGLE CALENDAR CARD */}
+              <div className="p-4 rounded-[20px] bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Bell className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-900 dark:text-white">
+                      Reminder & Calendar
+                    </span>
+                  </div>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <input
+                      type="checkbox"
+                      id="sync-calendar-checkbox"
+                      checked={calendarReminderEnabled}
+                      onChange={(e) => setCalendarReminderEnabled(e.target.checked)}
+                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <span>Sync with Google Calendar</span>
+                  </label>
+                </div>
+
+                {calendarReminderEnabled && (
+                  <div className="space-y-3 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                        Notify Before
+                      </label>
+                      <select
+                        value={notifyBefore}
+                        onChange={(e) => handleNotifyBeforeChange(e.target.value)}
+                        className="w-full px-3 py-2 rounded-[12px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold"
+                      >
+                        <option value="At time">At time</option>
+                        <option value="10 min">10 min</option>
+                        <option value="30 min">30 min</option>
+                        <option value="1 hour">1 hour</option>
+                        <option value="1 day">1 day before</option>
+                        <option value="3 days">3 days before</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                          Reminder Date
+                        </label>
+                        <input
+                          type="date"
+                          value={reminderDate}
+                          onChange={(e) => handleReminderDateChange(e.target.value)}
+                          className="w-full px-3 py-2 rounded-[12px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                          Reminder Time
+                        </label>
+                        <input
+                          type="time"
+                          value={reminderTime}
+                          onChange={(e) => setReminderTime(e.target.value)}
+                          className="w-full px-3 py-2 rounded-[12px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold"
+                        />
+                      </div>
+                    </div>
+
+                    {/* LIVE PREVIEW BOX */}
+                    <div className="p-3 rounded-[12px] bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                      You'll be reminded <strong>{formatHumanReminder(reminderDate, reminderTime)}</strong>.
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* INPUT ROW 6: ACTION BUTTONS */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                  className="px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-[14px] cursor-pointer"
                 >
                   Cancel
                 </button>
+
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-[14px] shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  {isSubmitting ? 'Saving...' : editingItem ? 'Save Changes' : 'Create Recurring Bill'}
+                  {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{editingItem ? 'Save Changes' : 'Add Payment'}</span>
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      {/* Delete Confirmation */}
-      {itemToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl border border-slate-100 p-6 space-y-4">
-            <h3 className="text-base font-bold text-slate-900">Delete Recurring Bill?</h3>
-            <p className="text-xs text-slate-500">
-              Are you sure you want to delete <strong className="text-slate-900">{itemToDelete.name || itemToDelete.title}</strong> ({formatCurrency(itemToDelete.amount)})?
-            </p>
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                onClick={() => setItemToDelete(null)}
-                className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  await onDeleteRecurring(itemToDelete);
-                  setItemToDelete(null);
-                }}
-                className="px-4 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-xs cursor-pointer"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
+

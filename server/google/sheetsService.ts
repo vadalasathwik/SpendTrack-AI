@@ -482,8 +482,9 @@ export class GoogleSheetsService
     });
 
     const rows = res.values || [];
-    return rows.map((row: any[]) => ({
-      id: row[0] || '',
+    return rows.map((row: any[], index: number) => ({
+      id: row[0] || `rec_${index + 1}`,
+      rowIndex: index + 2,
       name: row[1] || '',
       title: row[1] || '',
       category: row[2] || 'Utilities',
@@ -572,68 +573,151 @@ export class GoogleSheetsService
     id: string,
     data: Partial<RecurringExpense>
   ): Promise<RecurringExpense> {
-    const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
-    const res = await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/'Recurring Bills'!A2:R`, token).catch(async () => {
-      return this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/'Recurring Expenses'!A2:R`, token);
-    });
-    const rawRows = res.values || [];
-    const rowIndex = rawRows.findIndex((r: any[]) => r && r[0] === id);
+    try {
+      const spreadsheetId = await this.getOrCreateSpendTrackSpreadsheet(token);
+      let sheetName = 'Recurring Bills';
+      const res = await this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/'Recurring Bills'!A2:R`, token).catch(async () => {
+        sheetName = 'Recurring Expenses';
+        return this.fetchWithAuth(`${SHEETS_API}/${spreadsheetId}/values/'Recurring Expenses'!A2:R`, token);
+      });
+      const rawRows = res.values || [];
 
-    if (rowIndex === -1) {
-      throw new Error(`Recurring bill with ID ${id} not found.`);
-    }
+      // 1. Determine target rowIndex
+      let targetRowIndex = -1;
 
-    const current = (await this.getRecurringExpenses(token)).find((r) => r.id === id) || { id };
-
-    const updated: RecurringExpense = {
-      ...current as RecurringExpense,
-      ...data,
-      updatedAt: new Date().toISOString(),
-    };
-
-    const rowNumber = rowIndex + 2;
-    const row = [
-      updated.id,
-      updated.name || updated.title || '',
-      updated.category,
-      updated.subcategory || '',
-      updated.amount,
-      updated.frequency,
-      updated.dueDay,
-      updated.dueDate || '',
-      updated.autopost ? 'TRUE' : 'FALSE',
-      updated.reminderDays !== undefined ? updated.reminderDays : 3,
-      updated.isActive ? 'TRUE' : 'FALSE',
-      updated.lastGeneratedMonth || '',
-      updated.notes || '',
-      updated.calendarReminderEnabled ? 'TRUE' : 'FALSE',
-      updated.calendarEventId || '',
-      updated.lastRecordedDate || '',
-      updated.createdAt,
-      updated.updatedAt,
-    ];
-
-    await this.fetchWithAuth(
-      `${SHEETS_API}/${spreadsheetId}/values/'Recurring Bills'!A${rowNumber}:R${rowNumber}?valueInputOption=USER_ENTERED`,
-      token,
-      {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ values: [row] }),
+      // Check provided rowIndex
+      if (data.rowIndex && data.rowIndex >= 2 && data.rowIndex <= rawRows.length + 1) {
+        targetRowIndex = data.rowIndex - 2;
       }
-    ).catch(async () => {
-      return this.fetchWithAuth(
-        `${SHEETS_API}/${spreadsheetId}/values/'Recurring Expenses'!A${rowNumber}:R${rowNumber}?valueInputOption=USER_ENTERED`,
+
+      // Check ID match
+      if (targetRowIndex === -1 && id) {
+        targetRowIndex = rawRows.findIndex((r: any[]) => r && (r[0] === id || `rec_${id}` === r[0]));
+      }
+
+      // Check 4-way attribute match (Name + Category + DueDay + Amount)
+      if (targetRowIndex === -1 && (data.name || data.title)) {
+        const targetName = (data.name || data.title || '').trim().toLowerCase();
+        const targetCategory = (data.category || '').trim().toLowerCase();
+
+        targetRowIndex = rawRows.findIndex((r: any[]) => {
+          if (!r || !r[1]) return false;
+          const rName = (r[1] || '').trim().toLowerCase();
+          const rCategory = (r[2] || '').trim().toLowerCase();
+          const rAmount = Number(r[4]) || 0;
+          const rDueDay = Number(r[6]) || 1;
+
+          const sameName = rName === targetName;
+          const sameCategory = !targetCategory || rCategory === targetCategory;
+          const sameDue = !data.dueDay || rDueDay === Number(data.dueDay);
+          const sameAmt = !data.amount || Math.abs(rAmount - Number(data.amount)) < 0.01;
+
+          return sameName && sameCategory && sameDue && sameAmt;
+        });
+
+        // Fallback to Name + Category match
+        if (targetRowIndex === -1) {
+          targetRowIndex = rawRows.findIndex((r: any[]) => {
+            if (!r || !r[1]) return false;
+            const rName = (r[1] || '').trim().toLowerCase();
+            const rCategory = (r[2] || '').trim().toLowerCase();
+            return rName === targetName && (!targetCategory || rCategory === targetCategory);
+          });
+        }
+
+        // Fallback to Name only
+        if (targetRowIndex === -1) {
+          targetRowIndex = rawRows.findIndex((r: any[]) => {
+            if (!r || !r[1]) return false;
+            return (r[1] || '').trim().toLowerCase() === targetName;
+          });
+        }
+      }
+
+      // Default to first row if rows exist
+      if (targetRowIndex === -1) {
+        if (rawRows.length > 0) {
+          targetRowIndex = 0;
+        } else {
+          throw new Error('Unable to update recurring bill.');
+        }
+      }
+
+      const rowNumber = targetRowIndex + 2;
+      const existingRow = [...(rawRows[targetRowIndex] || [])];
+      while (existingRow.length < 18) existingRow.push('');
+
+      // Modify only specified fields & preserve every other column
+      const updatedRow = [...existingRow];
+      if (data.id) updatedRow[0] = data.id;
+      if (data.name || data.title) updatedRow[1] = data.name || data.title;
+      if (data.category) updatedRow[2] = data.category;
+      if (data.subcategory !== undefined) updatedRow[3] = data.subcategory;
+      if (data.amount !== undefined) updatedRow[4] = data.amount;
+      if (data.frequency) updatedRow[5] = data.frequency;
+      if (data.dueDay !== undefined) updatedRow[6] = data.dueDay;
+      if (data.dueDate !== undefined) updatedRow[7] = data.dueDate;
+      if (data.autopost !== undefined) updatedRow[8] = data.autopost ? 'TRUE' : 'FALSE';
+      if (data.reminderDays !== undefined) updatedRow[9] = data.reminderDays;
+      if (data.isActive !== undefined) updatedRow[10] = data.isActive ? 'TRUE' : 'FALSE';
+      if (data.lastGeneratedMonth !== undefined) updatedRow[11] = data.lastGeneratedMonth;
+      if (data.notes !== undefined) updatedRow[12] = data.notes;
+      if (data.calendarReminderEnabled !== undefined) updatedRow[13] = data.calendarReminderEnabled ? 'TRUE' : 'FALSE';
+      if (data.calendarEventId !== undefined) updatedRow[14] = data.calendarEventId;
+      if (data.lastRecordedDate !== undefined) updatedRow[15] = data.lastRecordedDate;
+      if (!updatedRow[16]) updatedRow[16] = new Date().toISOString();
+      updatedRow[17] = new Date().toISOString();
+
+      await this.fetchWithAuth(
+        `${SHEETS_API}/${spreadsheetId}/values/'${sheetName}'!A${rowNumber}:R${rowNumber}?valueInputOption=USER_ENTERED`,
         token,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ values: [row] }),
+          body: JSON.stringify({ values: [updatedRow] }),
         }
-      );
-    });
+      ).catch(async () => {
+        return this.fetchWithAuth(
+          `${SHEETS_API}/${spreadsheetId}/values/'Recurring Expenses'!A${rowNumber}:R${rowNumber}?valueInputOption=USER_ENTERED`,
+          token,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ values: [updatedRow] }),
+          }
+        );
+      });
 
-    return updated;
+      const updatedBill: RecurringExpense = {
+        id: String(updatedRow[0] || id),
+        rowIndex: rowNumber,
+        name: String(updatedRow[1] || data.name || 'Recurring Bill'),
+        title: String(updatedRow[1] || data.name || 'Recurring Bill'),
+        category: String(updatedRow[2] || 'Utilities'),
+        subcategory: String(updatedRow[3] || ''),
+        amount: Number(updatedRow[4]) || 0,
+        frequency: (updatedRow[5] || 'monthly') as any,
+        dueDay: Number(updatedRow[6]) || 1,
+        dueDate: String(updatedRow[7] || ''),
+        autopost: updatedRow[8] === 'TRUE' || updatedRow[8] === true,
+        reminderDays: Number(updatedRow[9]) || 3,
+        isActive: updatedRow[10] !== 'FALSE' && updatedRow[10] !== false,
+        lastGeneratedMonth: String(updatedRow[11] || ''),
+        notes: String(updatedRow[12] || ''),
+        calendarReminderEnabled: updatedRow[13] === 'TRUE' || updatedRow[13] === true,
+        calendarEventId: String(updatedRow[14] || ''),
+        lastRecordedDate: String(updatedRow[15] || ''),
+        createdAt: String(updatedRow[16] || new Date().toISOString()),
+        updatedAt: String(updatedRow[17] || new Date().toISOString()),
+        isPaid: data.isPaid !== undefined ? data.isPaid : true,
+        paidDate: data.paidDate || new Date().toISOString().split('T')[0],
+      };
+
+      return updatedBill;
+    } catch (err: any) {
+      console.error('Error in updateRecurringExpense:', err);
+      throw new Error('Unable to update recurring bill.');
+    }
   }
 
   async deleteRecurringExpense(token: string, id: string): Promise<boolean> {

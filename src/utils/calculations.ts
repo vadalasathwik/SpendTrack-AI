@@ -1,4 +1,4 @@
-import { Expense, CategorySpending, PeriodComparisonResult, ItemAnalyticsSummary, MonthlyItem, ConsumptionLog, BudgetMetrics, UserSettings, DateRange } from '../types.js';
+import { Expense, CategorySpending, PeriodComparisonResult, ItemAnalyticsSummary, MonthlyItem, ConsumptionLog, BudgetMetrics, UserSettings, DateRange, RecurringExpense } from '../types.js';
 import { CATEGORY_COLORS } from '../data/defaults.js';
 
 /**
@@ -794,5 +794,84 @@ export function calculateBudgetMetrics(
     daysRemaining,
   };
 }
+
+/**
+ * Priority order matching for recurring bills:
+ * 1. Google Sheets Row ID / persistent ID (exact match)
+ * 2. Exact match of Name + Category + Due Day + Amount
+ * 3. Match of Name + Category + Amount
+ * 4. Match of Name + Category
+ * 5. Match of Name
+ */
+export function findMatchingRecurringBill(
+  target: RecurringExpense,
+  candidates: RecurringExpense[]
+): RecurringExpense | undefined {
+  if (!candidates || candidates.length === 0) return undefined;
+
+  const targetName = (target.name || target.title || '').trim().toLowerCase();
+
+  // 1 & 2. Persistent ID match
+  if (target.id) {
+    const idMatch = candidates.find((c) => c.id === target.id);
+    if (idMatch) return idMatch;
+  }
+
+  // 3. Match of Name + Category + Due Day + Amount
+  const exact4Way = candidates.find((c) => {
+    const cName = (c.name || c.title || '').trim().toLowerCase();
+    const sameName = cName === targetName;
+    const sameCategory = (c.category || '').toLowerCase() === (target.category || '').toLowerCase();
+    const sameDueDay = Number(c.dueDay) === Number(target.dueDay);
+    const sameAmount = Math.abs(Number(c.amount) - Number(target.amount)) < 0.01;
+    return sameName && sameCategory && sameDueDay && sameAmount;
+  });
+  if (exact4Way) return exact4Way;
+
+  // 4. Match of Name + Category + Amount
+  const nameCatAmount = candidates.find((c) => {
+    const cName = (c.name || c.title || '').trim().toLowerCase();
+    const sameName = cName === targetName;
+    const sameCategory = (c.category || '').toLowerCase() === (target.category || '').toLowerCase();
+    const sameAmount = Math.abs(Number(c.amount) - Number(target.amount)) < 0.01;
+    return sameName && sameCategory && sameAmount;
+  });
+  if (nameCatAmount) return nameCatAmount;
+
+  // 5. Match of Name + Category
+  const nameCat = candidates.find((c) => {
+    const cName = (c.name || c.title || '').trim().toLowerCase();
+    const sameName = cName === targetName;
+    const sameCategory = (c.category || '').toLowerCase() === (target.category || '').toLowerCase();
+    return sameName && sameCategory;
+  });
+  if (nameCat) return nameCat;
+
+  // 6. Match of Name
+  return candidates.find((c) => {
+    const cName = (c.name || c.title || '').trim().toLowerCase();
+    return cName && cName === targetName;
+  });
+}
+
+/**
+ * Sanitizes technical error messages to prevent exposing internal IDs or technical stack traces.
+ */
+export function sanitizeErrorMessage(msg?: string | null): string {
+  if (!msg) return "Couldn't sync changes. Tap Retry.";
+  const lower = msg.toLowerCase();
+  if (
+    lower.includes('rec_') ||
+    lower.includes('not found') ||
+    lower.includes('id ') ||
+    lower.includes('failed to fetch') ||
+    lower.includes('unable') ||
+    lower.includes('error')
+  ) {
+    return "Couldn't sync changes. Tap Retry.";
+  }
+  return msg;
+}
+
 
 

@@ -30,24 +30,19 @@ interface AIAssistantPageProps {
 }
 
 const SUGGESTED_QUESTIONS = [
+  'How much did I spend?',
+  'Upcoming payments',
+  'Analyze my budget',
   'Where did my money go this month?',
   'Which category increased the most?',
   'How much did I spend on groceries?',
-  'Which items became more expensive?',
-  'How long did my cooking gas last?',
-  'What is my average daily household spending?',
   'Which regular items cost me the most?',
-  'Compare this month with last month.',
-  'How much did I spend on utilities?',
-  'What recurring bills do I have?',
-  'What was my biggest single expense?',
-  'How much milk do I use per day?',
 ];
 
 const DEFAULT_WELCOME_MESSAGE: AIChatMessage = {
   id: 'welcome-msg',
   role: 'assistant',
-  content: `Hello! I'm **${BRAND_NAME}**. I analyze your real expense history, category trends, item inflation, and daily household consumption rates.\n\nAsk me anything about your spending or select a suggested topic below.`,
+  content: `Hello! I'm **${BRAND_NAME}**.\n\n### Ask TrackPay anything\n\nSelect a prompt chip below or ask any question about your spending:`,
   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 };
 
@@ -364,18 +359,66 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const renderFormattedText = (text: string) => {
-    const lines = text.split('\n');
-    return lines.map((line, idx) => {
-      const isBullet = line.trim().startsWith('* ') || line.trim().startsWith('- ');
-      const content = isBullet ? line.trim().substring(2) : line;
+  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
+  const [editingTitleText, setEditingTitleText] = useState<string>('');
 
+  const handleRenameChat = (chatId: string, currentTitle: string) => {
+    setEditingTitleId(chatId);
+    setEditingTitleText(currentTitle);
+  };
+
+  const saveRenameChat = (chatId: string) => {
+    if (!editingTitleText.trim()) return;
+    setSessions((prev) =>
+      prev.map((s) => (s.id === chatId ? { ...s, title: editingTitleText.trim() } : s))
+    );
+    setEditingTitleId(null);
+  };
+
+  const renderFormattedText = (text: string) => {
+    // Check for code blocks
+    if (text.includes('```')) {
+      const parts = text.split(/(```[\s\S]*?```)/g);
+      return parts.map((part, pIdx) => {
+        if (part.startsWith('```') && part.endsWith('```')) {
+          const codeContent = part.slice(3, -3).replace(/^[a-z]+\n/, '');
+          return (
+            <pre key={pIdx} className="my-2 p-3 bg-slate-950 text-emerald-400 rounded-xl font-mono text-xs overflow-x-auto">
+              <code>{codeContent}</code>
+            </pre>
+          );
+        }
+        return <div key={pIdx}>{renderFormattedText(part)}</div>;
+      });
+    }
+
+    const lines = text.split('\n');
+    const elements: React.ReactNode[] = [];
+    let tableRows: string[] = [];
+
+    lines.forEach((line, idx) => {
+      const trimmed = line.trim();
+
+      // Check if line is a table row
+      if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+        tableRows.push(trimmed);
+        return;
+      }
+
+      // If we accumulated table rows and hit a non-table line, render the table
+      if (tableRows.length > 0) {
+        elements.push(renderMarkdownTable(tableRows, `table-${idx}`));
+        tableRows = [];
+      }
+
+      const isBullet = trimmed.startsWith('* ') || trimmed.startsWith('- ');
+      const content = isBullet ? trimmed.substring(2) : line;
       const parts = content.split(/(\*\*.*?\*\*)/g);
 
       const parsedContent = parts.map((part, pIdx) => {
         if (part.startsWith('**') && part.endsWith('**')) {
           return (
-            <strong key={pIdx} className="font-semibold text-slate-900">
+            <strong key={pIdx} className="font-bold text-slate-900 dark:text-white">
               {part.slice(2, -2)}
             </strong>
           );
@@ -384,314 +427,315 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
       });
 
       if (isBullet) {
-        return (
+        elements.push(
           <div key={idx} className="flex items-start gap-2 my-1 pl-1">
             <span className="text-emerald-500 font-bold">•</span>
-            <span className="flex-1 text-slate-700">{parsedContent}</span>
+            <span className="flex-1 text-slate-700 dark:text-slate-300">{parsedContent}</span>
           </div>
         );
+      } else if (trimmed === '') {
+        elements.push(<div key={idx} className="h-1.5" />);
+      } else {
+        elements.push(
+          <p key={idx} className="my-1 text-slate-700 dark:text-slate-300 leading-relaxed">
+            {parsedContent}
+          </p>
+        );
       }
-
-      if (line.trim() === '') {
-        return <div key={idx} className="h-2" />;
-      }
-
-      return (
-        <p key={idx} className="my-1 text-slate-700 leading-relaxed">
-          {parsedContent}
-        </p>
-      );
     });
+
+    if (tableRows.length > 0) {
+      elements.push(renderMarkdownTable(tableRows, 'table-end'));
+    }
+
+    return elements;
+  };
+
+  const renderMarkdownTable = (rows: string[], keyPrefix: string) => {
+    const parsedRows = rows.map((r) =>
+      r
+        .split('|')
+        .map((c) => c.trim())
+        .filter((c, i, arr) => i > 0 && i < arr.length - 1)
+    );
+
+    if (parsedRows.length < 2) return null;
+    const headers = parsedRows[0];
+    const dataRows = parsedRows.slice(2);
+
+    return (
+      <div key={keyPrefix} className="my-3 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+        <table className="w-full text-xs text-left text-slate-700 dark:text-slate-300">
+          <thead className="bg-slate-100 dark:bg-slate-800 font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800">
+            <tr>
+              {headers.map((h, i) => (
+                <th key={i} className="px-3 py-2">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {dataRows.map((row, rIdx) => (
+              <tr key={rIdx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                {row.map((cell, cIdx) => (
+                  <td key={cIdx} className="px-3 py-2 font-medium">
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
   };
 
   return (
     <div
-      className="flex flex-col h-[calc(100vh-10.5rem)] md:h-[calc(100vh-9.5rem)] max-w-4xl mx-auto w-full bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+      className="flex h-[calc(100vh-10.5rem)] md:h-[calc(100vh-9.5rem)] max-w-[1440px] mx-auto w-full bg-white dark:bg-slate-900 rounded-[20px] border border-slate-200 dark:border-slate-800 soft-shadow overflow-hidden"
       id="spendtrack-ai-container"
     >
-      {/* AI Header / Multi-Chat Toolbar */}
-      <div className="bg-slate-900 text-white px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 shrink-0 relative z-20">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-slate-950 shadow-md shadow-emerald-500/30 shrink-0">
-            <Sparkles className="w-5 h-5" />
+      {/* DESKTOP SIDEBAR FOR CHAT CONVERSATIONS */}
+      <aside className="hidden md:flex flex-col w-64 border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 shrink-0">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2 font-bold text-sm text-slate-900 dark:text-white">
+            <MessageSquare className="w-4 h-4 text-emerald-600" />
+            <span>Conversations</span>
           </div>
-
-          <div className="min-w-0">
-            {/* Active Session Switcher Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setShowSessionDropdown((v) => !v)}
-                className="flex items-center gap-1.5 font-bold text-sm sm:text-base text-white hover:text-emerald-300 transition-colors text-left truncate cursor-pointer"
-              >
-                <span className="truncate max-w-[180px] sm:max-w-[280px]">
-                  {currentChatTitle}
-                </span>
-                <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-              </button>
-
-              {showSessionDropdown && (
-                <div className="absolute top-full left-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-xl shadow-xl p-2 z-50 text-xs">
-                  <div className="flex items-center justify-between px-2 py-1 mb-1 border-b border-slate-700 font-semibold text-slate-400 uppercase tracking-wider text-[10px]">
-                    <span>Saved Chats ({sessions.length})</span>
-                    <button
-                      onClick={handleNewChat}
-                      className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer"
-                    >
-                      <Plus className="w-3 h-3" /> New
-                    </button>
-                  </div>
-
-                  <div className="max-h-56 overflow-y-auto space-y-1">
-                    {sessions.map((s) => (
-                      <div
-                        key={s.id}
-                        className={`flex items-center justify-between p-2 rounded-lg transition-colors cursor-pointer ${
-                          s.id === activeChatId
-                            ? 'bg-emerald-600/30 text-emerald-300 font-semibold border border-emerald-500/40'
-                            : 'hover:bg-slate-700 text-slate-300'
-                        }`}
-                        onClick={() => {
-                          setActiveChatId(s.id);
-                          setMessages(s.messages);
-                          setShowSessionDropdown(false);
-                        }}
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <MessageSquare className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate">{s.title}</span>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteChat(s.id);
-                          }}
-                          title="Delete Chat"
-                          className="p-1 text-slate-400 hover:text-rose-400 transition-colors rounded cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-
-                    {sessions.length === 0 && (
-                      <p className="text-slate-400 text-center py-3">No saved chats yet</p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <p className="text-[11px] text-slate-400 flex items-center gap-2 truncate">
-              <span>{dateRange.label}</span>
-              <span>•</span>
-              <span>
-                {periodExpenses.length} purchases ({formatCurrency(totalPeriodSpending)})
-              </span>
-            </p>
-          </div>
-        </div>
-
-        {/* Action Controls: New Chat & Delete Active Chat */}
-        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={handleNewChat}
-            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg text-xs transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
-            title="Start new AI conversation"
+            className="p-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 cursor-pointer"
+            title="New Conversation"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Chat</span>
+            <Plus className="w-4 h-4" />
           </button>
+        </div>
 
-          {activeSession && (
-            <button
-              onClick={() => handleDeleteChat(activeChatId)}
-              title="Delete this conversation"
-              className="p-2 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer text-xs flex items-center gap-1"
+        <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-thin">
+          {sessions.map((s) => (
+            <div
+              key={s.id}
+              className={`p-2.5 rounded-xl flex items-center justify-between text-xs transition-colors cursor-pointer group ${
+                s.id === activeChatId
+                  ? 'bg-emerald-100/80 dark:bg-emerald-950/80 text-emerald-900 dark:text-emerald-300 font-bold border border-emerald-300/80 dark:border-emerald-800'
+                  : 'hover:bg-slate-200/60 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-300'
+              }`}
+              onClick={() => {
+                setActiveChatId(s.id);
+                setMessages(s.messages);
+              }}
             >
-              <Trash2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Delete</span>
-            </button>
+              <div className="flex items-center gap-2 truncate flex-1 min-w-0">
+                <MessageSquare className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                {editingTitleId === s.id ? (
+                  <input
+                    type="text"
+                    value={editingTitleText}
+                    onChange={(e) => setEditingTitleText(e.target.value)}
+                    onBlur={() => saveRenameChat(s.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveRenameChat(s.id);
+                    }}
+                    autoFocus
+                    className="w-full px-1 py-0.5 text-xs bg-white text-slate-900 rounded border border-emerald-500 focus:outline-none"
+                  />
+                ) : (
+                  <span className="truncate" onDoubleClick={() => handleRenameChat(s.id, s.title)}>
+                    {s.title}
+                  </span>
+                )}
+              </div>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteChat(s.id);
+                }}
+                className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-500 rounded cursor-pointer transition-opacity"
+                title="Delete Chat"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+
+          {sessions.length === 0 && (
+            <p className="text-slate-400 text-center py-6 text-xs">No saved chats</p>
           )}
         </div>
-      </div>
+      </aside>
 
-      {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4 bg-slate-50/50">
-        {isHistoryLoading && (
-          <div className="flex items-center justify-center py-6 text-slate-400 text-xs gap-2">
-            <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
-            <span>Loading conversation history from Google Sheets...</span>
-          </div>
-        )}
-
-        {!isHistoryLoading &&
-          messages.map((msg) => {
-            const isUser = msg.role === 'user';
-            const isErr = msg.status === 'error';
-
-            return (
-              <div
-                key={msg.id}
-                className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
-              >
-                {/* Avatar */}
-                <div
-                  className={`w-8 h-8 rounded-xl shrink-0 flex items-center justify-center text-xs font-bold shadow-xs ${
-                    isUser
-                      ? 'bg-slate-800 text-white'
-                      : isErr
-                      ? 'bg-rose-100 text-rose-700'
-                      : 'bg-emerald-600 text-white'
-                  }`}
-                >
-                  {isUser ? <UserIcon className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
-                </div>
-
-                {/* Message Bubble */}
-                <div
-                  className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-sm shadow-xs relative group ${
-                    isUser
-                      ? 'bg-slate-900 text-white rounded-tr-xs'
-                      : isErr
-                      ? 'bg-rose-50 border border-rose-200 text-rose-900 rounded-tl-xs'
-                      : 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs'
-                  }`}
-                >
-                  {isUser ? (
-                    <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                  ) : (
-                    <div className="space-y-1">{renderFormattedText(msg.content)}</div>
-                  )}
-
-                  {/* Footer with Timestamp & Copy */}
-                  <div
-                    className={`flex items-center justify-between gap-2 mt-2 pt-1 border-t text-[10px] ${
-                      isUser ? 'border-slate-800 text-slate-400' : 'border-slate-100 text-slate-400'
-                    }`}
-                  >
-                    <span>{msg.timestamp}</span>
-
-                    {!isUser && !isErr && (
-                      <button
-                        onClick={() => handleCopyMessage(msg.id, msg.content)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-slate-600 flex items-center gap-1 cursor-pointer"
-                        title="Copy response"
-                      >
-                        {copiedId === msg.id ? (
-                          <>
-                            <Check className="w-3 h-3 text-emerald-600" />
-                            <span className="text-emerald-600 font-medium">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3 h-3" />
-                            <span>Copy</span>
-                          </>
-                        )}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-        {/* Loading State */}
-        {isLoading && (
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-xl shrink-0 flex items-center justify-center bg-emerald-600 text-white shadow-xs animate-pulse">
+      {/* MAIN CHAT WINDOW */}
+      <div className="flex-1 flex flex-col min-w-0 h-full">
+        {/* Chat Toolbar Header */}
+        <div className="bg-slate-900 text-white px-4 sm:px-6 py-3 flex items-center justify-between border-b border-slate-800 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-slate-950 shrink-0 shadow-sm">
               <Sparkles className="w-4 h-4" />
             </div>
-            <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-xs px-4 py-3 shadow-xs flex items-center gap-3 text-slate-600 text-sm">
-              <RefreshCw className="w-4 h-4 text-emerald-600 animate-spin" />
-              <span className="font-medium text-slate-700">
-                Analyzing your spending & consumption data...
-              </span>
+
+            <div className="min-w-0">
+              <h2 className="font-bold text-sm sm:text-base text-white truncate">
+                {currentChatTitle}
+              </h2>
+              <p className="text-[11px] text-slate-400 truncate">
+                {dateRange.label} • {periodExpenses.length} purchases ({formatCurrency(totalPeriodSpending)})
+              </p>
             </div>
           </div>
-        )}
 
-        {/* Suggested Questions Section */}
-        {messages.length <= 2 && !isLoading && !isHistoryLoading && (
-          <div className="mt-4 pt-2">
-            <div className="flex items-center gap-2 mb-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-              <span>Suggested Questions</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {SUGGESTED_QUESTIONS.map((q, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleSendMessage(q)}
-                  className="text-left text-xs bg-white hover:bg-emerald-50/80 hover:border-emerald-300 border border-slate-200 text-slate-700 hover:text-emerald-900 rounded-xl p-2.5 transition-all shadow-2xs flex items-center justify-between gap-2 group cursor-pointer"
-                >
-                  <span className="font-medium">{q}</span>
-                  <CornerDownLeft className="w-3.5 h-3.5 text-slate-300 group-hover:text-emerald-600 shrink-0" />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Error Retry Banner */}
-      {errorMessage && (
-        <div className="bg-rose-50 border-t border-rose-200 px-4 py-2 flex items-center justify-between text-xs text-rose-800">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>{errorMessage}</span>
+            <button
+              onClick={handleNewChat}
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-[14px] text-xs transition-all flex items-center gap-1.5 shadow-xs cursor-pointer md:hidden"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>New</span>
+            </button>
+
+            {activeSession && (
+              <button
+                onClick={() => handleDeleteChat(activeChatId)}
+                title="Delete Chat"
+                className="p-1.5 text-slate-400 hover:text-rose-400 rounded-xl cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
-          <button
-            onClick={() => handleSendMessage(messages[messages.length - 1]?.content)}
-            className="font-bold text-rose-700 hover:text-rose-900 underline ml-2 cursor-pointer"
-          >
-            Retry
-          </button>
         </div>
-      )}
 
-      {/* Input Area */}
-      <div className="p-3 sm:p-4 bg-white border-t border-slate-200 shrink-0">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSendMessage();
-          }}
-          className="flex items-center gap-2"
-        >
-          <div className="flex-1 relative">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value);
-                e.target.style.height = 'auto';
-                e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask a question about your spending, groceries, fuel, gas, or daily burn..."
-              rows={1}
-              disabled={isLoading}
-              className="w-full resize-none rounded-xl border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 bg-slate-50/50 focus:bg-white transition-all outline-none"
-            />
-          </div>
+        {/* Messages Scroll Area */}
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4 bg-slate-50/50 dark:bg-slate-950/50">
+          {isHistoryLoading && (
+            <div className="flex items-center justify-center py-6 text-slate-400 text-xs gap-2">
+              <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
+              <span>Loading chat history from Google Sheets...</span>
+            </div>
+          )}
 
-          <button
-            type="submit"
-            disabled={!input.trim() || isLoading}
-            id="send-ai-btn"
-            className="p-2.5 sm:px-4 sm:py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white rounded-xl font-medium text-sm transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed shrink-0"
+          {!isHistoryLoading &&
+            messages.map((msg) => {
+              const isUser = msg.role === 'user';
+              const isErr = msg.status === 'error';
+
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
+                >
+                  <div
+                    className={`w-8 h-8 rounded-xl shrink-0 flex items-center justify-center text-xs font-bold shadow-xs ${
+                      isUser
+                        ? 'bg-slate-800 text-white'
+                        : isErr
+                        ? 'bg-rose-100 text-rose-700'
+                        : 'bg-emerald-600 text-white'
+                    }`}
+                  >
+                    {isUser ? <UserIcon className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
+                  </div>
+
+                  <div
+                    className={`max-w-[88%] sm:max-w-[75%] rounded-[20px] px-4 py-3 text-sm shadow-xs relative group ${
+                      isUser
+                        ? 'bg-slate-900 text-white rounded-tr-xs'
+                        : isErr
+                        ? 'bg-rose-50 border border-rose-200 text-rose-900 rounded-tl-xs'
+                        : 'bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-xs'
+                    }`}
+                  >
+                    {isUser ? (
+                      <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                    ) : (
+                      <div className="space-y-1">{renderFormattedText(msg.content)}</div>
+                    )}
+
+                    <div
+                      className={`flex items-center justify-between gap-2 mt-2 pt-1.5 border-t text-[10px] ${
+                        isUser ? 'border-slate-800 text-slate-400' : 'border-slate-100 dark:border-slate-800 text-slate-400'
+                      }`}
+                    >
+                      <span>{msg.timestamp}</span>
+
+                      {!isUser && !isErr && (
+                        <button
+                          onClick={() => handleCopyMessage(msg.id, msg.content)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-slate-600 dark:hover:text-slate-200 flex items-center gap-1 cursor-pointer"
+                          title="Copy response"
+                        >
+                          {copiedId === msg.id ? (
+                            <>
+                              <Check className="w-3 h-3 text-emerald-600" />
+                              <span className="text-emerald-600 font-medium">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3 h-3" />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+          {isLoading && (
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-xl shrink-0 flex items-center justify-center bg-emerald-600 text-white shadow-xs animate-pulse">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl rounded-tl-xs px-4 py-3 shadow-xs flex items-center gap-3 text-slate-600 dark:text-slate-300 text-sm">
+                <RefreshCw className="w-4 h-4 text-emerald-600 animate-spin" />
+                <span className="font-medium">Analyzing your spending & consumption data...</span>
+              </div>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* STICKY MESSAGE INPUT BOX */}
+        <div className="p-3 sm:p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendMessage();
+            }}
+            className="flex items-center gap-2"
           >
-            <Send className="w-4 h-4" />
-            <span className="hidden sm:inline">Ask AI</span>
-          </button>
-        </form>
+            <div className="flex-1 relative">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="Ask a question about your spending, groceries, fuel, gas, or daily burn..."
+                rows={1}
+                disabled={isLoading}
+                className="w-full resize-none rounded-[12px] border border-slate-300 dark:border-slate-700 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 px-3.5 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 bg-slate-50 dark:bg-slate-950 focus:bg-white dark:focus:bg-slate-900 transition-all outline-none"
+              />
+            </div>
 
-        <p className="text-[10px] text-center text-slate-400 mt-2">
-          {BRAND_NAME} saves conversations to Google Sheets and analyzes real household spending.
-        </p>
+            <button
+              type="submit"
+              disabled={!input.trim() || isLoading}
+              id="send-ai-btn"
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white rounded-[14px] font-bold text-sm transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed shrink-0"
+            >
+              <Send className="w-4 h-4" />
+              <span className="hidden sm:inline">Send</span>
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

@@ -1,1 +1,1 @@
-export const BRAND_NAME = "Spend Track AI";
+export const BRAND_NAME = "TrackPay";

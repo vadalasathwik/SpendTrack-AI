@@ -1,5 +1,5 @@
 {
-  "name": "Spend Track AI",
+  "name": "TrackPay",
   "description": "Understand where your money goes. Personal expense and household consumption tracking application.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

@@ -1,18 +1,11 @@
 import React from 'react';
 import {
   X,
-  ShoppingCart,
-  Sparkles,
-  Repeat,
-  Bot,
+  Package,
+  Brain,
   Settings,
-  Receipt,
-  LayoutDashboard,
-  BarChart3,
-  ExternalLink,
-  ShieldCheck,
-  FileSpreadsheet,
-  TrendingUp,
+  Users,
+  Compass,
 } from 'lucide-react';
 import { BRAND_NAME } from '../constants/brand.js';
 
@@ -21,7 +14,6 @@ interface MobileMoreDrawerProps {
   onClose: () => void;
   activeTab: string;
   onSelectTab: (tab: string) => void;
-  userEmail?: string;
 }
 
 export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
@@ -29,52 +21,37 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
   onClose,
   activeTab,
   onSelectTab,
-  userEmail,
 }) => {
   if (!isOpen) return null;
 
   const menuItems = [
     {
-      id: 'budget',
-      title: 'Budget AI & Inflation',
-      subtitle: 'Predict future spend & track staple inflation',
-      icon: TrendingUp,
-      color: 'text-emerald-600 bg-emerald-50',
-    },
-    {
       id: 'monthly-items',
-      title: 'Monthly Items Catalog',
-      subtitle: 'Your regular purchases & 1-tap templates',
-      icon: ShoppingCart,
-      color: 'text-amber-600 bg-amber-50',
+      title: '📦 Monthly Items',
+      subtitle: 'Regular catalog & stock consumption rates',
+      icon: Package,
+      color: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60',
     },
     {
       id: 'items',
-      title: 'Item Intelligence',
-      subtitle: 'Price shifts, lifespans & consumption rates',
-      icon: Sparkles,
-      color: 'text-emerald-600 bg-emerald-50',
+      title: '🧠 Intelligence',
+      subtitle: 'Price shifts, lifespans & spending analytics',
+      icon: Brain,
+      color: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60',
     },
     {
-      id: 'recurring',
-      title: 'Recurring Bills',
-      subtitle: 'WiFi, utilities, subscriptions & calendar alerts',
-      icon: Repeat,
-      color: 'text-blue-600 bg-blue-50',
-    },
-    {
-      id: 'ai',
-      title: BRAND_NAME,
-      subtitle: 'Instant answers on spending & household burn',
-      icon: Bot,
-      color: 'text-purple-600 bg-purple-50',
+      id: 'family',
+      title: '👨‍👩‍👧 Family Workspace',
+      subtitle: 'Shared household budget & member controls',
+      icon: Users,
+      color: 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60',
     },
     {
       id: 'settings',
-      title: 'Workspace & Settings',
-      subtitle: 'Google Sheets, Drive, categories & exports',
+      title: '⚙️ Settings',
+      subtitle: 'Google Sheets, Drive, categories & CSV export',
       icon: Settings,
-      color: 'text-slate-600 bg-slate-100',
+      color: 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800',
     },
   ];
 
@@ -87,29 +64,32 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
       />
       <div
         id="mobile-more-drawer"
-        className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl border border-slate-200/90 max-h-[85vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200"
+        className="relative bg-white dark:bg-slate-900 w-full sm:max-w-md rounded-t-[24px] sm:rounded-[20px] shadow-2xl border border-slate-200/90 dark:border-slate-800 max-h-[85vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-200"
       >
         {/* Drawer Handle on mobile */}
-        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-3 mb-1 sm:hidden" />
+        <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto mt-3 mb-1 sm:hidden" />
 
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <h3 className="font-bold text-base text-slate-900 tracking-tight">More Features</h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {userEmail ? `Connected as ${userEmail}` : `${BRAND_NAME} Command Center`}
-            </p>
+        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Compass className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <div>
+              <h3 className="font-extrabold text-base text-slate-900 dark:text-white tracking-tight">Tools</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Secondary features & workspace options
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Menu Items */}
-        <div className="p-3 sm:p-4 space-y-1.5 overflow-y-auto flex-1">
+        <div className="p-3 sm:p-4 space-y-2 overflow-y-auto flex-1">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isSelected = activeTab === item.id;
@@ -121,14 +101,14 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
                   onSelectTab(item.id);
                   onClose();
                 }}
-                className={`w-full p-3.5 rounded-2xl flex items-center gap-3.5 text-left transition-all cursor-pointer ${
+                className={`w-full p-3.5 rounded-[16px] flex items-center gap-3.5 text-left transition-all cursor-pointer ${
                   isSelected
-                    ? 'bg-emerald-50 border border-emerald-200 shadow-2xs'
-                    : 'hover:bg-slate-50 border border-transparent'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 shadow-2xs'
+                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-transparent'
                 }`}
               >
                 <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${item.color}`}
+                  className={`w-10 h-10 rounded-[12px] flex items-center justify-center shrink-0 ${item.color}`}
                 >
                   <Icon className="w-5 h-5" />
                 </div>
@@ -136,18 +116,18 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
                   <div className="flex items-center justify-between">
                     <span
                       className={`text-sm font-bold truncate ${
-                        isSelected ? 'text-emerald-900' : 'text-slate-900'
+                        isSelected ? 'text-emerald-900 dark:text-emerald-300' : 'text-slate-900 dark:text-white'
                       }`}
                     >
                       {item.title}
                     </span>
                     {isSelected && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-200/80 text-emerald-900">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-200/80 dark:bg-emerald-800 text-emerald-900 dark:text-emerald-200">
                         Active
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-500 truncate mt-0.5">{item.subtitle}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">{item.subtitle}</p>
                 </div>
               </button>
             );
@@ -155,7 +135,7 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
         </div>
 
         {/* Footer info */}
-        <div className="p-3 bg-slate-50 border-t border-slate-100 text-center text-[11px] text-slate-400">
+        <div className="p-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 text-center text-[11px] text-slate-400 dark:text-slate-500">
           {BRAND_NAME} • Futuristic because it is effortless.
         </div>
       </div>

@@ -43,6 +43,7 @@ export interface AnalyzeSpendingParams {
   dateRange?: DateRange;
   currentDate?: string;
   userEmail?: string;
+  upcomingCalendarEvents?: any[];
 }
 
 export class GeminiAssistantService {
@@ -161,6 +162,14 @@ export class GeminiAssistantService {
         dueDate: r.dueDate,
         calendarReminderEnabled: r.calendarReminderEnabled,
         notes: r.notes,
+      })),
+      upcomingGoogleCalendarEvents: (params.upcomingCalendarEvents || []).map((ev: any) => ({
+        id: ev.id,
+        summary: ev.summary,
+        description: ev.description,
+        startDate: ev.startDate,
+        startTime: ev.startTime,
+        amount: ev.amount,
       })),
       totalExpensesCountInDatabase: expenses.length,
     };
