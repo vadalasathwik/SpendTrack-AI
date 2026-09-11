@@ -100,35 +100,37 @@ export const onAuthStateChange = (
     return onAuthStateChanged(
       auth,
       (firebaseUser) => {
-        if (firebaseUser) {
+        const storedJWT = getStoredJWT();
+        if (firebaseUser && storedJWT) {
           callback(firebaseUser);
         } else {
           const user = getStoredUserProfile();
-          callback(
-            user
-              ? ({
-                  uid: user.uid,
-                  email: user.email,
-                  displayName: user.name,
-                  photoURL: user.photoURL,
-                } as any)
-              : null
-          );
+          if (user && storedJWT) {
+            callback({
+              uid: user.uid,
+              email: user.email,
+              displayName: user.name,
+              photoURL: user.photoURL,
+            } as any);
+          } else {
+            callback(null);
+          }
         }
       },
       (err) => {
         console.warn("Firebase Auth listener notice:", err);
         const user = getStoredUserProfile();
-        callback(
-          user
-            ? ({
-                uid: user.uid,
-                email: user.email,
-                displayName: user.name,
-                photoURL: user.photoURL,
-              } as any)
-            : null
-        );
+        const storedJWT = getStoredJWT();
+        if (user && storedJWT) {
+          callback({
+            uid: user.uid,
+            email: user.email,
+            displayName: user.name,
+            photoURL: user.photoURL,
+          } as any);
+        } else {
+          callback(null);
+        }
       }
     );
   } catch (err) {

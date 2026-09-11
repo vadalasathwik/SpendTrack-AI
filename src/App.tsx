@@ -36,7 +36,7 @@ import {
 import { getDateRangeFromPreset } from './utils/dateRanges.js';
 import { calculateMonthlyItemIntelligence } from './utils/calculations.js';
 import { SpendTrackApi } from './services/api.js';
-import { signInWithGoogle, signOutApp, onAuthStateChange, clearAuthSession } from './services/authService.js';
+import { signInWithGoogle, signOutApp, onAuthStateChange, clearAuthSession, getStoredJWT } from './services/authService.js';
 import { isFirebaseConfigured } from './services/firebase.js';
 import { BRAND_NAME } from './constants/brand.js';
 
@@ -153,21 +153,38 @@ export function App() {
     };
   }, []);
 
-  // Auth Listener
+  // Auth Listener: Resolves auth state before triggering any workspace data loading
   useEffect(() => {
-    const unsubscribe = onAuthStateChange(async (firebaseUser) => {
-      setUser(firebaseUser);
-      setAuthLoading(false);
-      if (firebaseUser) {
-        loadDataFromWorkspace();
+    const unsubscribe = onAuthStateChange((firebaseUser) => {
+      const token = getStoredJWT();
+      if (firebaseUser && token) {
+        setUser(firebaseUser);
       } else {
-        setExpenses([]);
-        setRecurringExpenses([]);
-        setMonthlyItems([]);
+        setUser(null);
+        clearAuthSession();
       }
+      setAuthLoading(false);
     });
     return () => unsubscribe();
   }, []);
+
+  // Data Loading Trigger: Only loads workspace data when auth state is resolved and authenticated
+  useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
+    if (!user || !getStoredJWT()) {
+      setExpenses([]);
+      setRecurringExpenses([]);
+      setMonthlyItems([]);
+      setConsumptionLogs([]);
+      setPersistedNotifications([]);
+      return;
+    }
+
+    loadDataFromWorkspace();
+  }, [authLoading, user]);
 
   // Google Sign-In & Workspace Provisioning Handler
   const handleGoogleSignIn = async () => {
@@ -207,6 +224,9 @@ export function App() {
 
   // Load all Workspace Data
   const loadDataFromWorkspace = async () => {
+    if (authLoading || !user || !getStoredJWT()) {
+      return;
+    }
     if (isWorkspaceLoadingRef.current) return;
     isWorkspaceLoadingRef.current = true;
     setSyncStatus({ state: 'syncing' });
