@@ -59,140 +59,169 @@ export function createExpressApp() {
     res.json({ success: true });
   });
 
-  // Helper to extract Google Auth Token
+  // Helper to extract Google Auth Token (requires valid authenticated user session & googleToken)
   const getGoogleToken = (req: express.Request): string | null => {
-    return (req as any).googleToken || req.headers.authorization?.replace("Bearer ", "") || null;
+    const user = (req as any).user;
+    const googleToken = (req as any).googleToken;
+    if (!user || !googleToken) {
+      return null;
+    }
+    return googleToken;
   };
 
   // Expenses CRUD
   app.get("/api/expenses", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       const expenses = await googleSheetsService.getExpenses(token);
       res.json(expenses);
     } catch (err: any) {
-      console.warn("Sheets sync warning (getExpenses):", err.message);
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(500).json({ error: err.message || "Failed to fetch expenses" });
     }
   });
 
   app.post("/api/expenses", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       const created = await googleSheetsService.createExpense(token, req.body);
       res.json(created);
     } catch (err: any) {
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(400).json({ error: err.message || "Failed to create expense" });
     }
   });
 
   app.put("/api/expenses/:id", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       const updated = await googleSheetsService.updateExpense(token, req.params.id, req.body);
       res.json(updated);
     } catch (err: any) {
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(400).json({ error: err.message || "Failed to update expense" });
     }
   });
 
   app.delete("/api/expenses/:id", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       await googleSheetsService.deleteExpense(token, req.params.id);
       res.json({ success: true });
     } catch (err: any) {
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(400).json({ error: err.message || "Failed to delete expense" });
     }
   });
 
   // Monthly Items CRUD
   app.get("/api/monthly-items", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       const items = await googleSheetsService.getMonthlyItems(token);
       res.json(items);
     } catch (err: any) {
-      console.warn("Sheets sync warning (getMonthlyItems):", err.message);
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(500).json({ error: err.message || "Failed to fetch monthly items" });
     }
   });
 
   app.post("/api/monthly-items", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       const created = await googleSheetsService.createMonthlyItem(token, req.body);
       res.json(created);
     } catch (err: any) {
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(400).json({ error: err.message || "Failed to create monthly item" });
     }
   });
 
   app.put("/api/monthly-items/:id", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       const updated = await googleSheetsService.updateMonthlyItem(token, req.params.id, req.body);
       res.json(updated);
     } catch (err: any) {
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(400).json({ error: err.message || "Failed to update monthly item" });
     }
   });
 
   app.delete("/api/monthly-items/:id", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       await googleSheetsService.deleteMonthlyItem(token, req.params.id);
       res.json({ success: true });
     } catch (err: any) {
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(400).json({ error: err.message || "Failed to delete monthly item" });
     }
   });
 
   // Consumption Log CRUD
   app.get("/api/consumption-log", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       const logs = await googleSheetsService.getConsumptionLogs(token);
       res.json(logs);
     } catch (err: any) {
-      console.warn("Sheets sync warning (getConsumptionLogs):", err.message);
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(500).json({ error: err.message || "Failed to fetch consumption logs" });
     }
   });
 
   app.post("/api/consumption-log", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       const log = await googleSheetsService.createConsumptionLog(token, req.body);
 
       // Update remaining quantity on matching MonthlyItem
@@ -225,85 +254,101 @@ export function createExpressApp() {
 
       res.json({ log, updatedItem });
     } catch (err: any) {
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(400).json({ error: err.message || "Failed to log consumption" });
     }
   });
 
   app.delete("/api/consumption-log/:id", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       await googleSheetsService.deleteConsumptionLog(token, req.params.id);
       res.json({ success: true });
     } catch (err: any) {
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(400).json({ error: err.message || "Failed to delete consumption log" });
     }
   });
 
   // Categories
   app.get("/api/categories", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       const cats = await googleSheetsService.getCategories(token);
       res.json(cats);
     } catch (err: any) {
-      console.warn("Sheets sync warning (getCategories):", err.message);
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(500).json({ error: err.message || "Failed to fetch categories" });
     }
   });
 
   app.post("/api/categories", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       const saved = await googleSheetsService.saveCategories(token, req.body);
       res.json(saved);
     } catch (err: any) {
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(400).json({ error: err.message || "Failed to save categories" });
     }
   });
 
   // Recurring Expenses CRUD
   app.get("/api/recurring", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       const list = await googleSheetsService.getRecurringExpenses(token);
       res.json(list);
     } catch (err: any) {
-      console.warn("Sheets sync warning (getRecurring):", err.message);
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(500).json({ error: err.message || "Failed to fetch recurring expenses" });
     }
   });
 
   app.post("/api/recurring", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       const created = await googleSheetsService.createRecurringExpense(token, req.body);
       res.json(created);
     } catch (err: any) {
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(400).json({ error: err.message || "Failed to create recurring expense" });
     }
   });
 
   app.post("/api/recurring/generate-due", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       const bills = await googleSheetsService.getRecurringExpenses(token);
       const today = new Date();
       const currentYear = today.getFullYear();
@@ -345,32 +390,41 @@ export function createExpressApp() {
 
       res.json({ success: true, createdExpenses, updatedBills });
     } catch (err: any) {
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(500).json({ error: err.message || "Failed to auto-generate recurring expenses" });
     }
   });
 
   app.put("/api/recurring/:id", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       const updated = await googleSheetsService.updateRecurringExpense(token, req.params.id, req.body);
       res.json(updated);
     } catch (err: any) {
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(400).json({ error: err.message || "Failed to update recurring expense" });
     }
   });
 
   app.delete("/api/recurring/:id", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       await googleSheetsService.deleteRecurringExpense(token, req.params.id);
       res.json({ success: true });
     } catch (err: any) {
+      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(400).json({ error: err.message || "Failed to delete recurring expense" });
     }
   });
@@ -408,29 +462,33 @@ export function createExpressApp() {
 
   // User Settings Routes (Google Sheets Settings Tab)
   app.get("/api/settings", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       const settings = await googleSheetsService.getSettings(token);
       res.json(settings);
     } catch (err: any) {
-      console.error("GET /api/settings error:", err);
+      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(500).json({ error: err.message || "Failed to fetch settings from Google Sheets" });
     }
   });
 
   app.post("/api/settings", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) {
-        return res.status(401).json({ error: "Google authentication required" });
-      }
       const updated = await googleSheetsService.saveSettings(token, req.body || {});
       res.json(updated);
     } catch (err: any) {
-      console.error("POST /api/settings error:", err);
+      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(500).json({ error: err.message || "Failed to save settings to Google Sheets" });
     }
   });
@@ -462,104 +520,135 @@ export function createExpressApp() {
       });
       res.json({ reply });
     } catch (err: any) {
-      console.error("AI Chat error:", err);
       res.status(500).json({ error: err.message || "SpendTrack AI service error" });
     }
   });
 
   // SpendTrack AI Chat History & Notifications
   app.get("/api/ai/chat/history", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) return res.status(401).json({ error: "Google authentication required" });
       const history = await googleSheetsService.getAIChatHistory(token);
       res.json({ success: true, history });
     } catch (err: any) {
-      console.error("GET /api/ai/chat/history error:", err);
+      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(500).json({ error: err.message || "Failed to fetch AI chat history" });
     }
   });
 
   app.post("/api/ai/chat/history", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) return res.status(401).json({ error: "Google authentication required" });
       const saved = await googleSheetsService.saveAIChatMessage(token, req.body || {});
       res.json({ success: true, saved });
     } catch (err: any) {
-      console.error("POST /api/ai/chat/history error:", err);
+      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(500).json({ error: err.message || "Failed to save AI chat message" });
     }
   });
 
   app.delete("/api/ai/chat/history/:chatId", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) return res.status(401).json({ error: "Google authentication required" });
       await googleSheetsService.deleteAIChat(token, req.params.chatId);
       res.json({ success: true });
     } catch (err: any) {
-      console.error("DELETE /api/ai/chat/history error:", err);
+      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(500).json({ error: err.message || "Failed to delete AI chat session" });
     }
   });
 
   app.get("/api/notifications", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) return res.status(401).json({ error: "Google authentication required" });
       const notifications = await googleSheetsService.getNotifications(token);
       res.json({ success: true, notifications });
     } catch (err: any) {
-      console.error("GET /api/notifications error:", err);
+      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(500).json({ error: err.message || "Failed to fetch notifications" });
     }
   });
 
   app.post("/api/notifications", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) return res.status(401).json({ error: "Google authentication required" });
       const notification = await googleSheetsService.saveNotification(token, req.body || {});
       res.json({ success: true, notification });
     } catch (err: any) {
-      console.error("POST /api/notifications error:", err);
+      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(500).json({ error: err.message || "Failed to save notification" });
     }
   });
 
   app.put("/api/notifications/:id", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) return res.status(401).json({ error: "Google authentication required" });
       const updated = await googleSheetsService.updateNotification(token, req.params.id, req.body || {});
       res.json({ success: true, notification: updated });
     } catch (err: any) {
-      console.error("PUT /api/notifications error:", err);
+      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(500).json({ error: err.message || "Failed to update notification" });
     }
   });
 
   app.delete("/api/notifications/:id", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) return res.status(401).json({ error: "Google authentication required" });
       await googleSheetsService.deleteNotification(token, req.params.id);
       res.json({ success: true });
     } catch (err: any) {
-      console.error("DELETE /api/notifications/:id error:", err);
+      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(500).json({ error: err.message || "Failed to delete notification" });
     }
   });
 
   app.delete("/api/notifications", async (req, res) => {
+    const token = getGoogleToken(req);
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    }
     try {
-      const token = getGoogleToken(req);
-      if (!token) return res.status(401).json({ error: "Google authentication required" });
       await googleSheetsService.clearAllNotifications(token);
       res.json({ success: true });
     } catch (err: any) {
-      console.error("DELETE /api/notifications error:", err);
+      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
+        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
+      }
       res.status(500).json({ error: err.message || "Failed to clear all notifications" });
     }
   });

@@ -36,7 +36,8 @@ import {
 import { getDateRangeFromPreset } from './utils/dateRanges.js';
 import { calculateMonthlyItemIntelligence } from './utils/calculations.js';
 import { SpendTrackApi } from './services/api.js';
-import { signInWithGoogle, signOutApp, onAuthStateChange } from './services/authService.js';
+import { signInWithGoogle, signOutApp, onAuthStateChange, clearAuthSession } from './services/authService.js';
+import { isFirebaseConfigured } from './services/firebase.js';
 import { BRAND_NAME } from './constants/brand.js';
 
 // UI Components
@@ -123,6 +124,9 @@ export function App() {
     setActiveTab('ai');
   };
 
+  // Ref to prevent simultaneous workspace requests on startup
+  const isWorkspaceLoadingRef = React.useRef(false);
+
   // Listen to network status
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -132,6 +136,20 @@ export function App() {
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Listen for 401 unauthorized session events across the app
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      clearAuthSession();
+      setUser(null);
+      setIsDemoMode(false);
+      setSyncStatus({ state: 'idle' });
+    };
+    window.addEventListener('spendtrack_401_unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('spendtrack_401_unauthorized', handleUnauthorized);
     };
   }, []);
 
@@ -165,12 +183,20 @@ export function App() {
       if (res?.user) {
         setUser(res.user);
         await loadDataFromWorkspace();
+      } else {
+        // Firebase is not configured or user cancelled: cleanly switch to Demo Mode
+        setIsDemoMode(true);
+        setSyncStatus({ state: 'idle' });
       }
     } catch (err: any) {
       console.error('Google Sign In failed:', err);
+      let errorMsg = err.message || 'Google Sign-In failed';
+      if (errorMsg.includes('auth/api-key-not-valid') || errorMsg.includes('api-key-not-valid')) {
+        errorMsg = 'Invalid Firebase API Key in .env.local. Please update VITE_FIREBASE_API_KEY with a valid Firebase Web API Key or explore Demo Mode.';
+      }
       setSyncStatus({
         state: 'error',
-        errorMessage: err.message || 'Google Sign-In failed',
+        errorMessage: errorMsg,
       });
     } finally {
       setTimeout(() => {
@@ -181,7 +207,10 @@ export function App() {
 
   // Load all Workspace Data
   const loadDataFromWorkspace = async () => {
+    if (isWorkspaceLoadingRef.current) return;
+    isWorkspaceLoadingRef.current = true;
     setSyncStatus({ state: 'syncing' });
+
     try {
       const status = await SpendTrackApi.checkWorkspaceStatus();
       setWorkspaceStatus(status);
@@ -235,10 +264,24 @@ export function App() {
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
       console.warn('Workspace sync notice:', err.message);
+      if (
+        err.message?.includes('401') ||
+        err.message?.includes('unauthorized') ||
+        err.message?.includes('Unauthorized') ||
+        err.message?.includes('Not authenticated')
+      ) {
+        clearAuthSession();
+        setUser(null);
+        setIsDemoMode(false);
+        setSyncStatus({ state: 'idle' });
+        return;
+      }
       setSyncStatus({
         state: 'error',
         errorMessage: err.message || 'Running in local mode',
       });
+    } finally {
+      isWorkspaceLoadingRef.current = false;
     }
   };
 

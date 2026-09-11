@@ -81,9 +81,19 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
         
         {/* Error Notification Banner if sign in failed */}
         {errorMessage && (
-          <div className="w-full max-w-xl mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center gap-3 shadow-sm animate-shake">
-            <div className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-            <p className="flex-1 font-medium">{errorMessage}</p>
+          <div className="w-full max-w-2xl mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm animate-shake">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" />
+              <p className="font-semibold text-xs sm:text-sm leading-relaxed">{errorMessage}</p>
+            </div>
+            {onExploreDemo && (
+              <button
+                onClick={onExploreDemo}
+                className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shrink-0 transition-all cursor-pointer shadow-xs active:scale-95 self-end sm:self-auto"
+              >
+                Use Demo Mode
+              </button>
+            )}
           </div>
         )}
 

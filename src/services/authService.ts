@@ -5,7 +5,7 @@ import {
   User,
   signOut,
 } from "firebase/auth";
-import { auth } from "./firebase";
+import { auth, isFirebaseConfigured } from "./firebase";
 
 const JWT_STORAGE_KEY = "spendtrack_jwt";
 const USER_PROFILE_KEY = "spendtrack_user_profile";
@@ -79,12 +79,58 @@ export const clearAuthSession = () => {
 export const onAuthStateChange = (
   callback: (user: User | null) => void
 ) => {
-  if (!auth) {
-    callback(null);
+  // If Firebase is NOT configured or auth instance is null, do NOT call any Firebase auth listener methods
+  if (!isFirebaseConfigured || !auth) {
+    const storedUser = getStoredUserProfile();
+    const storedJWT = getStoredJWT();
+    if (storedUser && storedJWT) {
+      callback({
+        uid: storedUser.uid,
+        email: storedUser.email,
+        displayName: storedUser.name,
+        photoURL: storedUser.photoURL,
+      } as any);
+    } else {
+      callback(null);
+    }
     return () => {};
   }
+
   try {
-    return onAuthStateChanged(auth, callback);
+    return onAuthStateChanged(
+      auth,
+      (firebaseUser) => {
+        if (firebaseUser) {
+          callback(firebaseUser);
+        } else {
+          const user = getStoredUserProfile();
+          callback(
+            user
+              ? ({
+                  uid: user.uid,
+                  email: user.email,
+                  displayName: user.name,
+                  photoURL: user.photoURL,
+                } as any)
+              : null
+          );
+        }
+      },
+      (err) => {
+        console.warn("Firebase Auth listener notice:", err);
+        const user = getStoredUserProfile();
+        callback(
+          user
+            ? ({
+                uid: user.uid,
+                email: user.email,
+                displayName: user.name,
+                photoURL: user.photoURL,
+              } as any)
+            : null
+        );
+      }
+    );
   } catch (err) {
     console.warn("Firebase Auth listener notice:", err);
     callback(null);
@@ -97,9 +143,11 @@ export const onAuthStateChange = (
 export const signInWithGoogle = async (
   onStepProgress?: (step: number) => void
 ): Promise<SignInResult | null> => {
-  if (!auth) {
-    throw new Error("Firebase Authentication is not available. Please verify your configuration.");
+  // If Firebase is NOT configured or auth is null, do NOT call Firebase methods.
+  if (!isFirebaseConfigured || !auth) {
+    return null;
   }
+
   const provider = new GoogleAuthProvider();
 
   provider.setCustomParameters({
@@ -151,9 +199,9 @@ export const signInWithGoogle = async (
     onStepProgress?.(5);
 
     return data;
-  } catch (err) {
+  } catch (err: any) {
     clearAuthSession();
-    console.error(err);
+    console.error("Google Sign-In error:", err);
     throw err;
   }
 };
@@ -161,7 +209,7 @@ export const signInWithGoogle = async (
 /* ---------------- Sign Out ---------------- */
 
 export const signOutApp = async () => {
-  if (auth) {
+  if (isFirebaseConfigured && auth) {
     await signOut(auth).catch(() => {});
   }
   clearAuthSession();

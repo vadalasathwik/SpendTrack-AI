@@ -36,6 +36,9 @@ async function apiFetch<T>(
   if (!res.ok) {
     if (res.status === 401) {
       clearAuthSession();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("spendtrack_401_unauthorized"));
+      }
       throw new Error(
         "Session expired or unauthorized. Please sign in with Google again."
       );
@@ -375,7 +378,10 @@ export const SpendTrackApi = {
 
   // Notifications
   async getNotifications(): Promise<AppNotification[]> {
-    return apiFetch<AppNotification[]>("/api/notifications");
+    const res = await apiFetch<any>("/api/notifications");
+    if (Array.isArray(res)) return res;
+    if (res && Array.isArray(res.notifications)) return res.notifications;
+    return [];
   },
 
   async saveNotification(notification: Omit<AppNotification, "id" | "createdAt"> & { id?: string; createdAt?: string }) {
