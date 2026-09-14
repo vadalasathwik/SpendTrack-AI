@@ -181,13 +181,13 @@ export class GeminiAssistantService {
    * System instruction enforcing strict truthfulness, Indian currency formatting, and consumption domain logic
    */
   private getSystemInstruction(): string {
-    return `You are "SpendTrack AI", an intelligent and friendly personal finance and household consumption assistant for the SpendTrack application.
+    return `You are "TrackPay AI", an intelligent and friendly personal finance and household consumption assistant for the TrackPay application.
 
 YOUR PURPOSE:
 Help the user clearly understand their spending, categories, items, consumption duration, prices, price changes, cost per day, spending velocity, period comparisons, recurring expenses, and household consumption patterns.
 
 CRITICAL TRUTHFULNESS & ACCURACY DIRECTIVES:
-1. ONLY USE REAL DATA: You have been provided the user's authentic SpendTrack database in structured JSON. Every calculation, price, date, and figure you cite MUST strictly originate from this data.
+1. ONLY USE REAL DATA: You have been provided the user's authentic TrackPay database in structured JSON. Every calculation, price, date, and figure you cite MUST strictly originate from this data.
 2. NO HALLUCINATIONS: Never fabricate expenses, purchases, prices, or consumption records. If the user asks about an item or period with zero or insufficient historical records (e.g. asking for price inflation on an item bought only once), clearly state that there is not enough historical data yet.
 3. CURRENCY FORMATTING: Format all Indian rupee amounts with the '₹' symbol and appropriate commas (e.g., ₹1,200, ₹14,500, ₹1,25,000).
 4. EXPLAIN CALCULATIONS: When answering consumption or cost questions, concisely show the formula so the user understands where the numbers came from:
@@ -220,7 +220,7 @@ CRITICAL TRUTHFULNESS & ACCURACY DIRECTIVES:
     const contents: any[] = [];
 
     // First, ground the model with the user's live data
-    const contextPrompt = `Here is the user's current SpendTrack data context:\n\`\`\`json\n${dataContextJson}\n\`\`\`\nPlease answer the user's questions based strictly on this data.`;
+    const contextPrompt = `Here is the user's current TrackPay data context:\n\`\`\`json\n${dataContextJson}\n\`\`\`\nPlease answer the user's questions based strictly on this data.`;
 
     contents.push({
       role: 'user',
@@ -231,7 +231,7 @@ CRITICAL TRUTHFULNESS & ACCURACY DIRECTIVES:
       role: 'model',
       parts: [
         {
-          text: "Understood. I have loaded your current SpendTrack data and consumption records. I am ready to answer any questions about your expenses, categories, item price trends, daily burn rates, and period comparisons with complete mathematical accuracy.",
+          text: "Understood. I have loaded your current TrackPay data and consumption records. I am ready to answer any questions about your expenses, categories, item price trends, daily burn rates, and period comparisons with complete mathematical accuracy.",
         },
       ],
     });
@@ -286,7 +286,7 @@ CRITICAL TRUTHFULNESS & ACCURACY DIRECTIVES:
           console.warn(`Gemini API model ${modelName} attempt ${attempt} warning:`, msg);
 
           if (is503 && attempt === 1) {
-            console.log('SpendTrack AI is temporarily busy due to high demand. Retrying automatically...');
+            console.log('TrackPay AI is temporarily busy due to high demand. Retrying automatically...');
             await delay(800);
             continue;
           }
@@ -305,11 +305,11 @@ CRITICAL TRUTHFULNESS & ACCURACY DIRECTIVES:
     const lastStatus = lastError?.status || lastError?.statusCode;
 
     if (lastStatus === 503 || lastMsg.includes('503') || lastMsg.includes('UNAVAILABLE')) {
-      throw new Error('SpendTrack AI is temporarily busy due to high demand. Retrying automatically...');
+      throw new Error('TrackPay AI is temporarily busy due to high demand. Retrying automatically...');
     } else if (lastStatus === 404 || lastMsg.includes('404') || lastMsg.includes('NOT_FOUND')) {
       throw new Error('The configured Gemini model is unavailable. Falling back to the latest supported model.');
     } else {
-      throw new Error('SpendTrack AI service is temporarily unavailable.');
+      throw new Error('TrackPay AI service is temporarily unavailable.');
     }
   }
 }

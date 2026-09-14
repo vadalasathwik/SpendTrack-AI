@@ -1143,7 +1143,7 @@ export function App() {
                 </div>
                 <h2 className="text-xl font-bold text-slate-900 mb-2">Firebase Configuration Required</h2>
                 <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-                  Spend Track AI requires valid Firebase Authentication configuration. Please ensure <code className="bg-slate-100 px-1.5 py-0.5 rounded text-rose-600 font-mono text-xs">VITE_FIREBASE_API_KEY</code>, <code className="bg-slate-100 px-1.5 py-0.5 rounded text-rose-600 font-mono text-xs">VITE_FIREBASE_AUTH_DOMAIN</code>, and <code className="bg-slate-100 px-1.5 py-0.5 rounded text-rose-600 font-mono text-xs">VITE_FIREBASE_PROJECT_ID</code> are configured.
+                  {BRAND_NAME} requires valid Firebase Authentication configuration. Please ensure <code className="bg-slate-100 px-1.5 py-0.5 rounded text-rose-600 font-mono text-xs">VITE_FIREBASE_API_KEY</code>, <code className="bg-slate-100 px-1.5 py-0.5 rounded text-rose-600 font-mono text-xs">VITE_FIREBASE_AUTH_DOMAIN</code>, and <code className="bg-slate-100 px-1.5 py-0.5 rounded text-rose-600 font-mono text-xs">VITE_FIREBASE_PROJECT_ID</code> are configured.
                 </p>
                 <button
                   onClick={() => window.location.reload()}

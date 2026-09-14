@@ -150,6 +150,18 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
               </>
             )}
           </button>
+
+          <p className="text-[11px] text-slate-400 text-center font-medium leading-relaxed">
+            By signing in, you agree to {BRAND_NAME}&apos;s{' '}
+            <a href="/privacy" className="text-emerald-400 hover:underline">
+              Privacy Policy
+            </a>{' '}
+            and{' '}
+            <a href="/terms" className="text-emerald-400 hover:underline">
+              Terms of Service
+            </a>
+            .
+          </p>
         </div>
       </main>
 
@@ -157,8 +169,8 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
       <footer className="w-full max-w-6xl mx-auto px-6 py-6 border-t border-slate-800 text-center text-xs font-semibold text-slate-500 flex items-center justify-between">
         <span>&copy; 2026 {BRAND_NAME}</span>
         <div className="flex items-center gap-4">
-          <a href="/privacy" className="hover:text-slate-300 transition-colors">Privacy</a>
-          <a href="/terms" className="hover:text-slate-300 transition-colors">Terms</a>
+          <a href="/privacy" className="hover:text-slate-300 transition-colors">Privacy Policy</a>
+          <a href="/terms" className="hover:text-slate-300 transition-colors">Terms of Service</a>
         </div>
       </footer>
     </div>

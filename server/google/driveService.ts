@@ -31,8 +31,8 @@ export class GoogleDriveService implements DriveStorageRepository {
   /**
    * Find or create folder in Drive
    */
-  private async findOrCreateFolder(token: string, folderName: string, parentId?: string): Promise<string> {
-    let query = `mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`;
+  private async findOrCreateFolder(token: string, folderName: string, parentId?: string, fallbackName?: string): Promise<string> {
+    let query = `mimeType='application/vnd.google-apps.folder' and (name='${folderName}'${fallbackName ? ` or name='${fallbackName}'` : ''}) and trashed=false`;
     if (parentId) {
       query += ` and '${parentId}' in parents`;
     }
@@ -64,14 +64,14 @@ export class GoogleDriveService implements DriveStorageRepository {
   }
 
   /**
-   * Ensures SpendTrack directory structure exists:
-   * SpendTrack/
+   * Ensures TrackPay directory structure exists:
+   * TrackPay/
    *   ├── Receipts/
    *   ├── Exports/
    *   └── Backups/
    */
   async ensureFolders(token: string) {
-    const rootFolderId = await this.findOrCreateFolder(token, 'SpendTrack');
+    const rootFolderId = await this.findOrCreateFolder(token, 'TrackPay', undefined, 'SpendTrack');
     const receiptsFolderId = await this.findOrCreateFolder(token, 'Receipts', rootFolderId);
     const exportsFolderId = await this.findOrCreateFolder(token, 'Exports', rootFolderId);
     const backupsFolderId = await this.findOrCreateFolder(token, 'Backups', rootFolderId);

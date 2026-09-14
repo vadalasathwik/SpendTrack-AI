@@ -15,9 +15,9 @@ export default defineConfig(({ mode }) => {
         registerType: "autoUpdate",
         includeAssets: ["favicon.svg", "apple-touch-icon.png", "pwa-192x192.png", "pwa-512x512.png"],
         manifest: {
-          name: "Spend Track AI",
-          short_name: "Spend Track AI",
-          description: "Personal AI Finance & Expense Workspace",
+          name: "TrackPay",
+          short_name: "TrackPay",
+          description: "TrackPay — Smart Personal Finance & Payment Companion",
           theme_color: "#10B981",
           background_color: "#FFFFFF",
           display: "standalone",

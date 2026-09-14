@@ -123,9 +123,9 @@ export class GoogleCalendarService {
     const minutesBefore = this.parseMinutesBefore(eventDetails.notifyBefore ?? eventDetails.minutesBefore);
     const recurrence = this.getRecurrenceRule(eventDetails.frequency);
 
-    const formattedSummary = summaryText.startsWith('[SpendTrack]')
+    const formattedSummary = summaryText.startsWith('[TrackPay]') || summaryText.startsWith('[SpendTrack]')
       ? summaryText
-      : `[SpendTrack] ${summaryText}`;
+      : `[TrackPay] ${summaryText}`;
 
     const descriptionText = eventDetails.description
       ? eventDetails.description
@@ -208,11 +208,9 @@ export class GoogleCalendarService {
 
     const minutesBefore = this.parseMinutesBefore(eventDetails.notifyBefore ?? eventDetails.minutesBefore);
 
-    const formattedSummary = summaryText.startsWith('[SpendTrack]')
+    const formattedSummary = summaryText.startsWith('[TrackPay]') || summaryText.startsWith('[SpendTrack]')
       ? summaryText
-      : summaryText.startsWith('✓ Paid')
-      ? `[SpendTrack] ${summaryText}`
-      : `[SpendTrack] ${summaryText}`;
+      : `[TrackPay] ${summaryText}`;
 
     const eventPayload: any = {
       summary: formattedSummary,
@@ -292,7 +290,7 @@ export class GoogleCalendarService {
 
       return {
         id: item.id,
-        summary: (item.summary || '').replace(/^\[SpendTrack\]\s*/, ''),
+        summary: (item.summary || '').replace(/^\[(TrackPay|SpendTrack)\]\s*/, ''),
         description: item.description,
         startDate: startDate || new Date().toISOString().split('T')[0],
         startTime: startTime,

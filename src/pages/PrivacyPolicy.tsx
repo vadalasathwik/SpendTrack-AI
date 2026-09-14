@@ -8,7 +8,7 @@ export default function PrivacyPolicy() {
         <header className="border-b border-slate-200/80 pb-6 mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">Privacy Policy</h1>
-            <p className="text-sm font-semibold text-emerald-700 mt-1">Last updated: 4 September 2026</p>
+            <p className="text-sm font-semibold text-emerald-700 mt-1">Last updated: 14 September 2026</p>
           </div>
           <a
             href="/"
@@ -22,64 +22,93 @@ export default function PrivacyPolicy() {
           <section>
             <h2 className="text-xl font-extrabold text-slate-900 mb-3">About {BRAND_NAME}</h2>
             <p>
-              {BRAND_NAME} is an AI-powered personal finance workspace designed to help users track expenses, budgets, recurring subscriptions, catalog purchases, and receipt images directly within their user-owned Google Workspace (Google Sheets, Google Drive, and Google Calendar).
+              {BRAND_NAME} is an AI-powered personal finance and household consumption companion designed to help users track expenses, budgets, recurring subscriptions, and receipt images directly within their user-owned Google Workspace account.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-extrabold text-slate-900 mb-3">Information We Collect</h2>
+            <h2 className="text-xl font-extrabold text-slate-900 mb-3">Information We Collect & Google Integrations</h2>
             <p className="mb-3">
-              {BRAND_NAME} accesses and processes only the data necessary to provide and operate personal financial management features:
+              {BRAND_NAME} accesses and processes user data strictly to provide core financial management features through the following Google integrations:
             </p>
-            <ul className="list-disc pl-6 space-y-2 text-slate-700 font-medium">
-              <li><strong>Google account information:</strong> Name, email address, and profile photo (optional).</li>
-              <li><strong>Financial records:</strong> Expenses, budgets, and recurring payment details created within the application.</li>
-              <li><strong>Receipt images:</strong> Invoices and receipt images uploaded by the user.</li>
-              <li><strong>Google Workspace metadata:</strong> Google Sheets metadata and Google Drive file identifiers required for workspace synchronization and storage.</li>
+            <ul className="list-disc pl-6 space-y-3 text-slate-700 font-medium">
+              <li>
+                <strong>Google Sign-In Authentication:</strong> We use Google Sign-In (OAuth 2.0) to securely authenticate your identity (basic profile name and email address) without requesting or storing any separate passwords.
+              </li>
+              <li>
+                <strong>Google Sheets Storage:</strong> All your financial records, expense logs, budget targets, and recurring payment schedules are stored inside a user-owned Google Sheets spreadsheet (titled <em>TrackPay Database</em>) residing directly in your personal Google Drive. {BRAND_NAME} operates on a data-sovereignty model—your raw financial data stays under your Google account control.
+              </li>
+              <li>
+                <strong>Google Calendar Access:</strong> With your explicit consent, {BRAND_NAME} accesses your Google Calendar to create, update, and sync bill payment reminders and subscription due dates so you never miss a payment.
+              </li>
+              <li>
+                <strong>Receipt Scanning with Gemini AI:</strong> When you upload a receipt photo or invoice image, {BRAND_NAME} processes the image using Google Gemini AI models to automatically extract merchant name, transaction date, line items, and payment totals to simplify expense entry.
+              </li>
             </ul>
           </section>
 
           <section>
             <h2 className="text-xl font-extrabold text-slate-900 mb-3">How We Use Your Data</h2>
             <p>
-              Your data is used solely to provide core app functionality: synchronizing financial records to your designated Google Sheet, storing receipt images in your personal Google Drive, generating bill reminders on your Google Calendar, and providing real-time AI spending insights via Gemini AI.
+              Your data is used exclusively to deliver the functionality of {BRAND_NAME}: synchronizing financial records to your designated Google Sheet, storing receipt attachments in your personal Google Drive folder, scheduling payment reminders in Google Calendar, and serving real-time AI spending insights powered by Gemini AI.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-extrabold text-slate-900 mb-3">Data Storage</h2>
-            <p>
-              Your financial data and uploaded files reside inside your own personal Google Account (Google Drive and Google Sheets). {BRAND_NAME} operates on a data sovereignty architecture and does not host or store your financial records on external database servers.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-extrabold text-slate-900 mb-3">Data Sharing</h2>
-            <p className="p-4 bg-emerald-50 border border-emerald-200/80 rounded-2xl text-emerald-950 font-bold">
-              {BRAND_NAME} does not sell or share personal information with third parties.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-extrabold text-slate-900 mb-3">Google API Services</h2>
-            <div className="p-5 bg-slate-100/80 border border-slate-200 rounded-2xl text-slate-800 font-semibold italic">
-              {BRAND_NAME}'s use of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements.
+            <h2 className="text-xl font-extrabold text-slate-900 mb-3">Data Sharing & Third Parties</h2>
+            <div className="p-4 bg-emerald-50 border border-emerald-200/80 rounded-2xl text-emerald-950 font-bold">
+              {BRAND_NAME} does not sell, rent, trade, or share your personal data or financial information with third parties or advertisers.
             </div>
           </section>
 
           <section>
-            <h2 className="text-xl font-extrabold text-slate-900 mb-3">Your Rights</h2>
-            <p>
-              You maintain full ownership of your data at all times. You can revoke {BRAND_NAME}’s OAuth access at any time through your Google Account Permissions. You may also delete your financial records and uploaded files directly from your Google Drive and Google Sheets workspace whenever you choose.
+            <h2 className="text-xl font-extrabold text-slate-900 mb-3">Google API Limited Use Compliance</h2>
+            <div className="p-5 bg-slate-100/80 border border-slate-200 rounded-2xl text-slate-800 font-semibold italic">
+              {BRAND_NAME}'s use and transfer to any other app of information received from Google APIs will adhere to the{' '}
+              <a
+                href="https://developers.google.com/terms/api-services-user-data-policy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-emerald-700 underline font-bold"
+              >
+                Google API Services User Data Policy
+              </a>
+              , including the Limited Use requirements.
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-extrabold text-slate-900 mb-3">User Data Control & Deletion</h2>
+            <p className="mb-3">
+              You retain total control and ownership of all your data at all times:
             </p>
+            <ul className="list-disc pl-6 space-y-2 text-slate-700 font-medium">
+              <li>
+                <strong>Revoking Access:</strong> You can revoke {BRAND_NAME}'s access at any time via your{' '}
+                <a
+                  href="https://myaccount.google.com/permissions"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-emerald-700 underline"
+                >
+                  Google Account Security Settings
+                </a>.
+              </li>
+              <li>
+                <strong>Deleting Data:</strong> Because your data resides in your Google Drive and Google Sheets, you can directly delete the <em>TrackPay Database</em> spreadsheet and receipt files from your Google Drive whenever you wish.
+              </li>
+              <li>
+                <strong>Requesting Support / Complete Deletion:</strong> To request account disassociation or complete deletion assistance, please contact us at the details below.
+              </li>
+            </ul>
           </section>
 
           <section className="border-t border-slate-200/80 pt-6">
-            <h2 className="text-xl font-extrabold text-slate-900 mb-2">Contact Us</h2>
+            <h2 className="text-xl font-extrabold text-slate-900 mb-2">User Data Deletion Contact</h2>
             <p>
-              If you have any questions or feedback regarding this Privacy Policy, please contact:
+              If you have any questions, privacy concerns, or data deletion requests regarding {BRAND_NAME}, please contact our developer support team:
             </p>
-            <p className="mt-2 font-bold text-slate-900">
+            <p className="mt-3 font-bold text-slate-900">
               Email:{' '}
               <a href="mailto:thesonusathwik@gmail.com" className="text-emerald-700 hover:underline">
                 thesonusathwik@gmail.com

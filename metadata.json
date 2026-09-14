@@ -1,6 +1,6 @@
 {
   "name": "TrackPay",
-  "description": "Understand where your money goes. Personal expense and household consumption tracking application.",
+  "description": "TrackPay — Smart Personal Finance & Household Consumption Workspace.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

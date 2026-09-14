@@ -58,8 +58,8 @@ export class GoogleCalendarService implements CalendarRepository {
     const recurrence = this.getRecurrenceRule(reminder.frequency);
 
     const eventBody = {
-      summary: `[SpendTrack] ${reminder.summary}`,
-      description: `${reminder.description || 'SpendTrack recurring bill reminder'}\n\nManaged automatically by SpendTrack.`,
+      summary: `[TrackPay] ${reminder.summary}`,
+      description: `${reminder.description || 'TrackPay recurring bill reminder'}\n\nManaged automatically by TrackPay.`,
       start: {
         date: reminder.dueDate,
       },
@@ -101,8 +101,8 @@ export class GoogleCalendarService implements CalendarRepository {
     const recurrence = this.getRecurrenceRule(reminder.frequency);
 
     const eventBody = {
-      summary: `[SpendTrack] ${reminder.summary}`,
-      description: `${reminder.description || 'SpendTrack recurring bill reminder'}\n\nManaged automatically by SpendTrack.`,
+      summary: `[TrackPay] ${reminder.summary}`,
+      description: `${reminder.description || 'TrackPay recurring bill reminder'}\n\nManaged automatically by TrackPay.`,
       start: {
         date: reminder.dueDate,
       },

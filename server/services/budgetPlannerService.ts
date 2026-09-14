@@ -226,7 +226,7 @@ export class BudgetPlannerService {
   ): Promise<string[]> {
     try {
       const ai = getAiClient();
-      const prompt = `You are the SpendTrack Budget AI Assistant. Based strictly on the following authentic spending and inflation metrics, generate 3 highly actionable, specific, and mathematically sound budget tips.
+      const prompt = `You are the TrackPay Budget AI Assistant. Based strictly on the following authentic spending and inflation metrics, generate 3 highly actionable, specific, and mathematically sound budget tips.
 
 Grounded Data:
 - Current Month Spent: ₹${summary.currentMonth.spent}

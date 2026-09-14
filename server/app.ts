@@ -633,7 +633,7 @@ export function createExpressApp() {
       });
       res.json({ reply });
     } catch (err: any) {
-      res.status(500).json({ error: err.message || "SpendTrack AI service error" });
+      res.status(500).json({ error: err.message || "TrackPay AI service error" });
     }
   });
 

@@ -38,11 +38,11 @@ export class GoogleSheetsService
   }
 
   /**
-   * Locates or creates a dedicated "SpendTrack Database" Spreadsheet in the user's Google Drive.
+   * Locates or creates a dedicated "TrackPay Database" Spreadsheet in the user's Google Drive.
    */
   async getOrCreateSpendTrackSpreadsheet(token: string): Promise<string> {
-    // 1. Search for existing spreadsheet titled "SpendTrack Database" or legacy "SpendTrack"
-    const query = `(name = 'SpendTrack Database' or name = 'SpendTrack') and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`;
+    // 1. Search for existing spreadsheet titled "TrackPay Database", "SpendTrack Database", or legacy names
+    const query = `(name = 'TrackPay Database' or name = 'SpendTrack Database' or name = 'TrackPay' or name = 'SpendTrack') and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`;
     const searchUrl = `${DRIVE_API}?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name)`;
     const searchRes = await this.fetchWithAuth(searchUrl, token);
 
@@ -55,7 +55,7 @@ export class GoogleSheetsService
       const createUrl = SHEETS_API;
       const body = {
         properties: {
-          title: 'SpendTrack Database',
+          title: 'TrackPay Database',
         },
         sheets: [
           { properties: { title: 'Expenses', gridProperties: { frozenRowCount: 1 } } },
