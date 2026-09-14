@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
+import { ApiErrorCodes, sendApiError } from '../middleware/apiError.js';
 
 export interface JWTUserPayload {
   uid: string;
@@ -148,12 +149,13 @@ export function authenticateJWT(req: Request, res: Response, next: NextFunction)
 
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    const requestId = (req as any)?.requestId || (res.getHeader('X-Request-Id') as string) || 'N/A';
-    return res.status(401).json({
-      error: 'Unauthorized: Missing or invalid Bearer JWT.',
-      requestId,
-      timestamp: new Date().toISOString(),
-    });
+    return sendApiError(
+      res,
+      req,
+      401,
+      ApiErrorCodes.UNAUTHORIZED,
+      'Unauthorized: Missing or invalid Bearer JWT.'
+    );
   }
 
   const token = authHeader.substring(7);
@@ -167,12 +169,13 @@ export function authenticateJWT(req: Request, res: Response, next: NextFunction)
     }
     next();
   } catch (err: unknown) {
-    const requestId = (req as any)?.requestId || (res.getHeader('X-Request-Id') as string) || 'N/A';
     const message = err instanceof Error ? err.message : 'Invalid authentication token.';
-    return res.status(401).json({
-      error: `Unauthorized: ${message}`,
-      requestId,
-      timestamp: new Date().toISOString(),
-    });
+    return sendApiError(
+      res,
+      req,
+      401,
+      ApiErrorCodes.UNAUTHORIZED,
+      `Unauthorized: ${message}`
+    );
   }
 }

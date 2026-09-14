@@ -8,6 +8,15 @@ import { familyWorkspaceService } from "./services/familyWorkspaceService.js";
 import { geminiAssistantService } from "./services/geminiService.js";
 import { receiptVisionService } from "./services/receiptVisionService.js";
 import { googleCalendarService } from "./services/googleCalendarService.js";
+import {
+  ApiErrorCodes,
+  apiErrorHandler,
+  handleRouteError,
+  requestIdMiddleware,
+  requireGoogleAccessToken,
+  sendApiError,
+} from "./middleware/apiError.js";
+import { aiChatRateLimit, receiptScanRateLimit } from "./middleware/rateLimit.js";
 
 dotenv.config();
 
@@ -35,14 +44,24 @@ export function createExpressApp() {
       },
     })
   );
-  app.use(express.json({ limit: "20mb" }));
+
+  app.use(requestIdMiddleware);
+
+  // Default JSON limit is small; receipt scan opts into a higher limit below.
+  app.use((req, res, next) => {
+    const path = req.path || req.originalUrl || "";
+    const isReceiptScan =
+      path === "/api/receipt/scan" || path.startsWith("/api/receipt/scan?");
+    const limit = isReceiptScan ? "8mb" : "1mb";
+    return express.json({ limit })(req, res, next);
+  });
 
   // Health check
   app.get("/api/health", (_, res) => {
     res.json({ success: true });
   });
 
-  // Google authentication
+  // Google authentication (rate limit applied inside auth router)
   app.use("/api/auth", authRoutes);
 
   // Authenticate JWT for all subsequent /api routes
@@ -82,166 +101,154 @@ export function createExpressApp() {
   });
 
   // Helper to extract Google Auth Token (requires valid authenticated user session & googleToken)
-  const getGoogleToken = (req: express.Request): string | null => {
-    const user = (req as any).user;
-    const googleToken = (req as any).googleToken;
-    if (!user || !googleToken) {
-      return null;
-    }
-    return googleToken;
+  const getGoogleToken = (req: express.Request): string => {
+    return requireGoogleAccessToken(req);
   };
 
   // Expenses CRUD
   app.get("/api/expenses", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const expenses = await googleSheetsService.getExpenses(token);
       res.json(expenses);
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(500).json({ error: err.message || "Failed to fetch expenses" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to fetch expenses", 500);
     }
   });
 
   app.post("/api/expenses", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const created = await googleSheetsService.createExpense(token, req.body);
       res.json(created);
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(400).json({ error: err.message || "Failed to create expense" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to create expense", 400);
     }
   });
 
   app.put("/api/expenses/:id", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const updated = await googleSheetsService.updateExpense(token, req.params.id, req.body);
       res.json(updated);
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(400).json({ error: err.message || "Failed to update expense" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to update expense", 400);
     }
   });
 
   app.delete("/api/expenses/:id", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       await googleSheetsService.deleteExpense(token, req.params.id);
       res.json({ success: true });
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(400).json({ error: err.message || "Failed to delete expense" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to delete expense", 400);
     }
   });
 
   // Monthly Items CRUD
   app.get("/api/monthly-items", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const items = await googleSheetsService.getMonthlyItems(token);
       res.json(items);
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(500).json({ error: err.message || "Failed to fetch monthly items" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to fetch monthly items", 500);
     }
   });
 
   app.post("/api/monthly-items", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const created = await googleSheetsService.createMonthlyItem(token, req.body);
       res.json(created);
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(400).json({ error: err.message || "Failed to create monthly item" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to create monthly item", 400);
     }
   });
 
   app.put("/api/monthly-items/:id", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const updated = await googleSheetsService.updateMonthlyItem(token, req.params.id, req.body);
       res.json(updated);
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(400).json({ error: err.message || "Failed to update monthly item" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to update monthly item", 400);
     }
   });
 
   app.delete("/api/monthly-items/:id", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       await googleSheetsService.deleteMonthlyItem(token, req.params.id);
       res.json({ success: true });
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(400).json({ error: err.message || "Failed to delete monthly item" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to delete monthly item", 400);
     }
   });
 
   // Consumption Log CRUD
   app.get("/api/consumption-log", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const logs = await googleSheetsService.getConsumptionLogs(token);
       res.json(logs);
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(500).json({ error: err.message || "Failed to fetch consumption logs" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to fetch consumption logs", 500);
     }
   });
 
   app.post("/api/consumption-log", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const log = await googleSheetsService.createConsumptionLog(token, req.body);
@@ -275,100 +282,94 @@ export function createExpressApp() {
       }
 
       res.json({ log, updatedItem });
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(400).json({ error: err.message || "Failed to log consumption" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to log consumption", 400);
     }
   });
 
   app.delete("/api/consumption-log/:id", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       await googleSheetsService.deleteConsumptionLog(token, req.params.id);
       res.json({ success: true });
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(400).json({ error: err.message || "Failed to delete consumption log" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to delete consumption log", 400);
     }
   });
 
   // Categories
   app.get("/api/categories", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const cats = await googleSheetsService.getCategories(token);
       res.json(cats);
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(500).json({ error: err.message || "Failed to fetch categories" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to fetch categories", 500);
     }
   });
 
   app.post("/api/categories", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const saved = await googleSheetsService.saveCategories(token, req.body);
       res.json(saved);
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(400).json({ error: err.message || "Failed to save categories" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to save categories", 400);
     }
   });
 
   // Recurring Expenses CRUD
   app.get("/api/recurring", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const list = await googleSheetsService.getRecurringExpenses(token);
       res.json(list);
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(500).json({ error: err.message || "Failed to fetch recurring expenses" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to fetch recurring expenses", 500);
     }
   });
 
   app.post("/api/recurring", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const created = await googleSheetsService.createRecurringExpense(token, req.body);
       res.json(created);
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(400).json({ error: err.message || "Failed to create recurring expense" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to create recurring expense", 400);
     }
   });
 
   app.post("/api/recurring/generate-due", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const bills = await googleSheetsService.getRecurringExpenses(token);
@@ -411,43 +412,38 @@ export function createExpressApp() {
       }
 
       res.json({ success: true, createdExpenses, updatedBills });
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(500).json({ error: err.message || "Failed to auto-generate recurring expenses" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to auto-generate recurring expenses", 500);
     }
   });
 
   app.put("/api/recurring/:id", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const updated = await googleSheetsService.updateRecurringExpense(token, req.params.id, req.body);
       res.json(updated);
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(400).json({ error: err.message || "Failed to update recurring expense" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to update recurring expense", 400);
     }
   });
 
   app.delete("/api/recurring/:id", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       await googleSheetsService.deleteRecurringExpense(token, req.params.id);
       res.json({ success: true });
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes("authentication credentials")) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(400).json({ error: err.message || "Failed to delete recurring expense" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to delete recurring expense", 400);
     }
   });
 
@@ -469,50 +465,48 @@ export function createExpressApp() {
     });
   });
 
-  app.post("/api/receipt/scan", async (req, res) => {
+  app.post("/api/receipt/scan", receiptScanRateLimit, async (req, res) => {
     try {
       const { base64Data, type } = req.body || {};
       if (!base64Data) {
-        return res.status(400).json({ error: "Missing base64Data" });
+        return sendApiError(res, req, 400, ApiErrorCodes.BAD_REQUEST, "Missing base64Data");
       }
       const data = await receiptVisionService.analyzeReceiptImage(base64Data, type);
       res.json(data);
-    } catch (err: any) {
-      console.error("Server /api/receipt/scan caught error:", err?.message || err);
-      res.status(500).json({ error: "Receipt scanner unavailable" });
+    } catch (err: unknown) {
+      console.error("Server /api/receipt/scan caught error:", err);
+      return handleRouteError(res, req, err, "Receipt scanner unavailable", 500);
     }
   });
 
   // User Settings Routes (Google Sheets Settings Tab)
   app.get("/api/settings", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const settings = await googleSheetsService.getSettings(token);
       res.json(settings);
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(500).json({ error: err.message || "Failed to fetch settings from Google Sheets" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to fetch settings from Google Sheets", 500);
     }
   });
 
   app.post("/api/settings", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const updated = await googleSheetsService.saveSettings(token, req.body || {});
       res.json(updated);
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(500).json({ error: err.message || "Failed to save settings to Google Sheets" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to save settings to Google Sheets", 500);
     }
   });
 
@@ -527,117 +521,117 @@ export function createExpressApp() {
 
   // Google Calendar API routes
   app.post("/api/calendar/event", async (req, res) => {
-    const accessToken = getGoogleToken(req);
-    const userEmail = (req as any).user?.email || "Unknown";
-
-    console.log("Calendar token exists:", !!accessToken);
-    console.log("User:", userEmail);
-    console.log("Creating Calendar Event...");
-
-    if (!accessToken) {
-      return res.status(200).json({
-        success: false,
-        message: "Google Calendar authorization missing",
-      });
+    let accessToken: string;
+    try {
+      accessToken = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
 
     try {
-      console.log("Creating Calendar Event Payload:", req.body);
       const result = await googleCalendarService.createCalendarEvent(accessToken, req.body);
-      console.log("Created Calendar Event:", result.eventId);
       return res.json({
         success: true,
         eventId: result.eventId,
         htmlLink: result.htmlLink,
       });
-    } catch (err: any) {
-      console.error("Google Calendar API Error:", err.message || err);
-      return res.status(500).json({
-        success: false,
-        error: err.message || "Failed to create Google Calendar event",
-        message: "Unable to create calendar reminder.",
-      });
+    } catch (err: unknown) {
+      console.error("Google Calendar API Error:", err);
+      return handleRouteError(res, req, err, "Failed to create Google Calendar event", 500);
     }
   });
 
   app.put("/api/calendar/event/:id", async (req, res) => {
-    const accessToken = getGoogleToken(req);
-    const userEmail = (req as any).user?.email || "Unknown";
-
-    console.log("Calendar token exists:", !!accessToken);
-    console.log("User:", userEmail);
-
-    if (!accessToken) {
-      return res.status(200).json({
-        success: false,
-        message: "Google Calendar authorization missing",
-      });
+    let accessToken: string;
+    try {
+      accessToken = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
 
     try {
-      console.log("Updating Calendar Event Payload:", req.params.id, req.body);
       const result = await googleCalendarService.updateCalendarEvent(accessToken, req.params.id, req.body);
-      console.log("Updated Calendar Event:", result.eventId);
       return res.json({
         success: true,
         eventId: result.eventId,
         htmlLink: result.htmlLink,
       });
-    } catch (err: any) {
-      console.error("Google Calendar API Error:", err.message || err);
-      return res.status(500).json({
-        success: false,
-        error: err.message || "Failed to update Google Calendar event",
-        message: "Unable to update calendar reminder.",
-      });
+    } catch (err: unknown) {
+      console.error("Google Calendar API Error:", err);
+      return handleRouteError(res, req, err, "Failed to update Google Calendar event", 500);
     }
   });
 
   app.delete("/api/calendar/event/:id", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       await googleCalendarService.deleteCalendarEvent(token, req.params.id);
       res.json({ success: true });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message || "Failed to delete Google Calendar event" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to delete Google Calendar event", 500);
     }
   });
 
   app.get("/api/calendar/upcoming", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const maxResults = parseInt(req.query.maxResults as string, 10) || 5;
       const events = await googleCalendarService.listUpcomingEvents(token, maxResults);
       res.json({ success: true, events });
-    } catch (err: any) {
-      res.json({ success: true, events: [] });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to fetch upcoming calendar events", 500);
     }
   });
 
   app.post("/api/calendar/sync", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const events = await googleCalendarService.listUpcomingEvents(token, 10);
       res.json({ success: true, lastSyncedAt: new Date().toISOString(), eventsCount: events.length });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message || "Failed to sync calendar" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to sync calendar", 500);
     }
   });
 
   // SpendTrack AI Chat
-  app.post("/api/ai/chat", async (req, res) => {
+  app.post("/api/ai/chat", aiChatRateLimit, async (req, res) => {
     try {
-      const token = getGoogleToken(req);
       const { message, history, dateRange, clientData } = req.body || {};
+      if (!message || typeof message !== "string") {
+        return sendApiError(res, req, 400, ApiErrorCodes.BAD_REQUEST, "Missing message");
+      }
+
+      let token: string | null = null;
+      try {
+        token = getGoogleToken(req);
+      } catch {
+        token = null;
+      }
+      if (!token && !clientData) {
+        return sendApiError(
+          res,
+          req,
+          401,
+          ApiErrorCodes.GOOGLE_AUTH_REQUIRED,
+          "Unauthorized: Google authentication required"
+        );
+      }
+
       const expenses = clientData?.expenses || (token ? await googleSheetsService.getExpenses(token).catch(() => []) : []);
       const recurringExpenses = clientData?.recurringExpenses || (token ? await googleSheetsService.getRecurringExpenses(token).catch(() => []) : []);
       const categories = clientData?.categories || (token ? await googleSheetsService.getCategories(token).catch(() => []) : []);
@@ -652,144 +646,144 @@ export function createExpressApp() {
         upcomingCalendarEvents,
       });
       res.json({ reply });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message || "TrackPay AI service error" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "TrackPay AI service error", 500);
     }
   });
 
   // SpendTrack AI Chat History & Notifications
   app.get("/api/ai/chat/history", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const history = await googleSheetsService.getAIChatHistory(token);
       res.json({ success: true, history });
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(500).json({ error: err.message || "Failed to fetch AI chat history" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to fetch AI chat history", 500);
     }
   });
 
   app.post("/api/ai/chat/history", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const saved = await googleSheetsService.saveAIChatMessage(token, req.body || {});
       res.json({ success: true, saved });
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(500).json({ error: err.message || "Failed to save AI chat message" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to save AI chat message", 500);
     }
   });
 
   app.delete("/api/ai/chat/history/:chatId", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       await googleSheetsService.deleteAIChat(token, req.params.chatId);
       res.json({ success: true });
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(500).json({ error: err.message || "Failed to delete AI chat session" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to delete AI chat session", 500);
     }
   });
 
   app.get("/api/notifications", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const notifications = await googleSheetsService.getNotifications(token);
       res.json({ success: true, notifications });
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(500).json({ error: err.message || "Failed to fetch notifications" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to fetch notifications", 500);
     }
   });
 
   app.post("/api/notifications", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const notification = await googleSheetsService.saveNotification(token, req.body || {});
       res.json({ success: true, notification });
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(500).json({ error: err.message || "Failed to save notification" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to save notification", 500);
     }
   });
 
   app.put("/api/notifications/:id", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       const updated = await googleSheetsService.updateNotification(token, req.params.id, req.body || {});
       res.json({ success: true, notification: updated });
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(500).json({ error: err.message || "Failed to update notification" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to update notification", 500);
     }
   });
 
   app.delete("/api/notifications/:id", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       await googleSheetsService.deleteNotification(token, req.params.id);
       res.json({ success: true });
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(500).json({ error: err.message || "Failed to delete notification" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to delete notification", 500);
     }
   });
 
   app.delete("/api/notifications", async (req, res) => {
-    const token = getGoogleToken(req);
-    if (!token) {
-      return res.status(401).json({ error: "Unauthorized: Authentication required" });
+    let token: string;
+    try {
+      token = getGoogleToken(req);
+    } catch (err) {
+      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
     }
     try {
       await googleSheetsService.clearAllNotifications(token);
       res.json({ success: true });
-    } catch (err: any) {
-      if (err?.status === 401 || err?.message?.includes('authentication credentials')) {
-        return res.status(401).json({ error: "Unauthorized: Invalid Google authentication token" });
-      }
-      res.status(500).json({ error: err.message || "Failed to clear all notifications" });
+    } catch (err: unknown) {
+      return handleRouteError(res, req, err, "Failed to clear all notifications", 500);
     }
   });
 
   // Catch-all 404 for ANY /api/* request to prevent falling through to Vite HTML fallback
   app.all("/api/*", (req, res) => {
-    res.status(404).json({ error: `API endpoint ${req.method} ${req.path} not found` });
+    sendApiError(
+      res,
+      req,
+      404,
+      ApiErrorCodes.NOT_FOUND,
+      `API endpoint ${req.method} ${req.path} not found`
+    );
   });
+
+  app.use(apiErrorHandler);
 
   return app;
 }

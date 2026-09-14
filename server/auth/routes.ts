@@ -1,23 +1,31 @@
 import { Router } from "express";
 import { OAuth2Client } from "google-auth-library";
 import { signJWT } from "./jwt.js";
+import { ApiErrorCodes, sendApiError } from "../middleware/apiError.js";
+import { authGoogleRateLimit } from "../middleware/rateLimit.js";
 
 const router = Router();
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
 const oauthClient = new OAuth2Client(googleClientId);
 
-router.post("/google", async (req, res) => {
+router.post("/google", authGoogleRateLimit, async (req, res) => {
   try {
     const { idToken, accessToken } = req.body;
 
     if (!idToken) {
-      return res.status(400).json({ error: "Missing idToken" });
+      return sendApiError(res, req, 400, ApiErrorCodes.BAD_REQUEST, "Missing idToken");
     }
 
     if (!googleClientId) {
       console.error("Google auth misconfiguration: GOOGLE_CLIENT_ID / VITE_GOOGLE_CLIENT_ID is not set");
-      return res.status(500).json({ error: "Server misconfiguration: Google client ID is not set" });
+      return sendApiError(
+        res,
+        req,
+        500,
+        ApiErrorCodes.SERVER_MISCONFIGURED,
+        "Server misconfiguration: Google client ID is not set"
+      );
     }
 
     let payload;
@@ -29,11 +37,23 @@ router.post("/google", async (req, res) => {
       payload = ticket.getPayload();
     } catch (err) {
       console.error("Google token verification failed:", err);
-      return res.status(401).json({ error: "Invalid Google ID token" });
+      return sendApiError(
+        res,
+        req,
+        401,
+        ApiErrorCodes.GOOGLE_ID_TOKEN_INVALID,
+        "Invalid Google ID token"
+      );
     }
 
     if (!payload?.sub) {
-      return res.status(401).json({ error: "Invalid Google token payload" });
+      return sendApiError(
+        res,
+        req,
+        401,
+        ApiErrorCodes.GOOGLE_ID_TOKEN_INVALID,
+        "Invalid Google token payload"
+      );
     }
 
     const uid = payload.sub;
@@ -73,7 +93,13 @@ router.post("/google", async (req, res) => {
     });
   } catch (err: unknown) {
     console.error("Google token verification failed:", err);
-    res.status(401).json({ error: "Invalid Google ID token" });
+    return sendApiError(
+      res,
+      req,
+      401,
+      ApiErrorCodes.GOOGLE_ID_TOKEN_INVALID,
+      "Invalid Google ID token"
+    );
   }
 });
 
