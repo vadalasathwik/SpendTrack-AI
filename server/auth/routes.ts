@@ -15,26 +15,31 @@ router.post("/google", async (req, res) => {
       return res.status(400).json({ error: "Missing idToken" });
     }
 
-    let uid = `user_${Date.now()}`;
-    let email = "";
-    let name = "Google User";
-    let photoURL = "";
+    if (!googleClientId) {
+      console.error("Google auth misconfiguration: GOOGLE_CLIENT_ID / VITE_GOOGLE_CLIENT_ID is not set");
+      return res.status(500).json({ error: "Server misconfiguration: Google client ID is not set" });
+    }
 
+    let payload;
     try {
       const ticket = await oauthClient.verifyIdToken({
         idToken,
-        ...(googleClientId ? { audience: googleClientId } : {}),
+        audience: googleClientId,
       });
-      const payload = ticket.getPayload();
-      if (payload) {
-        uid = payload.sub;
-        email = payload.email || "";
-        name = payload.name || "";
-        photoURL = payload.picture || "";
-      }
-    } catch {
-      // If client token is access token from Firebase popup
+      payload = ticket.getPayload();
+    } catch (err) {
+      console.error("Google token verification failed:", err);
+      return res.status(401).json({ error: "Invalid Google ID token" });
     }
+
+    if (!payload?.sub) {
+      return res.status(401).json({ error: "Invalid Google token payload" });
+    }
+
+    const uid = payload.sub;
+    const email = payload.email || "";
+    const name = payload.name || "";
+    const photoURL = payload.picture || "";
 
     const token = signJWT({
       user: {
@@ -66,7 +71,7 @@ router.post("/google", async (req, res) => {
       },
       isNewUser: false,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Google token verification failed:", err);
     res.status(401).json({ error: "Invalid Google ID token" });
   }

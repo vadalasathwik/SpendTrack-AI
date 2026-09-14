@@ -1,8 +1,6 @@
 import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'spendtrack_prod_jwt_secret_key_2026';
-
 export interface JWTUserPayload {
   uid: string;
   email: string;
@@ -22,6 +20,33 @@ export interface JWTPayload {
   googleToken?: string;
   iat: number;
   exp: number;
+}
+
+function isProductionRuntime(): boolean {
+  return process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
+}
+
+/**
+ * Resolves JWT_SECRET. In production (NODE_ENV=production or VERCEL set),
+ * a missing secret fails loudly so the server cannot start with a hardcoded key.
+ * Local/dev may use an obvious non-production fallback if unset.
+ */
+export function getJwtSecret(): string {
+  const secret = (process.env.JWT_SECRET || '').trim();
+  if (secret) {
+    return secret;
+  }
+  if (isProductionRuntime()) {
+    throw new Error(
+      'JWT_SECRET environment variable is required in production. Set JWT_SECRET before starting the server.'
+    );
+  }
+  return 'spendtrack_dev_only_jwt_secret';
+}
+
+/** Call during app startup so missing production secrets fail immediately. */
+export function assertJwtSecretConfigured(): void {
+  getJwtSecret();
 }
 
 /**
@@ -46,7 +71,7 @@ function base64UrlDecode(str: string): string {
 /**
  * Signs a JWT using HMAC-SHA256
  */
-export function signJWT(payloadData: Record<string, any>, expiresInSeconds: number = 7 * 24 * 3600): string {
+export function signJWT(payloadData: Record<string, unknown>, expiresInSeconds: number = 7 * 24 * 3600): string {
   const header = { alg: 'HS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
   const payload = {
@@ -58,9 +83,10 @@ export function signJWT(payloadData: Record<string, any>, expiresInSeconds: numb
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const dataToSign = `${encodedHeader}.${encodedPayload}`;
+  const jwtSecret = getJwtSecret();
 
   const signature = crypto
-    .createHmac('sha256', JWT_SECRET)
+    .createHmac('sha256', jwtSecret)
     .update(dataToSign)
     .digest();
 
@@ -83,9 +109,10 @@ export function verifyJWT(token: string): JWTPayload {
 
   const [encodedHeader, encodedPayload, encodedSignature] = parts;
   const dataToSign = `${encodedHeader}.${encodedPayload}`;
+  const jwtSecret = getJwtSecret();
 
   const expectedSignature = base64UrlEncode(
-    crypto.createHmac('sha256', JWT_SECRET).update(dataToSign).digest()
+    crypto.createHmac('sha256', jwtSecret).update(dataToSign).digest()
   );
 
   // Timing safe equal comparison for signatures
@@ -139,10 +166,11 @@ export function authenticateJWT(req: Request, res: Response, next: NextFunction)
       (req as any).googleToken = decoded.googleToken;
     }
     next();
-  } catch (err: any) {
+  } catch (err: unknown) {
     const requestId = (req as any)?.requestId || (res.getHeader('X-Request-Id') as string) || 'N/A';
+    const message = err instanceof Error ? err.message : 'Invalid authentication token.';
     return res.status(401).json({
-      error: `Unauthorized: ${err.message || 'Invalid authentication token.'}`,
+      error: `Unauthorized: ${message}`,
       requestId,
       timestamp: new Date().toISOString(),
     });

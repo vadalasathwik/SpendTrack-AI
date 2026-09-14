@@ -36,7 +36,7 @@ router.post("/google", async (req, res) => {
         uid,
         email,
       },
-      process.env.JWT_SECRET || "spendtrack_secret",
+      (() => { const s = (process.env.JWT_SECRET || "").trim(); if (!s) { throw new Error("JWT_SECRET environment variable is required"); } return s; })(),
       { expiresIn: "7d" }
     );
 

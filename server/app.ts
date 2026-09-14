@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./auth/routes.js";
-import { authenticateJWT } from "./auth/jwt.js";
+import { authenticateJWT, assertJwtSecretConfigured } from "./auth/jwt.js";
 import { googleSheetsService } from "./google/sheetsService.js";
 import { familyWorkspaceService } from "./services/familyWorkspaceService.js";
 import { geminiAssistantService } from "./services/geminiService.js";
@@ -11,10 +11,30 @@ import { googleCalendarService } from "./services/googleCalendarService.js";
 
 dotenv.config();
 
+const ALLOWED_ORIGINS = [
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "https://spend-track-rho.vercel.app",
+] as const;
+
 export function createExpressApp() {
+  // Fail fast in production if JWT_SECRET is missing (after dotenv has loaded).
+  assertJwtSecretConfigured();
+
   const app = express();
 
-  app.use(cors());
+  app.use(
+    cors({
+      origin(origin, callback) {
+        // Non-browser clients (no Origin) and allowlisted browser origins only.
+        if (!origin || (ALLOWED_ORIGINS as readonly string[]).includes(origin)) {
+          callback(null, true);
+          return;
+        }
+        callback(null, false);
+      },
+    })
+  );
   app.use(express.json({ limit: "20mb" }));
 
   // Health check
