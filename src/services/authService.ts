@@ -178,6 +178,9 @@ export const signInWithGoogle = async (
     prompt: "select_account",
   });
 
+  provider.addScope("openid");
+  provider.addScope("email");
+  provider.addScope("profile");
   provider.addScope("https://www.googleapis.com/auth/drive.file");
   provider.addScope("https://www.googleapis.com/auth/spreadsheets");
   provider.addScope("https://www.googleapis.com/auth/calendar.events");
@@ -188,9 +191,10 @@ export const signInWithGoogle = async (
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     const idToken = credential?.idToken;
+    const accessToken = credential?.accessToken;
 
-    if (!idToken) {
-      throw new Error("Failed to obtain Google ID token from sign-in.");
+    if (!idToken || !accessToken) {
+      throw new Error("Failed to obtain Google authentication credentials from sign-in.");
     }
 
     onStepProgress?.(1);
@@ -202,6 +206,7 @@ export const signInWithGoogle = async (
       },
       body: JSON.stringify({
         idToken,
+        accessToken,
       }),
     });
 

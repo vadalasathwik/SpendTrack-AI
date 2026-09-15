@@ -11,7 +11,7 @@ const oauthClient = new OAuth2Client(googleClientId);
 
 router.post("/google", authGoogleRateLimit, async (req, res) => {
   try {
-    const { idToken } = req.body;
+    const { idToken, accessToken } = req.body;
 
     if (!idToken) {
       return sendApiError(res, req, 400, ApiErrorCodes.BAD_REQUEST, "Missing idToken");
@@ -77,7 +77,7 @@ router.post("/google", authGoogleRateLimit, async (req, res) => {
         driveFolderId: "",
         calendarId: "",
       },
-      googleToken: idToken,
+      googleToken: accessToken || idToken,
     });
 
     res.json({
