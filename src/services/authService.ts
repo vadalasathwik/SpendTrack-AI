@@ -186,14 +186,11 @@ export const signInWithGoogle = async (
     onStepProgress?.(0);
 
     const result = await signInWithPopup(auth, provider);
+    const user = result.user;
+    const idToken = await user.getIdToken();
 
-    const credential =
-      GoogleAuthProvider.credentialFromResult(result);
-
-    const googleCredential = credential?.idToken || credential?.accessToken;
-
-    if (!googleCredential) {
-      throw new Error("Failed to obtain Google credential from sign-in.");
+    if (!idToken) {
+      throw new Error("Failed to obtain Google ID token from sign-in.");
     }
 
     onStepProgress?.(1);
@@ -204,8 +201,7 @@ export const signInWithGoogle = async (
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        idToken: googleCredential,
-        accessToken: credential?.accessToken,
+        idToken,
       }),
     });
 

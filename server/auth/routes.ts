@@ -11,11 +11,13 @@ const oauthClient = new OAuth2Client(googleClientId);
 
 router.post("/google", authGoogleRateLimit, async (req, res) => {
   try {
-    const { idToken, accessToken } = req.body;
+    const { idToken } = req.body;
 
     if (!idToken) {
       return sendApiError(res, req, 400, ApiErrorCodes.BAD_REQUEST, "Missing idToken");
     }
+
+    const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
 
     if (!googleClientId) {
       console.error("Google auth misconfiguration: GOOGLE_CLIENT_ID / VITE_GOOGLE_CLIENT_ID is not set");
@@ -27,6 +29,8 @@ router.post("/google", authGoogleRateLimit, async (req, res) => {
         "Server misconfiguration: Google client ID is not set"
       );
     }
+
+    const oauthClient = new OAuth2Client(googleClientId);
 
     let payload;
     try {
@@ -73,7 +77,7 @@ router.post("/google", authGoogleRateLimit, async (req, res) => {
         driveFolderId: "",
         calendarId: "",
       },
-      googleToken: accessToken || idToken,
+      googleToken: idToken,
     });
 
     res.json({

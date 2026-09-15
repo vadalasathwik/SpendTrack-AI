@@ -15,6 +15,9 @@ router.post("/google", async (req, res) => {
       return res.status(400).json({ error: "Missing idToken" });
     }
 
+    const googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
+    const oauthClient = new OAuth2Client(googleClientId);
+
     const ticket = await oauthClient.verifyIdToken({
       idToken,
       ...(googleClientId ? { audience: googleClientId } : {}),
