@@ -186,8 +186,8 @@ export const signInWithGoogle = async (
     onStepProgress?.(0);
 
     const result = await signInWithPopup(auth, provider);
-    const user = result.user;
-    const idToken = await user.getIdToken();
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    const idToken = credential?.idToken;
 
     if (!idToken) {
       throw new Error("Failed to obtain Google ID token from sign-in.");
