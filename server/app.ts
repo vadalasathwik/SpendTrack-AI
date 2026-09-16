@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./auth/routes.js";
+import apiRoutes from "./routes.js";
 import { authenticateJWT, assertJwtSecretConfigured } from "./auth/jwt.js";
 import { googleSheetsService } from "./google/sheetsService.js";
 import { familyWorkspaceService } from "./services/familyWorkspaceService.js";
@@ -105,66 +106,8 @@ export function createExpressApp() {
     return requireGoogleAccessToken(req);
   };
 
-  // Expenses CRUD
-  app.get("/api/expenses", async (req, res) => {
-    let token: string;
-    try {
-      token = getGoogleToken(req);
-    } catch (err) {
-      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
-    }
-    try {
-      const expenses = await googleSheetsService.getExpenses(token);
-      res.json(expenses);
-    } catch (err: unknown) {
-      return handleRouteError(res, req, err, "Failed to fetch expenses", 500);
-    }
-  });
-
-  app.post("/api/expenses", async (req, res) => {
-    let token: string;
-    try {
-      token = getGoogleToken(req);
-    } catch (err) {
-      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
-    }
-    try {
-      const created = await googleSheetsService.createExpense(token, req.body);
-      res.json(created);
-    } catch (err: unknown) {
-      return handleRouteError(res, req, err, "Failed to create expense", 400);
-    }
-  });
-
-  app.put("/api/expenses/:id", async (req, res) => {
-    let token: string;
-    try {
-      token = getGoogleToken(req);
-    } catch (err) {
-      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
-    }
-    try {
-      const updated = await googleSheetsService.updateExpense(token, req.params.id, req.body);
-      res.json(updated);
-    } catch (err: unknown) {
-      return handleRouteError(res, req, err, "Failed to update expense", 400);
-    }
-  });
-
-  app.delete("/api/expenses/:id", async (req, res) => {
-    let token: string;
-    try {
-      token = getGoogleToken(req);
-    } catch (err) {
-      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
-    }
-    try {
-      await googleSheetsService.deleteExpense(token, req.params.id);
-      res.json({ success: true });
-    } catch (err: unknown) {
-      return handleRouteError(res, req, err, "Failed to delete expense", 400);
-    }
-  });
+  // Expenses CRUD (Prisma backend)
+  app.use(apiRoutes);
 
   // Monthly Items CRUD
   app.get("/api/monthly-items", async (req, res) => {

@@ -3,6 +3,7 @@ import { OAuth2Client } from "google-auth-library";
 import { signJWT } from "./jwt.js";
 import { ApiErrorCodes, sendApiError } from "../middleware/apiError.js";
 import { authGoogleRateLimit } from "../middleware/rateLimit.js";
+import { prisma } from "../db/prisma.js";
 
 const router = Router();
 
@@ -65,6 +66,30 @@ router.post("/google", authGoogleRateLimit, async (req, res) => {
     const name = payload.name || "";
     const photoURL = payload.picture || "";
 
+    let dbUser = await prisma.user.findUnique({
+      where: { googleId: uid },
+    });
+
+    let isNewUser = false;
+    if (!dbUser) {
+      isNewUser = true;
+      dbUser = await prisma.user.create({
+        data: {
+          googleId: uid,
+          email,
+          name,
+          avatar: photoURL || null,
+          categories: {
+            create: {
+              name: "General",
+              color: "#6366F1",
+              icon: "wallet",
+            },
+          },
+        },
+      });
+    }
+
     const token = signJWT({
       user: {
         uid,
@@ -93,7 +118,7 @@ router.post("/google", authGoogleRateLimit, async (req, res) => {
         driveFolderId: "",
         calendarId: "",
       },
-      isNewUser: false,
+      isNewUser,
     });
   } catch (err: unknown) {
     console.error("Google token verification failed:", err);
