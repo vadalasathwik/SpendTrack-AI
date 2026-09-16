@@ -7,6 +7,7 @@ import {
   Users,
   Compass,
   FolderTree,
+  PieChart,
 } from 'lucide-react';
 import { BRAND_NAME } from '../constants/brand.js';
 
@@ -26,6 +27,13 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
   if (!isOpen) return null;
 
   const menuItems = [
+    {
+      id: 'budget',
+      title: '📊 Monthly Budget Dashboard',
+      subtitle: 'Track PostgreSQL budget targets & remaining balance',
+      icon: PieChart,
+      color: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60',
+    },
     {
       id: 'categories',
       title: '🏷️ Category Management',

@@ -59,6 +59,7 @@ import { CategoriesPage } from './pages/CategoriesPage.js';
 import { AIAssistantPage } from './pages/AIAssistantPage.js';
 import { WelcomePage } from './pages/WelcomePage.js';
 import { BudgetAIPage } from './pages/BudgetAIPage.js';
+import { BudgetDashboardPage } from './pages/BudgetDashboardPage.js';
 import { Routes, Route } from 'react-router-dom';
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Terms from "./pages/Terms";
@@ -1343,11 +1344,7 @@ export function App() {
         )}
 
         {activeTab === 'budget' && (
-          <BudgetAIPage
-            expenses={expenses}
-            recurringExpenses={recurringExpenses}
-            dateRange={dateRange}
-          />
+          <BudgetDashboardPage />
         )}
 
         {activeTab === 'family' && (

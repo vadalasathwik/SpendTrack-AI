@@ -351,9 +351,37 @@ export const SpendTrackApi = {
     });
   },
 
-  // Budget AI
-  async getBudgetSummary() {
-    return apiFetch<any>("/api/budget/summary");
+  // Budget Management
+  async getBudgetSummary(month?: number, year?: number) {
+    const params = new URLSearchParams();
+    if (month !== undefined) params.append("month", String(month));
+    if (year !== undefined) params.append("year", String(year));
+    const query = params.toString() ? `?${params.toString()}` : "";
+    return apiFetch<{
+      budget: number;
+      spent: number;
+      remaining: number;
+      percentage: number;
+    }>(`/api/budget/summary${query}`);
+  },
+
+  async getCurrentBudget(month?: number, year?: number) {
+    const params = new URLSearchParams();
+    if (month !== undefined) params.append("month", String(month));
+    if (year !== undefined) params.append("year", String(year));
+    const query = params.toString() ? `?${params.toString()}` : "";
+    return apiFetch<{
+      month: number;
+      year: number;
+      budget: number;
+    }>(`/api/budget/current${query}`);
+  },
+
+  async setBudget(amount: number, month?: number, year?: number) {
+    return apiFetch<any>("/api/budget", {
+      method: "POST",
+      body: JSON.stringify({ amount, month, year }),
+    });
   },
 
   async predictBudget(

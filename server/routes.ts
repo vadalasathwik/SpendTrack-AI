@@ -13,6 +13,11 @@ import {
   updateCategory,
   deleteCategory,
 } from "./services/category.service.js";
+import {
+  getCurrentBudget,
+  setBudget,
+  getBudgetSummary,
+} from "./services/budget.service.js";
 
 const router = Router();
 
@@ -167,6 +172,50 @@ router.delete("/api/categories/:id", async (req: any, res: any) => {
     console.error("DELETE /api/categories/:id error:", err);
     const status = err.message === "Category not found" ? 404 : 400;
     res.status(status).json({ error: err.message || "Failed to delete category" });
+  }
+});
+
+router.get("/api/budget/current", async (req: any, res: any) => {
+  try {
+    const userId = req.user?.userId || req.user?.uid;
+    const month = req.query.month ? parseInt(req.query.month as string, 10) : undefined;
+    const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
+    const budgetData = await getCurrentBudget(userId, month, year);
+    res.json(budgetData);
+  } catch (err: any) {
+    console.error("GET /api/budget/current error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch current budget" });
+  }
+});
+
+router.post("/api/budget", async (req: any, res: any) => {
+  try {
+    const userId = req.user?.userId || req.user?.uid;
+    const { month, year, amount, budget } = req.body || {};
+    const budgetAmount = amount !== undefined ? amount : budget;
+
+    const now = new Date();
+    const targetMonth = month !== undefined ? parseInt(month, 10) : now.getMonth() + 1;
+    const targetYear = year !== undefined ? parseInt(year, 10) : now.getFullYear();
+
+    const result = await setBudget(userId, targetMonth, targetYear, budgetAmount);
+    res.json(result);
+  } catch (err: any) {
+    console.error("POST /api/budget error:", err);
+    res.status(400).json({ error: err.message || "Failed to save budget" });
+  }
+});
+
+router.get("/api/budget/summary", async (req: any, res: any) => {
+  try {
+    const userId = req.user?.userId || req.user?.uid;
+    const month = req.query.month ? parseInt(req.query.month as string, 10) : undefined;
+    const year = req.query.year ? parseInt(req.query.year as string, 10) : undefined;
+    const summary = await getBudgetSummary(userId, month, year);
+    res.json(summary);
+  } catch (err: any) {
+    console.error("GET /api/budget/summary error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch budget summary" });
   }
 });
 

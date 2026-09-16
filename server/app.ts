@@ -423,10 +423,6 @@ export function createExpressApp() {
   });
 
   // Budget AI
-  app.get("/api/budget/summary", (req, res) => {
-    res.json({ success: true, summary: "Monthly budget tracking is active." });
-  });
-
   app.post("/api/budget/predict", (req, res) => {
     res.json({ success: true, predictedMonthlySpend: 15000 });
   });
