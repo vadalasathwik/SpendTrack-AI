@@ -14,12 +14,9 @@ export const ApiErrorCodes = {
   NOT_FOUND: "NOT_FOUND",
   RATE_LIMITED: "RATE_LIMITED",
   PAYLOAD_TOO_LARGE: "PAYLOAD_TOO_LARGE",
-  GOOGLE_AUTH_REQUIRED: "GOOGLE_AUTH_REQUIRED",
-  GOOGLE_AUTH_INVALID: "GOOGLE_AUTH_INVALID",
   GOOGLE_ID_TOKEN_INVALID: "GOOGLE_ID_TOKEN_INVALID",
   SERVER_MISCONFIGURED: "SERVER_MISCONFIGURED",
   INTERNAL_ERROR: "INTERNAL_ERROR",
-  UPSTREAM_ERROR: "UPSTREAM_ERROR",
 } as const;
 
 export type ApiErrorCode = (typeof ApiErrorCodes)[keyof typeof ApiErrorCodes];
@@ -71,42 +68,6 @@ export function requestIdMiddleware(req: Request, res: Response, next: NextFunct
   next();
 }
 
-export function requireGoogleAccessToken(req: Request): string {
-  const user = (req as Request & { user?: unknown }).user;
-  const googleToken = (req as Request & { googleToken?: string }).googleToken;
-  if (!user || !googleToken) {
-    throw new ApiError(
-      401,
-      ApiErrorCodes.GOOGLE_AUTH_REQUIRED,
-      "Unauthorized: Google authentication required"
-    );
-  }
-  return googleToken;
-}
-
-export function mapGoogleUpstreamError(err: unknown, fallbackMessage: string): ApiError {
-  const anyErr = err as { status?: number; message?: string };
-  const message = anyErr?.message || fallbackMessage;
-  if (
-    anyErr?.status === 401 ||
-    (typeof message === "string" && message.toLowerCase().includes("authentication credentials"))
-  ) {
-    return new ApiError(
-      401,
-      ApiErrorCodes.GOOGLE_AUTH_INVALID,
-      "Unauthorized: Invalid Google authentication token"
-    );
-  }
-  const status = typeof anyErr?.status === "number" && anyErr.status >= 400 && anyErr.status < 600
-    ? anyErr.status
-    : 500;
-  return new ApiError(
-    status >= 500 ? 500 : status,
-    status >= 500 ? ApiErrorCodes.UPSTREAM_ERROR : ApiErrorCodes.BAD_REQUEST,
-    message || fallbackMessage
-  );
-}
-
 export function handleRouteError(
   res: Response,
   req: Request,
@@ -116,10 +77,6 @@ export function handleRouteError(
 ): Response {
   if (err instanceof ApiError) {
     return sendApiError(res, req, err.status, err.code, err.message);
-  }
-  const mapped = mapGoogleUpstreamError(err, fallbackMessage);
-  if (mapped.code === ApiErrorCodes.GOOGLE_AUTH_INVALID) {
-    return sendApiError(res, req, mapped.status, mapped.code, mapped.message);
   }
   const anyErr = err as { message?: string };
   return sendApiError(
@@ -136,7 +93,6 @@ export const apiErrorHandler: ErrorRequestHandler = (err, req, res, _next) => {
     return;
   }
 
-  // express body-parser payload too large
   if (err && typeof err === "object" && (err as { type?: string }).type === "entity.too.large") {
     sendApiError(
       res,

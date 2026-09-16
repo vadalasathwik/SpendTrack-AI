@@ -611,7 +611,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
           {isHistoryLoading && (
             <div className="flex items-center justify-center py-6 text-slate-400 text-xs gap-2">
               <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
-              <span>Loading chat history from Google Sheets...</span>
+              <span>Loading chat history...</span>
             </div>
           )}
 

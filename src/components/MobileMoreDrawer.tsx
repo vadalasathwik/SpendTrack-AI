@@ -73,7 +73,7 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
     {
       id: 'settings',
       title: '⚙️ Settings',
-      subtitle: 'Google Sheets, Drive, categories & CSV export',
+      subtitle: 'Account, categories & CSV export',
       icon: Settings,
       color: 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800',
     },

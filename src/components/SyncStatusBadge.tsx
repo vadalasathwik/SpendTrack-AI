@@ -1,7 +1,6 @@
 import React from 'react';
-import { RefreshCw, CheckCircle2, AlertCircle, WifiOff, Cloud } from 'lucide-react';
+import { RefreshCw, CheckCircle2, WifiOff } from 'lucide-react';
 import { SyncStatus } from '../types.js';
-import { sanitizeErrorMessage } from '../utils/calculations.js';
 
 interface SyncStatusBadgeProps {
   status: SyncStatus;
@@ -13,7 +12,6 @@ interface SyncStatusBadgeProps {
 export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({
   status,
   isOnline,
-  onRetry,
   compact = false,
 }) => {
   if (!isOnline) {
@@ -35,7 +33,7 @@ export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({
         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200"
       >
         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-        <span>Syncing workspace...</span>
+        <span>Saving changes...</span>
       </div>
     );
   }
@@ -49,10 +47,10 @@ export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({
     <div
       id="sync-status-synced"
       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
-      title={status.lastSyncedAt ? `Last synchronized: ${status.lastSyncedAt.toLocaleTimeString()}` : 'Synced with Google'}
+      title={status.lastSyncedAt ? `Last saved: ${status.lastSyncedAt.toLocaleTimeString()}` : 'Saved securely in TrackPay'}
     >
       <CheckCircle2 className="w-3.5 h-3.5" />
-      <span>{compact ? 'Synced' : 'Synced with Google'}</span>
+      <span>{compact ? 'Saved' : 'Saved securely in TrackPay'}</span>
     </div>
   );
 };

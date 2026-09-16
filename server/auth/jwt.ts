@@ -9,16 +9,8 @@ export interface JWTUserPayload {
   photoURL?: string;
 }
 
-export interface JWTWorkspacePayload {
-  spreadsheetId: string;
-  driveFolderId: string;
-  calendarId: string;
-}
-
 export interface JWTPayload {
   user: JWTUserPayload;
-  workspace: JWTWorkspacePayload;
-  googleToken?: string;
   iat: number;
   exp: number;
 }
@@ -163,10 +155,6 @@ export function authenticateJWT(req: Request, res: Response, next: NextFunction)
   try {
     const decoded = verifyJWT(token);
     (req as any).user = decoded.user;
-    (req as any).workspace = decoded.workspace;
-    if (decoded.googleToken) {
-      (req as any).googleToken = decoded.googleToken;
-    }
     next();
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Invalid authentication token.';

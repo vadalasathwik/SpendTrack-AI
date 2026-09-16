@@ -163,7 +163,7 @@ export class GeminiAssistantService {
         calendarReminderEnabled: r.calendarReminderEnabled,
         notes: r.notes,
       })),
-      upcomingGoogleCalendarEvents: (params.upcomingCalendarEvents || []).map((ev: any) => ({
+      upcomingEvents: (params.upcomingCalendarEvents || []).map((ev: any) => ({
         id: ev.id,
         summary: ev.summary,
         description: ev.description,

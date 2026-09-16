@@ -6,9 +6,8 @@ import {
   RefreshCw,
   LogOut,
   CheckCircle2,
-  FileSpreadsheet,
-  HardDrive,
-  Calendar,
+  Database,
+  Sparkles,
   ShieldCheck,
 } from 'lucide-react';
 
@@ -98,22 +97,22 @@ export const ProfileSheet: React.FC<ProfileSheetProps> = ({
             <div className="p-3.5 rounded-[14px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2 text-xs">
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-medium">
-                  <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  Google Sheets Sync
+                  <Database className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  PostgreSQL Database
                 </span>
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
               </div>
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-medium">
-                  <HardDrive className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  Google Drive Storage
+                  <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  Gemini AI Scanner
                 </span>
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
               </div>
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-slate-700 dark:text-slate-300 font-medium">
-                  <Calendar className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                  Google Calendar Alerts
+                  <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  Google OAuth
                 </span>
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
               </div>

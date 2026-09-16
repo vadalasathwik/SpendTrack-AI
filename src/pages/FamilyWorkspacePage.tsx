@@ -11,9 +11,7 @@ import {
   Mail,
   Copy,
   AlertCircle,
-  HardDrive,
-  FileSpreadsheet,
-  Calendar,
+  Database,
   Sparkles,
   Loader2,
   Clock,
@@ -209,31 +207,31 @@ export const FamilyWorkspacePage: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-3">
-              <FileSpreadsheet className="w-5 h-5 text-emerald-600 shrink-0" />
+              <Database className="w-5 h-5 text-emerald-600 shrink-0" />
               <div className="min-w-0">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Google Sheet</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Database</span>
                 <p className="text-xs font-extrabold text-slate-800 truncate">
-                  {workspace?.spreadsheetId ? 'Connected' : `${BRAND_NAME} DB`}
+                  PostgreSQL
                 </p>
               </div>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-3">
-              <HardDrive className="w-5 h-5 text-emerald-600 shrink-0" />
+              <Sparkles className="w-5 h-5 text-emerald-600 shrink-0" />
               <div className="min-w-0">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Drive Receipts</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">AI Scanner</span>
                 <p className="text-xs font-extrabold text-slate-800 truncate">
-                  {BRAND_NAME}/Receipts
+                  Gemini Vision
                 </p>
               </div>
             </div>
 
             <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-3">
-              <Calendar className="w-5 h-5 text-emerald-600 shrink-0" />
+              <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
               <div className="min-w-0">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Google Calendar</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase">Auth</span>
                 <p className="text-xs font-extrabold text-slate-800 truncate">
-                  Bill Reminders
+                  Google OAuth
                 </p>
               </div>
             </div>

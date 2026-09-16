@@ -137,11 +137,6 @@ export interface UserSettings {
   dateFormat: string;
   monthlyBudget?: number;
   budgetStartDay?: number;
-  spreadsheetId?: string;
-  driveFolderId?: string;
-  receiptsFolderId?: string;
-  backupsFolderId?: string;
-  exportsFolderId?: string;
 }
 
 export interface BudgetMetrics {

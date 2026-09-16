@@ -341,7 +341,7 @@ const TransactionCardRow: React.FC<{
               target="_blank"
               rel="noreferrer"
               className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-[10px] hover:bg-emerald-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-              title="Open Receipt in Google Drive"
+              title="View Receipt"
             >
               <ExternalLink className="w-4 h-4" />
             </a>

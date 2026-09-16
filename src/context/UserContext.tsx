@@ -83,21 +83,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     if (!jwt) return null;
 
     try {
-      const status = await SpendTrackApi.checkWorkspaceStatus();
-
-      if (status?.spreadsheetId) {
-        const updated: WorkspaceMetadata = {
-          spreadsheetId: status.spreadsheetId,
-          driveFolderId:
-            status.driveFolders?.receiptsFolderId ??
-            workspace?.driveFolderId ??
-            "",
-          calendarId: workspace?.calendarId ?? "primary",
-        };
-
-        setWorkspace(updated);
-        return updated;
-      }
+      await SpendTrackApi.checkWorkspaceStatus();
     } catch (err) {
       console.warn("Refresh workspace failed:", err);
     }

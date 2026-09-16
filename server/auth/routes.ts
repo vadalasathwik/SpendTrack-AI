@@ -97,12 +97,6 @@ router.post("/google", authGoogleRateLimit, async (req, res) => {
         name,
         photoURL,
       },
-      workspace: {
-        spreadsheetId: "",
-        driveFolderId: "",
-        calendarId: "",
-      },
-      googleToken: accessToken || idToken,
     });
 
     res.json({
@@ -112,11 +106,6 @@ router.post("/google", authGoogleRateLimit, async (req, res) => {
         email,
         name,
         photoURL,
-      },
-      workspace: {
-        spreadsheetId: "",
-        driveFolderId: "",
-        calendarId: "",
       },
       isNewUser,
     });

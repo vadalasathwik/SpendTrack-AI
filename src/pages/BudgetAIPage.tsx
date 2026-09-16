@@ -143,7 +143,7 @@ export const BudgetAIPage: React.FC<BudgetAIPageProps> = ({
             Budget AI & Inflation Intelligence
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 font-medium mt-1">
-            Grounded directly on your Google Sheets expense database & historical unit pricing
+            Grounded directly on your TrackPay expense database & historical unit pricing
           </p>
         </div>
 

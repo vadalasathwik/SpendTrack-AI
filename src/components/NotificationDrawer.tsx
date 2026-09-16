@@ -221,7 +221,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
         {/* Footer */}
         <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 text-center">
           <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold">
-            Google Sheets Synchronized Notifications
+            TrackPay System Notifications
           </p>
         </div>
       </div>

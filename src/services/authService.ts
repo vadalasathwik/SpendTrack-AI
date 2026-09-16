@@ -19,16 +19,16 @@ export interface UserProfile {
 }
 
 export interface WorkspaceMetadata {
-  spreadsheetId: string;
-  driveFolderId: string;
-  calendarId: string;
+  spreadsheetId?: string;
+  driveFolderId?: string;
+  calendarId?: string;
 }
 
 export interface SignInResult {
   token: string;
   user: UserProfile;
-  workspace: WorkspaceMetadata;
-  isNewUser: boolean;
+  workspace?: WorkspaceMetadata;
+  isNewUser?: boolean;
 }
 
 /* ---------------- Storage ---------------- */
@@ -93,7 +93,6 @@ export const onAuthStateChange = (
 ) => {
   authListeners.add(callback);
 
-  // If Firebase is NOT configured or auth instance is null, check stored session
   if (!isFirebaseConfigured || !auth) {
     const user = getStoredUserProfile();
     const storedJWT = getStoredJWT();
@@ -167,7 +166,6 @@ export const onAuthStateChange = (
 export const signInWithGoogle = async (
   onStepProgress?: (step: number) => void
 ): Promise<SignInResult | null> => {
-  // If Firebase is NOT configured or auth is null, do NOT call Firebase methods.
   if (!isFirebaseConfigured || !auth) {
     return null;
   }
@@ -181,9 +179,6 @@ export const signInWithGoogle = async (
   provider.addScope("openid");
   provider.addScope("email");
   provider.addScope("profile");
-  provider.addScope("https://www.googleapis.com/auth/drive.file");
-  provider.addScope("https://www.googleapis.com/auth/spreadsheets");
-  provider.addScope("https://www.googleapis.com/auth/calendar.events");
 
   try {
     onStepProgress?.(0);
@@ -219,7 +214,9 @@ export const signInWithGoogle = async (
 
     setStoredJWT(data.token);
     setStoredUserProfile(data.user);
-    setStoredWorkspace(data.workspace);
+    if (data.workspace) {
+      setStoredWorkspace(data.workspace);
+    }
 
     onStepProgress?.(5);
 
@@ -234,14 +231,11 @@ export const signInWithGoogle = async (
 /* ---------------- Sign Out ---------------- */
 
 export const signOutApp = async () => {
-  // 1. Remove stored JWT, user profile, and cached workspace state
   clearAuthSession();
 
-  // 2. Perform Firebase signOut if configured
   if (isFirebaseConfigured && auth) {
     await signOut(auth).catch(() => {});
   }
 
-  // 3. Emit auth change immediately
   notifyAuthListeners(null);
 };

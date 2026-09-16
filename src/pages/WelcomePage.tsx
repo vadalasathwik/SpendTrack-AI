@@ -92,9 +92,9 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
             <div className="w-10 h-10 rounded-[14px] bg-emerald-950/60 text-emerald-400 flex items-center justify-center border border-emerald-800/60 group-hover:scale-105 transition-transform">
               <Calendar className="w-5 h-5 stroke-[2]" />
             </div>
-            <h3 className="font-extrabold text-base text-white">Google Calendar Sync</h3>
+            <h3 className="font-extrabold text-base text-white">Monthly Budget & Categories</h3>
             <p className="text-xs text-slate-400 leading-relaxed font-normal">
-              Seamlessly sync upcoming due dates and paid histories into Google Calendar.
+              Track monthly budget targets and manage custom expense categories.
             </p>
           </div>
 

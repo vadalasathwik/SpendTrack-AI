@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
 import {
-  FileSpreadsheet,
+  Database,
+  Sparkles,
   Download,
   Upload,
   Plus,
   Trash2,
   LogOut,
-  RefreshCw,
-  HardDrive,
-  Calendar,
   CheckCircle2,
+  ShieldCheck,
 } from 'lucide-react';
 import { CategoryItem, UserSettings } from '../types.js';
 
@@ -23,7 +22,7 @@ interface SettingsPageProps {
   onSignOut: () => void;
   onGoogleSignIn?: () => void;
   userEmail?: string;
-  workspaceStatus?: { spreadsheetId: string; driveFolders: any } | null;
+  workspaceStatus?: any;
   onRefreshWorkspace: () => void;
   onNavigateToCategories?: () => void;
 }
@@ -37,7 +36,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onImportCsv,
   onSignOut,
   userEmail,
-  onRefreshWorkspace,
   onNavigateToCategories,
 }) => {
   const [categoryList, setCategoryList] = useState<CategoryItem[]>(categories);
@@ -80,7 +78,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         currency: currencyVal,
         currencySymbol: symbol,
       });
-      setBudgetMsg('Budget settings saved successfully to Google Sheets!');
+      setBudgetMsg('Budget settings saved successfully!');
     } catch (err: any) {
       setBudgetMsg(err.message || 'Failed to save settings.');
     } finally {
@@ -125,7 +123,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   return (
     <div className="space-y-6 pb-20 max-w-[1440px] mx-auto" id="settings-page-container">
-      {/* Compact Workspace Status Card (Target Height: 110-130px) */}
+      {/* Account & System Status Card */}
       <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-[20px] border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 min-h-[110px] md:min-h-[120px]">
         {/* User Info & Connection Badges */}
         <div className="flex items-center gap-3.5 min-w-0">
@@ -135,47 +133,35 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           <div className="space-y-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-extrabold text-sm text-slate-900 dark:text-white truncate max-w-[220px] sm:max-w-[320px]">
-                {userEmail || 'Active Workspace'}
+                {userEmail || 'Active User'}
               </h3>
               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800/60">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                Connected
+                Account Active
               </span>
             </div>
 
             <div className="flex items-center gap-3 text-xs flex-wrap">
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>Google Sheets</span>
+                <Database className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>PostgreSQL</span>
                 <CheckCircle2 className="w-3 h-3 text-emerald-500" />
               </span>
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
-                <HardDrive className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                <span>Google Drive</span>
+                <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                <span>AI Receipt Scanner</span>
                 <CheckCircle2 className="w-3 h-3 text-emerald-500" />
               </span>
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
-                <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                <span>Google Calendar</span>
-                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span>Google OAuth Secured</span>
               </span>
             </div>
-
-            <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500">
-              Last sync: Just now
-            </p>
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Sign Out Button */}
         <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center pt-2 sm:pt-0">
-          <button
-            onClick={onRefreshWorkspace}
-            className="px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-[14px] flex items-center gap-2 transition-colors cursor-pointer"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Sync Now</span>
-          </button>
           <button
             onClick={onSignOut}
             className="px-4 py-2.5 text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/40 rounded-[14px] flex items-center gap-2 transition-colors cursor-pointer"
@@ -186,7 +172,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
       </div>
 
-      {/* Monthly Budget System Settings Card */}
+      {/* Monthly Budget Settings Card */}
       <div className="bg-white dark:bg-slate-900 p-5 rounded-[20px] border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4" id="monthly-budget-settings-card">
         <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
           <h3 className="text-base font-extrabold text-slate-900 dark:text-white">Monthly Household Budget Settings</h3>
@@ -312,7 +298,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   style={{ backgroundColor: cat.color }}
                 />
                 <span className="font-bold text-xs text-slate-800 dark:text-slate-200">{cat.name}</span>
-                {cat.subcategories.length > 0 && (
+                {cat.subcategories && cat.subcategories.length > 0 && (
                   <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">({cat.subcategories.length} sub)</span>
                 )}
               </div>
@@ -326,104 +312,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </button>
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* Google Calendar Integration Preferences Card */}
-      <div className="bg-white dark:bg-slate-900 p-5 rounded-[20px] border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4" id="google-calendar-settings-card">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-extrabold text-slate-900 dark:text-white">Google Calendar Preferences</h3>
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-200/60 dark:border-emerald-800/60">
-                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                Google Calendar Connected ✓
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Sync recurring bills, EMIs, and expense reminders directly to your Primary Google Calendar
-            </p>
-          </div>
-
-          <button
-            onClick={async () => {
-              try {
-                await onSaveUserSettings?.({
-                  calendarSyncRecurring: true,
-                  calendarAllowReminders: true,
-                  calendarLastSyncedAt: new Date().toISOString(),
-                });
-                alert('Google Calendar synced successfully!');
-              } catch {}
-            }}
-            className="px-4 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-[14px] flex items-center gap-2 transition-all cursor-pointer shadow-xs self-start sm:self-center"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Sync Calendar Now</span>
-          </button>
-        </div>
-
-        <div className="space-y-4 max-w-xl">
-          <div className="space-y-2">
-            <label className="flex items-center gap-2.5 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                defaultChecked={userSettings?.calendarSyncRecurring !== false}
-                onChange={(e) => onSaveUserSettings?.({ calendarSyncRecurring: e.target.checked })}
-                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer"
-              />
-              <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200">
-                Sync recurring bills automatically
-              </span>
-            </label>
-
-            <label className="flex items-center gap-2.5 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                defaultChecked={userSettings?.calendarAllowReminders !== false}
-                onChange={(e) => onSaveUserSettings?.({ calendarAllowReminders: e.target.checked })}
-                className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer"
-              />
-              <span className="text-xs font-extrabold text-slate-800 dark:text-slate-200">
-                Allow expense reminders
-              </span>
-            </label>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Default Reminder Time
-              </label>
-              <input
-                type="time"
-                defaultValue={userSettings?.calendarDefaultTime || '09:00'}
-                onChange={(e) => onSaveUserSettings?.({ calendarDefaultTime: e.target.value })}
-                className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-[12px] focus:ring-2 focus:ring-emerald-500 focus:outline-none font-bold text-slate-900 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Default Notification Timing
-              </label>
-              <select
-                defaultValue={userSettings?.calendarDefaultNotificationMinutes || 1440}
-                onChange={(e) => onSaveUserSettings?.({ calendarDefaultNotificationMinutes: parseInt(e.target.value, 10) })}
-                className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-[12px] focus:ring-2 focus:ring-emerald-500 focus:outline-none font-bold text-slate-900 dark:text-white"
-              >
-                <option value={10}>10 minutes before</option>
-                <option value={30}>30 minutes before</option>
-                <option value={60}>1 hour before</option>
-                <option value={1440}>1 day before (Default)</option>
-                <option value={4320}>3 days before</option>
-              </select>
-            </div>
-          </div>
-
-          <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 pt-1">
-            Last sync timestamp: {userSettings?.calendarLastSyncedAt ? new Date(userSettings.calendarLastSyncedAt).toLocaleString() : 'Just now'}
-          </p>
         </div>
       </div>
 
@@ -461,4 +349,3 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     </div>
   );
 };
-

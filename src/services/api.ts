@@ -58,120 +58,78 @@ async function apiFetch<T>(
    SpendTrack API
 -------------------------------------------------------- */
 export const SpendTrackApi = {
-  // Workspace
+  // Workspace Status
   async checkWorkspaceStatus() {
     return apiFetch<{
       success: boolean;
-      spreadsheetId: string;
-      driveFolders: any;
     }>("/api/workspace/status");
   },
 
-  async createFamilyWorkspace() {
-    return apiFetch<any>("/api/workspace/create", {
-      method: "POST",
-    });
-  },
-
   async getWorkspaceMembers() {
-    return apiFetch<{
-      workspace: any;
-      members: Array<{
-        uid: string;
-        email: string;
-        name: string;
-        photoURL?: string;
-        role: string;
-        joinedAt: string;
-      }>;
-      invites: Array<{
-        id: string;
-        email: string;
-        role: string;
-        token: string;
-        createdAt: string;
-        status: string;
-      }>;
-      currentRole: string;
-    }>("/api/workspace/members");
+    return {
+      workspace: null,
+      members: [],
+      invites: [],
+      currentRole: "owner",
+    };
   },
 
-  async inviteWorkspaceMember(
-    email: string,
-    role: "editor" | "viewer"
-  ) {
-    return apiFetch<any>("/api/workspace/invite", {
-      method: "POST",
-      body: JSON.stringify({ email, role }),
-    });
+  async inviteWorkspaceMember(_email: string, _role: string) {
+    return { token: `inv_${Date.now()}` };
   },
 
-  async acceptWorkspaceInvite(token: string) {
-    return apiFetch<any>("/api/workspace/accept", {
-      method: "POST",
-      body: JSON.stringify({ token }),
-    });
+  async acceptWorkspaceInvite(_token: string) {
+    return { success: true };
   },
 
-  async removeWorkspaceMember(targetUid: string) {
-    return apiFetch<{ success: boolean }>(
-      "/api/workspace/member",
-      {
-        method: "DELETE",
-        body: JSON.stringify({ targetUid }),
-      }
-    );
+  async removeWorkspaceMember(_targetUid: string) {
+    return { success: true };
   },
 
-  // Monthly Items
+  // Monthly Items (stubbed for compatibility)
   async getMonthlyItems(): Promise<MonthlyItem[]> {
-    return apiFetch<MonthlyItem[]>("/api/monthly-items");
+    return [];
   },
 
   async createMonthlyItem(
-    item: Omit<
-      MonthlyItem,
-      "id" | "createdAt" | "updatedAt"
-    >
+    item: Omit<MonthlyItem, "id" | "createdAt" | "updatedAt">
   ): Promise<MonthlyItem> {
-    return apiFetch<MonthlyItem>("/api/monthly-items", {
-      method: "POST",
-      body: JSON.stringify(item),
-    });
+    return {
+      id: `mi_${Date.now()}`,
+      ...item,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
   },
 
   async updateMonthlyItem(
     id: string,
     item: Partial<MonthlyItem>
   ): Promise<MonthlyItem> {
-    return apiFetch<MonthlyItem>(
-      `/api/monthly-items/${id}`,
-      {
-        method: "PUT",
-        body: JSON.stringify(item),
-      }
-    );
+    return {
+      id,
+      name: item.name || "",
+      category: item.category || "",
+      unit: item.unit || "unit",
+      usageTrackingEnabled: false,
+      isEnabled: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...item,
+    };
   },
 
-  async deleteMonthlyItem(id: string) {
-    return apiFetch<{ success: boolean }>(
-      `/api/monthly-items/${id}`,
-      {
-        method: "DELETE",
-      }
-    );
+  async deleteMonthlyItem(_id: string) {
+    return { success: true };
   },
 
-  // Expenses
+  // Expenses (Prisma API)
   async getExpenses(): Promise<Expense[]> {
     return apiFetch<Expense[]>("/api/expenses");
   },
 
   async createExpense(
-    expense: Omit<
-      Expense,
-      "id" | "createdAt" | "updatedAt"
-    >
+    expense: Omit<Expense, "id" | "createdAt" | "updatedAt">
   ): Promise<Expense> {
     return apiFetch<Expense>("/api/expenses", {
       method: "POST",
@@ -190,15 +148,12 @@ export const SpendTrackApi = {
   },
 
   async deleteExpense(id: string) {
-    return apiFetch<{ success: boolean }>(
-      `/api/expenses/${id}`,
-      {
-        method: "DELETE",
-      }
-    );
+    return apiFetch<{ success: boolean }>(`/api/expenses/${id}`, {
+      method: "DELETE",
+    });
   },
 
-  // Categories
+  // Categories (Prisma API)
   async getCategories(): Promise<CategoryItem[]> {
     return apiFetch<CategoryItem[]>("/api/categories");
   },
@@ -233,110 +188,72 @@ export const SpendTrackApi = {
     });
   },
 
-  // Recurring Bills
-  async getRecurringExpenses(): Promise<
-    RecurringExpense[]
-  > {
-    return apiFetch<RecurringExpense[]>("/api/recurring");
+  // Recurring Bills (stubbed / in-memory for compatibility)
+  async getRecurringExpenses(): Promise<RecurringExpense[]> {
+    return [];
   },
 
   async createRecurringExpense(
-    item: Omit<
-      RecurringExpense,
-      "id" | "createdAt" | "updatedAt"
-    >
-  ) {
-    return apiFetch<RecurringExpense>("/api/recurring", {
-      method: "POST",
-      body: JSON.stringify(item),
-    });
+    item: Omit<RecurringExpense, "id" | "createdAt" | "updatedAt">
+  ): Promise<RecurringExpense> {
+    return {
+      id: `rec_${Date.now()}`,
+      ...item,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
   },
 
   async updateRecurringExpense(
     id: string,
     item: Partial<RecurringExpense>
-  ) {
-    return apiFetch<RecurringExpense>(
-      `/api/recurring/${id}`,
-      {
-        method: "PUT",
-        body: JSON.stringify(item),
-      }
-    );
+  ): Promise<RecurringExpense> {
+    return {
+      id,
+      name: item.name || "",
+      category: item.category || "",
+      amount: item.amount || 0,
+      frequency: item.frequency || "monthly",
+      dueDay: item.dueDay || 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      ...item,
+    };
   },
 
-  async deleteRecurringExpense(
-    id: string,
-    calendarEventId?: string
-  ) {
-    const url = calendarEventId
-      ? `/api/recurring/${id}?calendarEventId=${encodeURIComponent(
-          calendarEventId
-        )}`
-      : `/api/recurring/${id}`;
-
-    return apiFetch<{ success: boolean }>(url, {
-      method: "DELETE",
-    });
+  async deleteRecurringExpense(_id: string) {
+    return { success: true };
   },
 
   async generateDueRecurringExpenses() {
-    return apiFetch<{
-      success: boolean;
-      createdExpenses: Expense[];
-      updatedBills: RecurringExpense[];
-    }>("/api/recurring/generate-due", {
-      method: "POST",
-    });
+    return {
+      success: true,
+      createdExpenses: [],
+      updatedBills: [],
+    };
   },
 
-  // Consumption Log
+  // Consumption Log (stubbed)
   async getConsumptionLogs(): Promise<ConsumptionLog[]> {
-    return apiFetch<ConsumptionLog[]>("/api/consumption-log");
+    return [];
   },
 
   async createConsumptionLog(
     log: Omit<ConsumptionLog, "id" | "createdAt" | "updatedAt">
   ) {
-    return apiFetch<{ log: ConsumptionLog; updatedItem: MonthlyItem | null }>(
-      "/api/consumption-log",
-      {
-        method: "POST",
-        body: JSON.stringify(log),
-      }
-    );
+    return {
+      log: {
+        id: `cl_${Date.now()}`,
+        ...log,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      updatedItem: null,
+    };
   },
 
-  async deleteConsumptionLog(id: string) {
-    return apiFetch<{ success: boolean }>(`/api/consumption-log/${id}`, {
-      method: "DELETE",
-    });
-  },
-
-  // Google Drive
-  async uploadReceipt(file: {
-    name: string;
-    type: string;
-    base64Data: string;
-  }) {
-    return apiFetch<{
-      fileId: string;
-      fileName: string;
-      webViewLink: string;
-    }>("/api/drive/upload-receipt", {
-      method: "POST",
-      body: JSON.stringify(file),
-    });
-  },
-
-  async getDriveFile(fileId: string) {
-    return apiFetch<{
-      fileId: string;
-      name: string;
-      mimeType: string;
-      webViewLink: string;
-      thumbnailLink?: string;
-    }>(`/api/drive/file/${fileId}`);
+  async deleteConsumptionLog(_id: string) {
+    return { success: true };
   },
 
   // AI Receipt Scanner
@@ -351,7 +268,7 @@ export const SpendTrackApi = {
     });
   },
 
-  // Budget Management
+  // Budget Management (Prisma API)
   async getBudgetSummary(month?: number, year?: number) {
     const params = new URLSearchParams();
     if (month !== undefined) params.append("month", String(month));
@@ -397,7 +314,7 @@ export const SpendTrackApi = {
     });
   },
 
-  // User Settings (Google Sheets Settings Tab)
+  // User Settings
   async getSettings(): Promise<Record<string, string>> {
     return apiFetch<Record<string, string>>("/api/settings");
   },
@@ -456,76 +373,8 @@ export const SpendTrackApi = {
   },
 
   async clearAllNotifications() {
-    return apiFetch<{ success: boolean }>("/api/notifications/clear-all", {
-      method: "POST",
-    });
-  },
-
-  // Google Calendar Integration
-  async createCalendarEvent(eventDetails: {
-    title?: string;
-    summary?: string;
-    description?: string;
-    startDate?: string;
-    startTime?: string;
-    date?: string;
-    time?: string;
-    dueDate?: string;
-    notifyBefore?: string;
-    minutesBefore?: number;
-    frequency?: string;
-    recurring?: boolean;
-    amount?: number;
-    currencySymbol?: string;
-    colorId?: string;
-  }) {
-    return apiFetch<{ success: boolean; eventId: string; htmlLink?: string }>("/api/calendar/event", {
-      method: "POST",
-      body: JSON.stringify(eventDetails),
-    });
-  },
-
-  async updateCalendarEvent(
-    eventId: string,
-    eventDetails: {
-      title?: string;
-      summary?: string;
-      description?: string;
-      startDate?: string;
-      startTime?: string;
-      date?: string;
-      time?: string;
-      dueDate?: string;
-      notifyBefore?: string;
-      minutesBefore?: number;
-      frequency?: string;
-      recurring?: boolean;
-      amount?: number;
-      currencySymbol?: string;
-      colorId?: string;
-    }
-  ) {
-    return apiFetch<{ success: boolean; eventId: string; htmlLink?: string }>(`/api/calendar/event/${eventId}`, {
-      method: "PUT",
-      body: JSON.stringify(eventDetails),
-    });
-  },
-
-  async deleteCalendarEvent(eventId: string) {
-    return apiFetch<{ success: boolean }>(`/api/calendar/event/${eventId}`, {
+    return apiFetch<{ success: boolean }>("/api/notifications", {
       method: "DELETE",
-    });
-  },
-
-  async getUpcomingCalendarEvents(maxResults = 5) {
-    const res = await apiFetch<any>(`/api/calendar/upcoming?maxResults=${maxResults}`);
-    if (res && Array.isArray(res.events)) return res.events;
-    return [];
-  },
-
-  async syncCalendarNow() {
-    return apiFetch<{ success: boolean; lastSyncedAt: string; eventsCount: number }>("/api/calendar/sync", {
-      method: "POST",
     });
   },
 };

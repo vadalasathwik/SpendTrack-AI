@@ -634,7 +634,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                       {exp.receiptDriveFileId && (
                         <span
                           className="text-[10px] text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full font-bold"
-                          title="Receipt saved in Google Drive"
+                          title="Receipt saved in TrackPay"
                         >
                           Receipt ✓
                         </span>

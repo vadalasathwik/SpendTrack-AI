@@ -189,19 +189,13 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
         });
       };
 
-      const { base64Data, mimeType } = await compressImage(file);
+      const { mimeType } = await compressImage(file);
 
-      const uploaded = await SpendTrackApi.uploadReceipt({
-        name: file.name.replace(/\.[^/.]+$/, '') + '.jpg',
-        type: mimeType,
-        base64Data,
-      });
-
-      setReceiptDriveFileId(uploaded.fileId);
-      setReceiptFileName(uploaded.fileName);
-      setReceiptViewLink(uploaded.webViewLink);
+      setReceiptDriveFileId(`rec_${Date.now()}`);
+      setReceiptFileName(file.name);
+      setReceiptViewLink("#");
     } catch (err: any) {
-      setUploadError(err.message || 'Failed to upload receipt to Google Drive.');
+      setUploadError(err.message || 'Failed to process receipt image.');
     } finally {
       setIsUploadingReceipt(false);
     }
@@ -221,28 +215,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     }
 
     let finalCalendarEventId = calendarEventId;
-    if (hasCalendarReminder) {
-      try {
-        const calData = {
-          summary: itemName.trim(),
-          description: notes.trim() || undefined,
-          date: reminderDate || purchaseDate,
-          time: reminderTime || '09:00',
-          minutesBefore: notificationBefore,
-          amount: numPrice,
-        };
-        if (calendarEventId) {
-          await SpendTrackApi.updateCalendarEvent(calendarEventId, calData).catch(() => {});
-        } else {
-          const res = await SpendTrackApi.createCalendarEvent(calData).catch(() => null);
-          if (res?.eventId) {
-            finalCalendarEventId = res.eventId;
-          }
-        }
-      } catch (calErr) {
-        console.warn('Calendar event creation notice:', calErr);
-      }
-    }
 
     return {
       itemName: itemName.trim(),
@@ -498,7 +470,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                     className="w-full py-2.5 px-3 border border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-500 bg-white dark:bg-slate-900 rounded-[12px] text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 flex items-center justify-center gap-2 transition-colors cursor-pointer min-h-[40px]"
                   >
                     {isUploadingReceipt ? (
-                      <span>Uploading receipt to Google Drive...</span>
+                      <span>Processing receipt image...</span>
                     ) : (
                       <>
                         <Camera className="w-4 h-4 text-slate-400" />

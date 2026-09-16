@@ -62,8 +62,8 @@ import { BudgetAIPage } from './pages/BudgetAIPage.js';
 import { BudgetDashboardPage } from './pages/BudgetDashboardPage.js';
 import { ReceiptScannerPage } from './pages/ReceiptScannerPage.js';
 import { Routes, Route } from 'react-router-dom';
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import Terms from "./pages/Terms";
+import { PrivacyPolicy } from "./pages/PrivacyPolicy.js";
+import { Terms } from "./pages/Terms.js";
 import { FamilyWorkspacePage } from './pages/FamilyWorkspacePage.js';
 
 const DATE_RANGE_STORAGE_KEY = 'spendtrack_date_range';
@@ -157,7 +157,7 @@ export function App() {
   // Sync / Workspace status
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({ state: 'idle' });
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [workspaceStatus, setWorkspaceStatus] = useState<{ spreadsheetId: string; driveFolders: any } | null>(null);
+  const [workspaceStatus, setWorkspaceStatus] = useState<any>(null);
 
   // Modals & Assistant State
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
@@ -687,58 +687,7 @@ export function App() {
   ) => {
     setSyncStatus({ state: 'saving' });
     try {
-      // 1. Create recurring payment first
       const savedPayment = await SpendTrackApi.createRecurringExpense(itemData);
-
-      // 2. Immediately after creating payment, if calendar sync is enabled, create calendar event
-      if (itemData.calendarReminderEnabled !== false) {
-        const reminderDate = itemData.reminderDate || itemData.dueDate || new Date().toISOString().split('T')[0];
-        const reminderTime = itemData.reminderTime || '20:00';
-        const dueDate = itemData.dueDate || reminderDate;
-        const notifyBefore = itemData.notifyBefore || '1 day';
-
-        console.log("Creating calendar for:", itemData.name);
-
-        const calPayload = {
-          title: `💳 Pay ${itemData.name}`,
-          summary: `💳 Pay ${itemData.name}`,
-          description: `Amount: ₹${itemData.amount}\nCategory: ${itemData.category}\nDue Date: ${dueDate}${itemData.notes ? '\nNotes: ' + itemData.notes : ''}\n\nCreated by TrackPay.`,
-          startDate: reminderDate,
-          startTime: reminderTime,
-          date: reminderDate,
-          time: reminderTime,
-          dueDate: dueDate,
-          notifyBefore,
-          recurring: false,
-          amount: itemData.amount,
-          colorId: "5", // 🟡 Yellow / Upcoming
-        };
-
-        try {
-          const cal = await SpendTrackApi.createCalendarEvent(calPayload);
-          if (cal && cal.success && cal.eventId) {
-            console.log("Calendar Event ID:", cal.eventId);
-            savedPayment.calendarEventId = cal.eventId;
-            savedPayment.calendarHtmlLink = cal.htmlLink;
-            savedPayment.calendarSyncStatus = 'synced';
-
-            // Persist calendar fields to Google Sheets
-            await SpendTrackApi.updateRecurringExpense(savedPayment.id, {
-              calendarEventId: cal.eventId,
-              calendarHtmlLink: cal.htmlLink,
-              calendarSyncStatus: 'synced',
-            }).catch((err) => {
-              console.warn('Non-fatal: Error updating calendar fields on payment:', err);
-            });
-          } else {
-            savedPayment.calendarSyncStatus = 'error';
-          }
-        } catch (calErr) {
-          console.error("Unable to create calendar reminder:", calErr);
-          savedPayment.calendarSyncStatus = 'error';
-        }
-      }
-
       setRecurringExpenses((prev) => [...prev, savedPayment]);
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
@@ -750,65 +699,7 @@ export function App() {
   const handleUpdateRecurring = async (id: string, itemData: Partial<RecurringExpense>) => {
     setSyncStatus({ state: 'saving' });
     try {
-      const existing = recurringExpenses.find((r) => r.id === id);
       const updated = await SpendTrackApi.updateRecurringExpense(id, itemData);
-
-      if (itemData.calendarReminderEnabled !== false && existing) {
-        const targetCalId = itemData.calendarEventId || existing.calendarEventId || updated.calendarEventId;
-        const name = itemData.name || existing.name || 'Bill';
-        const amount = itemData.amount || existing.amount || 0;
-        const category = itemData.category || existing.category || 'Utilities';
-        const reminderDate = itemData.reminderDate || existing.reminderDate || itemData.dueDate || existing.dueDate || new Date().toISOString().split('T')[0];
-        const reminderTime = itemData.reminderTime || existing.reminderTime || '20:00';
-        const dueDate = itemData.dueDate || existing.dueDate || reminderDate;
-        const notifyBefore = itemData.notifyBefore || existing.notifyBefore || '1 day';
-
-        console.log("Updating calendar for:", name);
-
-        const calPayload = {
-          title: `💳 Pay ${name}`,
-          summary: `💳 Pay ${name}`,
-          description: `Amount: ₹${amount}\nCategory: ${category}\nDue Date: ${dueDate}${itemData.notes || existing.notes ? '\nNotes: ' + (itemData.notes || existing.notes) : ''}\n\nCreated by TrackPay.`,
-          startDate: reminderDate,
-          startTime: reminderTime,
-          date: reminderDate,
-          time: reminderTime,
-          dueDate: dueDate,
-          notifyBefore,
-          recurring: false,
-          amount,
-          colorId: "5", // 🟡 Yellow / Upcoming
-        };
-
-        try {
-          if (targetCalId) {
-            const calRes = await SpendTrackApi.updateCalendarEvent(targetCalId, calPayload);
-            updated.calendarEventId = targetCalId;
-            if (calRes && calRes.htmlLink) {
-              updated.calendarHtmlLink = calRes.htmlLink;
-            }
-            updated.calendarSyncStatus = 'synced';
-            console.log("Updated Calendar Event ID:", targetCalId);
-          } else {
-            const cal = await SpendTrackApi.createCalendarEvent(calPayload);
-            if (cal && cal.success && cal.eventId) {
-              console.log("Calendar Event ID:", cal.eventId);
-              updated.calendarEventId = cal.eventId;
-              updated.calendarHtmlLink = cal.htmlLink;
-              updated.calendarSyncStatus = 'synced';
-              await SpendTrackApi.updateRecurringExpense(id, {
-                calendarEventId: cal.eventId,
-                calendarHtmlLink: cal.htmlLink,
-                calendarSyncStatus: 'synced',
-              }).catch(() => {});
-            }
-          }
-        } catch (calErr) {
-          console.error("Unable to update calendar reminder:", calErr);
-          updated.calendarSyncStatus = 'error';
-        }
-      }
-
       setRecurringExpenses((prev) => prev.map((r) => (r.id === id ? updated : r)));
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
@@ -821,7 +712,7 @@ export function App() {
   const handleDeleteRecurring = async (item: RecurringExpense) => {
     setSyncStatus({ state: 'saving' });
     try {
-      await SpendTrackApi.deleteRecurringExpense(item.id, item.calendarEventId);
+      await SpendTrackApi.deleteRecurringExpense(item.id);
       setRecurringExpenses((prev) => prev.filter((r) => r.id !== item.id));
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
@@ -851,19 +742,15 @@ export function App() {
     const today = new Date().toISOString().split('T')[0];
     const currentMonthStr = today.slice(0, 7);
 
-    // Match bill locally using priority order (ID -> Name + Category + Due Day + Amount -> Name + Category)
     const activeBill = findMatchingRecurringBill(targetRecurring, recurringExpenses) || targetRecurring;
 
-    // Prevent duplicate payment for the same month
     if (activeBill.lastGeneratedMonth === currentMonthStr) {
       return;
     }
 
-    // Capture previous state for rollback
     const prevExpenses = [...expenses];
     const prevRecurring = [...recurringExpenses];
 
-    // 1. Optimistic UI updates
     const tempExpenseId = `exp-rec-${Date.now()}`;
     const optimisticExpense: Expense = {
       id: tempExpenseId,
@@ -880,12 +767,10 @@ export function App() {
       notes: activeBill.notes ? `Recurring Bill: ${activeBill.notes}` : 'Recurring Bill Payment',
       source: 'recurring',
       recurringId: activeBill.id,
-      calendarEventId: activeBill.calendarEventId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    // Update local React state immediately for instant feedback
     setExpenses((prev) => [optimisticExpense, ...prev]);
     setRecurringExpenses((prev) =>
       prev.map((r) =>
@@ -899,7 +784,6 @@ export function App() {
     setSyncStatus({ state: 'syncing' });
 
     try {
-      // 2. Create monthly expense on server
       const expensePayload = {
         itemName: activeBill.name || activeBill.title || 'Recurring Bill',
         category: activeBill.category,
@@ -909,7 +793,6 @@ export function App() {
         notes: activeBill.notes ? `Recurring Bill: ${activeBill.notes}` : 'Recurring Bill Payment',
         source: 'recurring' as const,
         recurringId: activeBill.id,
-        calendarEventId: activeBill.calendarEventId,
       };
 
       const createdExpense = await SpendTrackApi.createExpense(expensePayload);
@@ -918,157 +801,19 @@ export function App() {
         prev.map((e) => (e.id === tempExpenseId ? createdExpense : e))
       );
 
-      // 3. Update existing row on Google Sheets (never create duplicate)
-      let updateSuccess = false;
-      let targetIdToUpdate = activeBill.id;
+      const updatedBill = await SpendTrackApi.updateRecurringExpense(activeBill.id, {
+        lastGeneratedMonth: currentMonthStr,
+        isPaid: true,
+        paidDate: today,
+      });
 
-      try {
-        const updatedBill = await SpendTrackApi.updateRecurringExpense(targetIdToUpdate, {
-          rowIndex: activeBill.rowIndex,
-          name: activeBill.name || activeBill.title,
-          category: activeBill.category,
-          dueDay: activeBill.dueDay,
-          amount: activeBill.amount,
-          lastGeneratedMonth: currentMonthStr,
-          isPaid: true,
-          paidDate: today,
-        });
-        setRecurringExpenses((prev) =>
-          prev.map((r) => (r.id === targetIdToUpdate || r.id === updatedBill.id ? updatedBill : r))
-        );
-        updateSuccess = true;
-      } catch (firstErr) {
-        // Silent Recovery: fetch latest recurring bills & re-match using fallback strategy
-        setSyncStatus({ state: 'syncing' });
-        try {
-          const freshBills = await SpendTrackApi.getRecurringExpenses();
-          setRecurringExpenses(freshBills);
-
-          const matchedFreshBill = findMatchingRecurringBill(activeBill, freshBills);
-
-          if (matchedFreshBill) {
-            targetIdToUpdate = matchedFreshBill.id;
-            const retriedBill = await SpendTrackApi.updateRecurringExpense(targetIdToUpdate, {
-              rowIndex: matchedFreshBill.rowIndex,
-              name: matchedFreshBill.name || matchedFreshBill.title,
-              category: matchedFreshBill.category,
-              dueDay: matchedFreshBill.dueDay,
-              amount: matchedFreshBill.amount,
-              lastGeneratedMonth: currentMonthStr,
-              isPaid: true,
-              paidDate: today,
-            });
-            setRecurringExpenses((prev) =>
-              prev.map((r) => (r.id === targetIdToUpdate || r.id === retriedBill.id ? retriedBill : r))
-            );
-            updateSuccess = true;
-          }
-        } catch (retryErr) {
-          console.error('Silent recovery retry failed:', retryErr);
-        }
-      }
-
-      if (!updateSuccess) {
-        throw new Error("Couldn't sync changes. Tap Retry.");
-      }
-
-      // 4. Update Google Calendar event to "✅ Paid • WiFi" with Green color (colorId: "2")
-      if (activeBill.calendarReminderEnabled !== false && activeBill.calendarEventId) {
-        const paidDescription = `Amount: ₹${activeBill.amount}\nCategory: ${activeBill.category}\nDue Date: ${activeBill.dueDate || today}\nPaid Date: ${today}${activeBill.notes ? '\nNotes: ' + activeBill.notes : ''}\n\nCreated by TrackPay.`;
-        const updatedPaidCal = await SpendTrackApi.updateCalendarEvent(activeBill.calendarEventId, {
-          title: `✅ Paid • ${activeBill.name || activeBill.title}`,
-          summary: `✅ Paid • ${activeBill.name || activeBill.title}`,
-          description: paidDescription,
-          date: today,
-          startDate: today,
-          amount: activeBill.amount,
-          colorId: "2", // 🟢 Green / Paid
-        }).catch((err) => {
-          console.warn('Non-fatal: Failed to mark calendar event as paid:', err);
-          return null;
-        });
-      }
-
-      // Automatically calculate next cycle's due date & reminder date (+1 month for monthly)
-      const baseDueDate = activeBill.dueDate ? new Date(activeBill.dueDate + 'T00:00:00') : new Date();
-      if (isNaN(baseDueDate.getTime())) baseDueDate.setTime(Date.now());
-
-      const nextDueDateObj = new Date(baseDueDate);
-      if (activeBill.frequency === 'weekly') {
-        nextDueDateObj.setDate(nextDueDateObj.getDate() + 7);
-      } else if (activeBill.frequency === 'yearly') {
-        nextDueDateObj.setFullYear(nextDueDateObj.getFullYear() + 1);
-      } else {
-        // monthly default
-        nextDueDateObj.setMonth(nextDueDateObj.getMonth() + 1);
-      }
-      const nextDueDateStr = nextDueDateObj.toISOString().split('T')[0];
-      const nextReminderDateObj = new Date(nextDueDateObj);
-      nextReminderDateObj.setDate(nextReminderDateObj.getDate() - 1);
-      const nextReminderDateStr = nextReminderDateObj.toISOString().split('T')[0];
-
-      // Schedule next cycle's Google Calendar reminder automatically with Yellow color (colorId: "5")
-      let nextCalEventId = activeBill.calendarEventId;
-      let nextCalHtmlLink = activeBill.calendarHtmlLink;
-      let calendarSyncStatus: 'synced' | 'error' = 'synced';
-
-      if (activeBill.calendarReminderEnabled !== false) {
-        try {
-          const nextCalPayload = {
-            title: `💳 Pay ${activeBill.name || activeBill.title}`,
-            summary: `💳 Pay ${activeBill.name || activeBill.title}`,
-            description: `Amount: ₹${activeBill.amount}\nCategory: ${activeBill.category}\nDue Date: ${nextDueDateStr}${activeBill.notes ? '\nNotes: ' + activeBill.notes : ''}\n\nCreated by TrackPay.`,
-            startDate: nextReminderDateStr,
-            startTime: activeBill.reminderTime || '20:00',
-            date: nextReminderDateStr,
-            time: activeBill.reminderTime || '20:00',
-            dueDate: nextDueDateStr,
-            notifyBefore: activeBill.notifyBefore || '1 day',
-            recurring: false,
-            amount: activeBill.amount,
-            colorId: "5", // 🟡 Yellow / Upcoming
-          };
-
-          const nextCalResult = await SpendTrackApi.createCalendarEvent(nextCalPayload);
-          if (nextCalResult && nextCalResult.success && nextCalResult.eventId) {
-            nextCalEventId = nextCalResult.eventId;
-            nextCalHtmlLink = nextCalResult.htmlLink;
-            calendarSyncStatus = 'synced';
-            console.log("Scheduled next cycle's Calendar Event ID:", nextCalEventId);
-          }
-        } catch (calErr) {
-          console.warn('Auto next month calendar creation warning:', calErr);
-          calendarSyncStatus = 'error';
-        }
-      }
-
-      // Update recurring payment record in Google Sheets and React state for next cycle
-      try {
-        const finalUpdatedBill = await SpendTrackApi.updateRecurringExpense(targetIdToUpdate, {
-          lastGeneratedMonth: currentMonthStr,
-          isPaid: true,
-          paidDate: today,
-          dueDate: nextDueDateStr,
-          reminderDate: nextReminderDateStr,
-          dueDay: nextDueDateObj.getDate(),
-          calendarEventId: nextCalEventId,
-          calendarHtmlLink: nextCalHtmlLink,
-          calendarSyncStatus,
-        });
-
-        setRecurringExpenses((prev) =>
-          prev.map((r) =>
-            r.id === targetIdToUpdate || r.id === finalUpdatedBill.id ? finalUpdatedBill : r
-          )
-        );
-      } catch (nextCycleErr) {
-        console.warn('Next cycle update warning:', nextCycleErr);
-      }
+      setRecurringExpenses((prev) =>
+        prev.map((r) => (r.id === activeBill.id ? updatedBill : r))
+      );
 
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
       console.error('Failed to mark bill as paid:', err);
-      // Rollback optimistic state if both attempts fail
       setExpenses(prevExpenses);
       setRecurringExpenses(prevRecurring);
 

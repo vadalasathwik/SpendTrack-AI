@@ -223,7 +223,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
       onClose();
     } catch (err: any) {
       console.error('Failed to save receipt expenses:', err);
-      setErrorMessage(err.message || 'Failed to save expenses to Google Sheets.');
+      setErrorMessage(err.message || 'Failed to save expenses to database.');
     } finally {
       setIsSaving(false);
     }
@@ -249,7 +249,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                 </span>
               </h2>
               <p className="text-xs text-slate-500 font-medium">
-                Upload or photograph a receipt to auto-extract items to Google Sheets
+                Upload or photograph a receipt to auto-extract expenses via Gemini Vision
               </p>
             </div>
           </div>
@@ -600,7 +600,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
               ) : (
                 <CheckCircle2 className="w-4 h-4" />
               )}
-              <span>Save All to Google Sheets</span>
+              <span>Save All to Expenses</span>
             </button>
           )}
         </div>
