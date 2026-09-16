@@ -25,6 +25,7 @@ interface SettingsPageProps {
   userEmail?: string;
   workspaceStatus?: { spreadsheetId: string; driveFolders: any } | null;
   onRefreshWorkspace: () => void;
+  onNavigateToCategories?: () => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
@@ -37,6 +38,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onSignOut,
   userEmail,
   onRefreshWorkspace,
+  onNavigateToCategories,
 }) => {
   const [categoryList, setCategoryList] = useState<CategoryItem[]>(categories);
   const [newCatName, setNewCatName] = useState('');
@@ -258,9 +260,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
       {/* Categories & Subcategories Management */}
       <div className="bg-white dark:bg-slate-900 p-5 rounded-[20px] border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
-        <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
-          <h3 className="text-base font-extrabold text-slate-900 dark:text-white">Custom Categories</h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Add or manage categories and visual color tags</p>
+        <div className="pb-3 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-extrabold text-slate-900 dark:text-white">Custom Categories</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Add or manage categories and visual color tags</p>
+          </div>
+          {onNavigateToCategories && (
+            <button
+              onClick={onNavigateToCategories}
+              className="px-3.5 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/80 dark:border-emerald-800/80 rounded-[12px] hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors cursor-pointer self-start sm:self-auto"
+            >
+              Open Category Manager →
+            </button>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

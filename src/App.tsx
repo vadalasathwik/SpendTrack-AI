@@ -55,6 +55,7 @@ import { ItemsAnalyticsPage } from './pages/ItemsAnalyticsPage.js';
 import { AnalyticsPage } from './pages/AnalyticsPage.js';
 import { RecurringPage } from './pages/RecurringPage.js';
 import { SettingsPage } from './pages/SettingsPage.js';
+import { CategoriesPage } from './pages/CategoriesPage.js';
 import { AIAssistantPage } from './pages/AIAssistantPage.js';
 import { WelcomePage } from './pages/WelcomePage.js';
 import { BudgetAIPage } from './pages/BudgetAIPage.js';
@@ -95,7 +96,7 @@ const getInitialActiveTab = (): any => {
 export function App() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'budget' | 'expenses' | 'monthly-items' | 'items' | 'analytics' | 'recurring' | 'ai' | 'family' | 'settings'
+    'dashboard' | 'budget' | 'expenses' | 'monthly-items' | 'items' | 'analytics' | 'recurring' | 'ai' | 'family' | 'settings' | 'categories'
   >(getInitialActiveTab);
   const [isMoreDrawerOpen, setIsMoreDrawerOpen] = useState(false);
 
@@ -589,6 +590,45 @@ export function App() {
     try {
       await SpendTrackApi.deleteExpense(expense.id);
       setExpenses((prev) => prev.filter((e) => e.id !== expense.id));
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  // CRUD for Categories
+  const handleCreateCategory = async (data: { name: string; color: string; icon: string }) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      const created = await SpendTrackApi.createCategory(data);
+      setCategories((prev) => [...prev.filter((c) => c.name !== created.name), created]);
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  const handleUpdateCategory = async (id: string, data: { name: string; color: string; icon: string }) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      const updated = await SpendTrackApi.updateCategory(id, data);
+      setCategories((prev) =>
+        prev.map((c) => ((c.id && c.id === id) || c.name === id ? updated : c))
+      );
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      await SpendTrackApi.deleteCategory(id);
+      setCategories((prev) => prev.filter((c) => c.id !== id && c.name !== id));
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
       setSyncStatus({ state: 'error', errorMessage: err.message });
@@ -1413,6 +1453,15 @@ export function App() {
           />
         )}
 
+        {activeTab === 'categories' && (
+          <CategoriesPage
+            categories={categories}
+            onCreateCategory={handleCreateCategory}
+            onUpdateCategory={handleUpdateCategory}
+            onDeleteCategory={handleDeleteCategory}
+          />
+        )}
+
         {activeTab === 'settings' && (
           <SettingsPage
             categories={categories}
@@ -1424,6 +1473,7 @@ export function App() {
             onSaveUserSettings={handleSaveUserSettings}
             onExportCsv={handleExportCsv}
             onImportCsv={handleImportCsv}
+            onNavigateToCategories={() => setActiveTab('categories')}
             onSignOut={handleSignOut}
             onGoogleSignIn={handleGoogleSignIn}
             userEmail={user?.email}

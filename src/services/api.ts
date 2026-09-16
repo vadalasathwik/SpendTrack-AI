@@ -203,6 +203,29 @@ export const SpendTrackApi = {
     return apiFetch<CategoryItem[]>("/api/categories");
   },
 
+  async createCategory(category: { name: string; color?: string; icon?: string }): Promise<CategoryItem> {
+    return apiFetch<CategoryItem>("/api/categories", {
+      method: "POST",
+      body: JSON.stringify(category),
+    });
+  },
+
+  async updateCategory(
+    id: string,
+    category: { name?: string; color?: string; icon?: string }
+  ): Promise<CategoryItem> {
+    return apiFetch<CategoryItem>(`/api/categories/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(category),
+    });
+  },
+
+  async deleteCategory(id: string) {
+    return apiFetch<{ success: boolean }>(`/api/categories/${id}`, {
+      method: "DELETE",
+    });
+  },
+
   async saveCategories(categories: CategoryItem[]) {
     return apiFetch<CategoryItem[]>("/api/categories", {
       method: "POST",

@@ -6,6 +6,7 @@ import {
   Settings,
   Users,
   Compass,
+  FolderTree,
 } from 'lucide-react';
 import { BRAND_NAME } from '../constants/brand.js';
 
@@ -25,6 +26,13 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
   if (!isOpen) return null;
 
   const menuItems = [
+    {
+      id: 'categories',
+      title: '🏷️ Category Management',
+      subtitle: 'Custom categories, color tags & icons',
+      icon: FolderTree,
+      color: 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60',
+    },
     {
       id: 'monthly-items',
       title: '📦 Monthly Items',

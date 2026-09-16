@@ -25,10 +25,13 @@ export interface Expense {
 }
 
 export interface CategoryItem {
+  id?: string;
   name: string;
-  subcategories: string[];
+  subcategories?: string[];
   color: string;
   icon?: string;
+  userId?: string;
+  createdAt?: string;
 }
 
 export interface MonthlyItem {

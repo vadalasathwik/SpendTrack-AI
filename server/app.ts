@@ -245,37 +245,6 @@ export function createExpressApp() {
     }
   });
 
-  // Categories
-  app.get("/api/categories", async (req, res) => {
-    let token: string;
-    try {
-      token = getGoogleToken(req);
-    } catch (err) {
-      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
-    }
-    try {
-      const cats = await googleSheetsService.getCategories(token);
-      res.json(cats);
-    } catch (err: unknown) {
-      return handleRouteError(res, req, err, "Failed to fetch categories", 500);
-    }
-  });
-
-  app.post("/api/categories", async (req, res) => {
-    let token: string;
-    try {
-      token = getGoogleToken(req);
-    } catch (err) {
-      return handleRouteError(res, req, err, "Unauthorized: Google authentication required", 401);
-    }
-    try {
-      const saved = await googleSheetsService.saveCategories(token, req.body);
-      res.json(saved);
-    } catch (err: unknown) {
-      return handleRouteError(res, req, err, "Failed to save categories", 400);
-    }
-  });
-
   // Recurring Expenses CRUD
   app.get("/api/recurring", async (req, res) => {
     let token: string;

@@ -7,6 +7,12 @@ import {
   updateExpense,
   deleteExpense,
 } from "./services/expense.service.js";
+import {
+  getCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+} from "./services/category.service.js";
 
 const router = Router();
 
@@ -114,6 +120,53 @@ router.delete("/api/expenses/:id", async (req: any, res: any) => {
   } catch (err: any) {
     console.error("DELETE /api/expenses/:id error:", err);
     res.status(400).json({ error: err.message || "Failed to delete expense" });
+  }
+});
+
+router.get("/api/categories", async (req: any, res: any) => {
+  try {
+    const userId = req.user?.userId || req.user?.uid;
+    const categories = await getCategories(userId);
+    res.json(categories);
+  } catch (err: any) {
+    console.error("GET /api/categories error:", err);
+    const status = err.message === "Category not found" ? 404 : 500;
+    res.status(status).json({ error: err.message || "Failed to fetch categories" });
+  }
+});
+
+router.post("/api/categories", async (req: any, res: any) => {
+  try {
+    const userId = req.user?.userId || req.user?.uid;
+    const category = await createCategory(userId, req.body);
+    res.json(category);
+  } catch (err: any) {
+    console.error("POST /api/categories error:", err);
+    res.status(400).json({ error: err.message || "Failed to create category" });
+  }
+});
+
+router.put("/api/categories/:id", async (req: any, res: any) => {
+  try {
+    const userId = req.user?.userId || req.user?.uid;
+    const category = await updateCategory(userId, req.params.id, req.body);
+    res.json(category);
+  } catch (err: any) {
+    console.error("PUT /api/categories/:id error:", err);
+    const status = err.message === "Category not found" ? 404 : 400;
+    res.status(status).json({ error: err.message || "Failed to update category" });
+  }
+});
+
+router.delete("/api/categories/:id", async (req: any, res: any) => {
+  try {
+    const userId = req.user?.userId || req.user?.uid;
+    await deleteCategory(userId, req.params.id);
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error("DELETE /api/categories/:id error:", err);
+    const status = err.message === "Category not found" ? 404 : 400;
+    res.status(status).json({ error: err.message || "Failed to delete category" });
   }
 });
 
