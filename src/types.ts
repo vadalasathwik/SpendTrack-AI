@@ -58,31 +58,35 @@ export interface MonthlyItem {
 export interface RecurringExpense {
   id: string;
   rowIndex?: number;
-  name: string; // title
+  name?: string;
   title?: string;
-  category: string;
+  category?: string | any;
+  categoryId?: string;
   subcategory?: string;
   amount: number;
-  frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
-  dueDay: number; // day of month (1-31)
-  dueDate?: string; // YYYY-MM-DD
+  frequency?: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | string;
+  dueDay?: number;
+  dueDate?: string;
+  startDate?: string;
+  nextRun?: string;
+  note?: string;
+  notes?: string;
   autopost?: boolean;
   reminderDays?: number;
   isActive?: boolean;
   isPaid?: boolean;
   paidDate?: string;
-  lastGeneratedMonth?: string; // YYYY-MM
-  notes?: string;
+  lastGeneratedMonth?: string;
   calendarReminderEnabled?: boolean;
   calendarEventId?: string;
   calendarHtmlLink?: string;
   calendarSyncStatus?: 'synced' | 'syncing' | 'error';
-  reminderDate?: string; // YYYY-MM-DD
-  reminderTime?: string; // HH:mm
-  notifyBefore?: string; // 'At time' | '10 min' | '30 min' | '1 hour' | '1 day' | '3 days'
+  reminderDate?: string;
+  reminderTime?: string;
+  notifyBefore?: string;
   lastRecordedDate?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
 }
 
 export interface ConsumptionLog {
@@ -261,3 +265,190 @@ export interface SyncStatus {
   lastSyncedAt: Date | null;
   errorMessage?: string;
 }
+
+export interface IncomeItem {
+  id: string;
+  title: string;
+  amount: number;
+  userId?: string;
+  createdAt?: string;
+}
+
+export interface EmiItem {
+  id: string;
+  title: string;
+  bank: string;
+  amount: number;
+  dueDay: number;
+  interestRate?: number | null;
+  outstanding?: number | null;
+  reminder?: boolean;
+  userId?: string;
+  createdAt?: string;
+}
+
+export interface InvestmentItem {
+  id: string;
+  title: string;
+  provider: string;
+  amount: number;
+  type: 'SIP' | 'GOLD_SIP' | 'MUTUAL_FUND' | 'STOCKS' | string;
+  frequency?: string;
+  nextDate: string;
+  isActive?: boolean;
+  userId?: string;
+  createdAt?: string;
+}
+
+export interface SavingItem {
+  id: string;
+  title: string;
+  type: 'RD' | 'FD' | 'EMERGENCY_FUND' | string;
+  targetAmount: number;
+  currentAmount: number;
+  monthlyContribution: number;
+  interestRate?: number | null;
+  maturityDate?: string | null;
+  userId?: string;
+  createdAt?: string;
+}
+
+export interface FinancialNote {
+  id: string;
+  title?: string;
+  content: string;
+  tags?: string;
+  pinned?: boolean;
+  userId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ReminderItem {
+  id: string;
+  userId?: string;
+  title: string;
+  description?: string | null;
+  dueDate: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH';
+  completed: boolean;
+  createdAt?: string;
+}
+
+export interface PlannerSummary {
+  income: number;
+  emi: number;
+  investments: number;
+  savings: number;
+  living: number;
+  buffer: number;
+}
+
+export interface UpcomingReminder {
+  id: string;
+  title: string;
+  type: 'EMI' | 'SIP' | 'RD' | 'FD' | 'REMINDER' | 'RECURRING';
+  amount?: number;
+  dueDate: string;
+  daysLeft: number;
+}
+
+export interface CashFlowCurrent {
+  income: number;
+  expenses: number;
+  emi: number;
+  investments: number;
+  savings: number;
+  freeCash: number;
+  savingRate: number;
+  emiRatio: number;
+}
+
+export interface GoalItem {
+  id: string;
+  title: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetDate: string;
+  monthlyContribution: number;
+  category?: string | null;
+  createdAt?: string;
+  progressPercent?: number;
+  remainingAmount?: number;
+  estimatedCompletionMonth?: string;
+  requiredMonthlyContribution?: number;
+  isAheadOfSchedule?: boolean;
+}
+
+export interface AssetItem {
+  id: string;
+  name: string;
+  category: string;
+  amount: number;
+  isAuto?: boolean;
+  createdAt?: string;
+}
+
+export interface LiabilityItem {
+  id: string;
+  name: string;
+  category: string;
+  amount: number;
+  isAuto?: boolean;
+  createdAt?: string;
+}
+
+export interface NetWorthSummary {
+  totalAssets: number;
+  totalLiabilities: number;
+  netWorth: number;
+  assetsByCategory: Record<string, number>;
+  liabilitiesByCategory: Record<string, number>;
+  assetsList: AssetItem[];
+  liabilitiesList: LiabilityItem[];
+}
+
+export interface CfoFinancialHealth {
+  healthScore: number;
+  freeCash: number;
+  savingRate: number;
+  emiRatio: number;
+  investmentRatio: number;
+  emergencyFundMonths: number;
+  risk: 'LOW' | 'MEDIUM' | 'HIGH';
+  insights: string[];
+}
+
+export interface AffordabilityResult {
+  affordable: boolean;
+  impact: 'LOW' | 'MEDIUM' | 'HIGH';
+  remainingCash: number;
+  message: string;
+}
+
+export interface MonthlyClosingReport {
+  monthName: string;
+  year: number;
+  income: number;
+  spent: number;
+  emi: number;
+  investments: number;
+  savings: number;
+  freeCash: number;
+  savingRate: number;
+  healthScore: number;
+  topCategories: { category: string; amount: number; percent: number }[];
+  biggestPurchase: { title: string; amount: number; date: string; category: string } | null;
+  aiSummary: string;
+}
+
+export interface SmartCfoNotification {
+  id: string;
+  type: 'EMI_DUE' | 'SIP_DUE' | 'RD_MATURITY' | 'FD_MATURITY' | 'BUDGET_WARNING' | 'EMERGENCY_LOW';
+  title: string;
+  message: string;
+  severity: 'INFO' | 'WARNING' | 'CRITICAL';
+  dueDate?: string;
+  createdAt: string;
+}
+

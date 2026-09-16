@@ -9,6 +9,7 @@ import {
   Menu,
   Bell,
   User,
+  Search,
 } from 'lucide-react';
 import {
   Expense,
@@ -46,6 +47,8 @@ import { ConsumeQuantityModal } from './components/ConsumeQuantityModal.js';
 import { BudgetOnboardingModal } from './components/BudgetOnboardingModal.js';
 import { QuickAddFAB } from './components/QuickAddFAB.js';
 import { ProfileSheet } from './components/ProfileSheet.js';
+import { GlobalSearchModal } from './components/GlobalSearchModal.js';
+import { FloatingAiCopilot } from './components/FloatingAiCopilot.js';
 
 // Pages
 import { DashboardPage } from './pages/DashboardPage.js';
@@ -65,6 +68,18 @@ import { Routes, Route } from 'react-router-dom';
 import { PrivacyPolicy } from "./pages/PrivacyPolicy.js";
 import { Terms } from "./pages/Terms.js";
 import { FamilyWorkspacePage } from './pages/FamilyWorkspacePage.js';
+import { FinancialNotebookPage } from './pages/FinancialNotebookPage.js';
+import { MonthlyPlannerPage } from './pages/MonthlyPlannerPage.js';
+import { WealthAllocationPage } from './pages/WealthAllocationPage.js';
+import { EmisPage } from './pages/EmisPage.js';
+import { InvestmentsPage } from './pages/InvestmentsPage.js';
+import { SavingsPage } from './pages/SavingsPage.js';
+import { FinanceHomePage } from './pages/FinanceHomePage.js';
+import { NotificationCenterPage } from './pages/NotificationCenterPage.js';
+import { FinanceHealthPage } from './pages/FinanceHealthPage.js';
+import { NetWorthPage } from './pages/NetWorthPage.js';
+import { GoalForecastPage } from './pages/GoalForecastPage.js';
+import { AiCfoPage } from './pages/AiCfoPage.js';
 
 const DATE_RANGE_STORAGE_KEY = 'spendtrack_date_range';
 const ACTIVE_TAB_STORAGE_KEY = 'spendtrack_active_tab';
@@ -101,6 +116,8 @@ export function App() {
     'dashboard' | 'budget' | 'expenses' | 'monthly-items' | 'items' | 'analytics' | 'recurring' | 'ai' | 'family' | 'settings' | 'categories' | 'receipt-scanner'
   >(getInitialActiveTab);
   const [isMoreDrawerOpen, setIsMoreDrawerOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [goals, setGoals] = useState<any[]>([]);
 
   const handleSelectTab = (tab: string) => {
     setActiveTab(tab as any);
@@ -144,6 +161,31 @@ export function App() {
   const [consumptionLogs, setConsumptionLogs] = useState<ConsumptionLog[]>([]);
   const [categories, setCategories] = useState<CategoryItem[]>(DEFAULT_CATEGORIES);
   const [persistedNotifications, setPersistedNotifications] = useState<AppNotification[]>([]);
+  const [incomes, setIncomes] = useState<any[]>([]);
+  const [emis, setEmis] = useState<any[]>([]);
+  const [investments, setInvestments] = useState<any[]>([]);
+  const [savings, setSavings] = useState<any[]>([]);
+  const [notes, setNotes] = useState<any[]>([]);
+  const [reminders, setReminders] = useState<any[]>([]);
+  const [plannerSummary, setPlannerSummary] = useState<any>({
+    income: 0,
+    emi: 0,
+    investments: 0,
+    savings: 0,
+    living: 55000,
+    buffer: 0,
+  });
+  const [cashFlow, setCashFlow] = useState<any>({
+    income: 0,
+    expenses: 0,
+    emi: 0,
+    investments: 0,
+    savings: 0,
+    freeCash: 0,
+    savingRate: 0,
+    emiRatio: 0,
+  });
+  const [upcomingTimeline, setUpcomingTimeline] = useState<any[]>([]);
 
   // User & Budget Settings Store
   const [userSettings, setUserSettings] = useState<UserSettings>({
@@ -180,6 +222,18 @@ export function App() {
 
   // Ref to prevent simultaneous workspace requests on startup
   const isWorkspaceLoadingRef = React.useRef(false);
+
+  // Global Ctrl+K / Cmd+K search shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Listen to network status
   useEffect(() => {
@@ -317,7 +371,24 @@ export function App() {
       const status = await SpendTrackApi.checkWorkspaceStatus();
       setWorkspaceStatus(status);
 
-      const [loadedExpenses, loadedRecurring, loadedCategories, loadedMonthly, loadedLogs, loadedSettings, loadedNotifs] = await Promise.all([
+      const [
+        loadedExpenses,
+        loadedRecurring,
+        loadedCategories,
+        loadedMonthly,
+        loadedLogs,
+        loadedSettings,
+        loadedNotifs,
+        loadedIncomes,
+        loadedEmis,
+        loadedInvestments,
+        loadedSavings,
+        loadedNotes,
+        loadedReminders,
+        loadedPlanner,
+        loadedCashFlow,
+        loadedUpcoming,
+      ] = await Promise.all([
         SpendTrackApi.getExpenses(),
         SpendTrackApi.getRecurringExpenses(),
         SpendTrackApi.getCategories(),
@@ -325,6 +396,15 @@ export function App() {
         SpendTrackApi.getConsumptionLogs(),
         SpendTrackApi.getSettings().catch(() => ({} as Record<string, string>)),
         SpendTrackApi.getNotifications().catch(() => []),
+        SpendTrackApi.getIncomes().catch(() => []),
+        SpendTrackApi.getEmis().catch(() => []),
+        SpendTrackApi.getInvestments().catch(() => []),
+        SpendTrackApi.getSavings().catch(() => []),
+        SpendTrackApi.getNotes().catch(() => []),
+        SpendTrackApi.getReminders().catch(() => []),
+        SpendTrackApi.getPlannerSummary().catch(() => ({ income: 0, emi: 0, investments: 0, savings: 0, living: 55000, buffer: 0 })),
+        SpendTrackApi.getCashFlowCurrent().catch(() => ({ income: 0, expenses: 0, emi: 0, investments: 0, savings: 0, freeCash: 0, savingRate: 0, emiRatio: 0 })),
+        SpendTrackApi.getUpcomingReminders().catch(() => []),
       ]);
 
       setExpenses(loadedExpenses || []);
@@ -335,6 +415,15 @@ export function App() {
       setMonthlyItems(loadedMonthly || []);
       setConsumptionLogs(loadedLogs || []);
       setPersistedNotifications(loadedNotifs || []);
+      setIncomes(loadedIncomes || []);
+      setEmis(loadedEmis || []);
+      setInvestments(loadedInvestments || []);
+      setSavings(loadedSavings || []);
+      setNotes(loadedNotes || []);
+      setReminders(loadedReminders || []);
+      setPlannerSummary(loadedPlanner || { income: 0, emi: 0, investments: 0, savings: 0, living: 55000, buffer: 0 });
+      setCashFlow(loadedCashFlow || { income: 0, expenses: 0, emi: 0, investments: 0, savings: 0, freeCash: 0, savingRate: 0, emiRatio: 0 });
+      setUpcomingTimeline(loadedUpcoming || []);
 
       const parsedSettings: UserSettings = {
         currencySymbol: loadedSettings.currencySymbol || '₹',
@@ -722,6 +811,232 @@ export function App() {
     }
   };
 
+  const handleProcessDueRecurring = async () => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      const result = await SpendTrackApi.processDueRecurringExpenses();
+      if (result && (result as any).processedCount > 0) {
+        const [freshExpenses, freshRecurring] = await Promise.all([
+          SpendTrackApi.getExpenses(),
+          SpendTrackApi.getRecurringExpenses(),
+        ]);
+        setExpenses(freshExpenses || []);
+        setRecurringExpenses(freshRecurring || []);
+      }
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  // Notebook & Planner Handlers
+  const handleAddIncome = async (data: { title: string; amount: number }) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      const item = await SpendTrackApi.createIncome(data);
+      setIncomes((prev) => [...prev, item]);
+      const summary = await SpendTrackApi.getPlannerSummary();
+      setPlannerSummary(summary);
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  const handleDeleteIncome = async (id: string) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      await SpendTrackApi.deleteIncome(id);
+      setIncomes((prev) => prev.filter((item) => item.id !== id));
+      const summary = await SpendTrackApi.getPlannerSummary();
+      setPlannerSummary(summary);
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  const handleAddEmi = async (data: any) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      const item = await SpendTrackApi.createEmi(data);
+      setEmis((prev) => [...prev, item]);
+      const summary = await SpendTrackApi.getPlannerSummary();
+      setPlannerSummary(summary);
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  const handleUpdateEmi = async (id: string, data: any) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      const updated = await SpendTrackApi.updateEmi(id, data);
+      setEmis((prev) => prev.map((e) => (e.id === id ? updated : e)));
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  const handleDeleteEmi = async (id: string) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      await SpendTrackApi.deleteEmi(id);
+      setEmis((prev) => prev.filter((e) => e.id !== id));
+      const summary = await SpendTrackApi.getPlannerSummary();
+      setPlannerSummary(summary);
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  const handleAddInvestment = async (data: any) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      const item = await SpendTrackApi.createInvestment(data);
+      setInvestments((prev) => [...prev, item]);
+      const summary = await SpendTrackApi.getPlannerSummary();
+      setPlannerSummary(summary);
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  const handleUpdateInvestment = async (id: string, data: any) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      const updated = await SpendTrackApi.updateInvestment(id, data);
+      setInvestments((prev) => prev.map((i) => (i.id === id ? updated : i)));
+      const summary = await SpendTrackApi.getPlannerSummary();
+      setPlannerSummary(summary);
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  const handleDeleteInvestment = async (id: string) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      await SpendTrackApi.deleteInvestment(id);
+      setInvestments((prev) => prev.filter((i) => i.id !== id));
+      const summary = await SpendTrackApi.getPlannerSummary();
+      setPlannerSummary(summary);
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  const handleAddSaving = async (data: any) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      const item = await SpendTrackApi.createSaving(data);
+      setSavings((prev) => [...prev, item]);
+      const summary = await SpendTrackApi.getPlannerSummary();
+      setPlannerSummary(summary);
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  const handleUpdateSaving = async (id: string, data: any) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      const updated = await SpendTrackApi.updateSaving(id, data);
+      setSavings((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      const summary = await SpendTrackApi.getPlannerSummary();
+      setPlannerSummary(summary);
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  const handleDeleteSaving = async (id: string) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      await SpendTrackApi.deleteSaving(id);
+      setSavings((prev) => prev.filter((s) => s.id !== id));
+      const summary = await SpendTrackApi.getPlannerSummary();
+      setPlannerSummary(summary);
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  const handleSaveNote = async (content: string, title?: string, tags?: string, pinned?: boolean) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      const saved = await SpendTrackApi.saveNote(content, title, tags, pinned);
+      setNotes([saved]);
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  const handleAddReminder = async (data: { title: string; description?: string; dueDate: string; priority?: string }) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      const item = await SpendTrackApi.createReminder(data);
+      setReminders((prev) => [...prev, item]);
+      const upcoming = await SpendTrackApi.getUpcomingReminders();
+      setUpcomingTimeline(upcoming);
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  const handleUpdateReminder = async (id: string, data: any) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      const updated = await SpendTrackApi.updateReminder(id, data);
+      setReminders((prev) => prev.map((r) => (r.id === id ? updated : r)));
+      const upcoming = await SpendTrackApi.getUpcomingReminders();
+      setUpcomingTimeline(upcoming);
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
+  const handleDeleteReminder = async (id: string) => {
+    setSyncStatus({ state: 'saving' });
+    try {
+      await SpendTrackApi.deleteReminder(id);
+      setReminders((prev) => prev.filter((r) => r.id !== id));
+      const upcoming = await SpendTrackApi.getUpcomingReminders();
+      setUpcomingTimeline(upcoming);
+      setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
+    } catch (err: any) {
+      setSyncStatus({ state: 'error', errorMessage: err.message });
+      throw err;
+    }
+  };
+
   const handleRecordRecurringAsExpense = (recurring: RecurringExpense) => {
     setEditingExpense(null);
     setInitialMonthlyItem({
@@ -1010,9 +1325,19 @@ export function App() {
               />
             </div>
 
+            {/* Search Button */}
+            <button
+              onClick={() => setIsSearchOpen(true)}
+              className="w-11 h-11 min-w-[44px] min-h-[44px] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-[14px] hover:bg-slate-100 dark:hover:bg-slate-800 relative cursor-pointer flex items-center justify-center border border-slate-200/80 dark:border-slate-800 transition-colors"
+              aria-label="Global Search"
+              title="Global Search"
+            >
+              <Search className="w-4 h-4 text-emerald-500" />
+            </button>
+
             {/* Notification Bell Button */}
             <button
-              onClick={() => setIsNotificationDrawerOpen(true)}
+              onClick={() => setActiveTab('notifications')}
               className="w-11 h-11 min-w-[44px] min-h-[44px] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-[14px] hover:bg-slate-100 dark:hover:bg-slate-800 relative cursor-pointer flex items-center justify-center border border-slate-200/80 dark:border-slate-800 transition-colors"
               aria-label="Notifications"
             >
@@ -1058,34 +1383,30 @@ export function App() {
       {/* Main Content Area */}
       <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-24 md:pb-12">
         {activeTab === 'dashboard' && (
-          <DashboardPage
+          <FinanceHomePage
+            user={user}
+            cashFlow={cashFlow}
+            upcomingTimeline={upcomingTimeline}
             expenses={expenses}
             dateRange={dateRange}
-            monthlyItems={monthlyItems}
-            recurringExpenses={recurringExpenses}
-            consumptionLogs={consumptionLogs}
             userSettings={userSettings}
             onOpenAddExpense={() => {
               setEditingExpense(null);
               setInitialMonthlyItem(null);
               setIsAddExpenseOpen(true);
             }}
+            onNavigateToTab={(tab) => setActiveTab(tab as any)}
             onOpenScanReceipt={() => setIsScanReceiptOpen(true)}
-            onViewExpenseHistory={() => setActiveTab('expenses')}
-            onViewMonthlyItems={() => setActiveTab('monthly-items')}
-            onViewRecurringBills={() => setActiveTab('recurring')}
-            onSelectItemAnalytics={(itemName) => {
-              setSelectedAnalyticsItem(itemName);
-              setActiveTab('items');
-            }}
-            onOpenAIWithQuestion={handleOpenAIWithQuestion}
-            onQuickAddFromItem={handleQuickAddPurchaseFromTemplate}
-            onOpenConsumeModal={(item) => {
-              setSelectedConsumeItem(item);
-              setIsConsumeModalOpen(true);
-            }}
-            onOpenSettings={() => setActiveTab('settings')}
-            onMarkAsPaid={handleMarkRecurringAsPaid}
+          />
+        )}
+
+        {activeTab === 'notifications' && (
+          <NotificationCenterPage
+            reminders={reminders}
+            upcomingTimeline={upcomingTimeline}
+            onAddReminder={handleAddReminder}
+            onUpdateReminder={handleUpdateReminder}
+            onDeleteReminder={handleDeleteReminder}
           />
         )}
 
@@ -1171,6 +1492,108 @@ export function App() {
           <AnalyticsPage expenses={expenses} currentDateRange={dateRange} />
         )}
 
+        {activeTab === 'notebook' && (
+          <FinancialNotebookPage
+            incomes={incomes}
+            emis={emis}
+            investments={investments}
+            savings={savings}
+            notes={notes}
+            onAddIncome={handleAddIncome}
+            onDeleteIncome={handleDeleteIncome}
+            onAddEmi={handleAddEmi}
+            onUpdateEmi={handleUpdateEmi}
+            onDeleteEmi={handleDeleteEmi}
+            onAddInvestment={handleAddInvestment}
+            onUpdateInvestment={handleUpdateInvestment}
+            onDeleteInvestment={handleDeleteInvestment}
+            onAddSaving={handleAddSaving}
+            onUpdateSaving={handleUpdateSaving}
+            onDeleteSaving={handleDeleteSaving}
+            onSaveNote={handleSaveNote}
+          />
+        )}
+
+        {activeTab === 'planner' && (
+          <MonthlyPlannerPage
+            emis={emis}
+            investments={investments}
+            savings={savings}
+            recurringExpenses={recurringExpenses}
+            expenses={expenses}
+          />
+        )}
+
+        {activeTab === 'wealth' && (
+          <WealthAllocationPage plannerSummary={plannerSummary} />
+        )}
+
+        {activeTab === 'emis' && (
+          <EmisPage
+            incomes={incomes}
+            emis={emis}
+            investments={investments}
+            savings={savings}
+            notes={notes}
+            onAddIncome={handleAddIncome}
+            onDeleteIncome={handleDeleteIncome}
+            onAddEmi={handleAddEmi}
+            onUpdateEmi={handleUpdateEmi}
+            onDeleteEmi={handleDeleteEmi}
+            onAddInvestment={handleAddInvestment}
+            onUpdateInvestment={handleUpdateInvestment}
+            onDeleteInvestment={handleDeleteInvestment}
+            onAddSaving={handleAddSaving}
+            onUpdateSaving={handleUpdateSaving}
+            onDeleteSaving={handleDeleteSaving}
+            onSaveNote={handleSaveNote}
+          />
+        )}
+
+        {activeTab === 'investments' && (
+          <InvestmentsPage
+            incomes={incomes}
+            emis={emis}
+            investments={investments}
+            savings={savings}
+            notes={notes}
+            onAddIncome={handleAddIncome}
+            onDeleteIncome={handleDeleteIncome}
+            onAddEmi={handleAddEmi}
+            onUpdateEmi={handleUpdateEmi}
+            onDeleteEmi={handleDeleteEmi}
+            onAddInvestment={handleAddInvestment}
+            onUpdateInvestment={handleUpdateInvestment}
+            onDeleteInvestment={handleDeleteInvestment}
+            onAddSaving={handleAddSaving}
+            onUpdateSaving={handleUpdateSaving}
+            onDeleteSaving={handleDeleteSaving}
+            onSaveNote={handleSaveNote}
+          />
+        )}
+
+        {activeTab === 'savings' && (
+          <SavingsPage
+            incomes={incomes}
+            emis={emis}
+            investments={investments}
+            savings={savings}
+            notes={notes}
+            onAddIncome={handleAddIncome}
+            onDeleteIncome={handleDeleteIncome}
+            onAddEmi={handleAddEmi}
+            onUpdateEmi={handleUpdateEmi}
+            onDeleteEmi={handleDeleteEmi}
+            onAddInvestment={handleAddInvestment}
+            onUpdateInvestment={handleUpdateInvestment}
+            onDeleteInvestment={handleDeleteInvestment}
+            onAddSaving={handleAddSaving}
+            onUpdateSaving={handleUpdateSaving}
+            onDeleteSaving={handleDeleteSaving}
+            onSaveNote={handleSaveNote}
+          />
+        )}
+
         {activeTab === 'recurring' && (
           <RecurringPage
             recurringExpenses={recurringExpenses}
@@ -1178,6 +1601,8 @@ export function App() {
             onAddRecurring={handleAddRecurring}
             onUpdateRecurring={handleUpdateRecurring}
             onDeleteRecurring={handleDeleteRecurring}
+            onProcessDue={handleProcessDueRecurring}
+            onGenerateDueBills={handleProcessDueRecurring}
             onRecordAsExpense={handleMarkRecurringAsPaid}
             onMarkAsPaid={handleMarkRecurringAsPaid}
             onNavigateToExpenses={() => setActiveTab('expenses')}
@@ -1203,6 +1628,22 @@ export function App() {
             onUpdateCategory={handleUpdateCategory}
             onDeleteCategory={handleDeleteCategory}
           />
+        )}
+
+        {activeTab === 'health' && (
+          <FinanceHealthPage onNavigateToTab={(tab) => setActiveTab(tab as any)} />
+        )}
+
+        {activeTab === 'networth' && (
+          <NetWorthPage />
+        )}
+
+        {activeTab === 'goals' && (
+          <GoalForecastPage />
+        )}
+
+        {activeTab === 'aicfo' && (
+          <AiCfoPage />
         )}
 
         {activeTab === 'receipt-scanner' && (
@@ -1410,7 +1851,23 @@ export function App() {
 
       {/* PWA Install Banner */}
       <PWAInstallPrompt />
-            </div>
+
+      {/* Floating AI CFO Copilot */}
+      <FloatingAiCopilot />
+
+      {/* Global Search Overlay Modal */}
+      <GlobalSearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        expenses={expenses}
+        notes={notes}
+        emis={emis}
+        investments={investments}
+        goals={goals}
+        reminders={reminders}
+        onSelectTab={(tab) => setActiveTab(tab as any)}
+      />
+    </div>
           )
         }
       />
