@@ -60,6 +60,7 @@ import { AIAssistantPage } from './pages/AIAssistantPage.js';
 import { WelcomePage } from './pages/WelcomePage.js';
 import { BudgetAIPage } from './pages/BudgetAIPage.js';
 import { BudgetDashboardPage } from './pages/BudgetDashboardPage.js';
+import { ReceiptScannerPage } from './pages/ReceiptScannerPage.js';
 import { Routes, Route } from 'react-router-dom';
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Terms from "./pages/Terms";
@@ -97,7 +98,7 @@ const getInitialActiveTab = (): any => {
 export function App() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'budget' | 'expenses' | 'monthly-items' | 'items' | 'analytics' | 'recurring' | 'ai' | 'family' | 'settings' | 'categories'
+    'dashboard' | 'budget' | 'expenses' | 'monthly-items' | 'items' | 'analytics' | 'recurring' | 'ai' | 'family' | 'settings' | 'categories' | 'receipt-scanner'
   >(getInitialActiveTab);
   const [isMoreDrawerOpen, setIsMoreDrawerOpen] = useState(false);
 
@@ -1456,6 +1457,14 @@ export function App() {
             onCreateCategory={handleCreateCategory}
             onUpdateCategory={handleUpdateCategory}
             onDeleteCategory={handleDeleteCategory}
+          />
+        )}
+
+        {activeTab === 'receipt-scanner' && (
+          <ReceiptScannerPage
+            categories={categories}
+            onSaveExpense={handleSaveExpense}
+            onNavigateToExpenses={() => setActiveTab('expenses')}
           />
         )}
 

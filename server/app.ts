@@ -8,6 +8,7 @@ import { googleSheetsService } from "./google/sheetsService.js";
 import { familyWorkspaceService } from "./services/familyWorkspaceService.js";
 import { geminiAssistantService } from "./services/geminiService.js";
 import { receiptVisionService } from "./services/receiptVisionService.js";
+import { extractReceipt } from "./services/receipt.service.js";
 import { googleCalendarService } from "./services/googleCalendarService.js";
 import {
   ApiErrorCodes,
@@ -383,7 +384,7 @@ export function createExpressApp() {
       if (!base64Data) {
         return sendApiError(res, req, 400, ApiErrorCodes.BAD_REQUEST, "Missing base64Data");
       }
-      const data = await receiptVisionService.analyzeReceiptImage(base64Data, type);
+      const data = await extractReceipt({ base64Data, mimeType: type });
       res.json(data);
     } catch (err: unknown) {
       console.error("Server /api/receipt/scan caught error:", err);

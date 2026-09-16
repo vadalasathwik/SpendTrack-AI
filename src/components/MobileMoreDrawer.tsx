@@ -8,6 +8,7 @@ import {
   Compass,
   FolderTree,
   PieChart,
+  Receipt,
 } from 'lucide-react';
 import { BRAND_NAME } from '../constants/brand.js';
 
@@ -27,6 +28,13 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
   if (!isOpen) return null;
 
   const menuItems = [
+    {
+      id: 'receipt-scanner',
+      title: '📷 AI Receipt Scanner',
+      subtitle: 'Convert physical receipts into expenses via Gemini Vision AI',
+      icon: Receipt,
+      color: 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60',
+    },
     {
       id: 'budget',
       title: '📊 Monthly Budget Dashboard',
