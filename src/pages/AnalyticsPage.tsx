@@ -195,7 +195,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
 
       {/* KPI Cards Grid (4 Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Expenses */}
+        {/* Total Expenses & Burn Rate */}
         <div className="bg-white dark:bg-slate-900 p-5 rounded-[20px] border border-slate-200/80 dark:border-slate-800 shadow-xs flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
@@ -204,8 +204,8 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
             <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
               {formatCurrency(stats.totalExpenses)}
             </div>
-            <p className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
-              All time record count
+            <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+              Monthly Burn Rate Tracked
             </p>
           </div>
           <div className="w-12 h-12 rounded-[14px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-200/60 dark:border-emerald-800/60 shrink-0">

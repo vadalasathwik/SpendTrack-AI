@@ -151,7 +151,23 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({
             )}
           </button>
 
-          <p className="text-[11px] text-slate-400 text-center font-medium leading-relaxed">
+          {/* Security Badges */}
+          <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 bg-slate-800/80 border border-slate-700/80 px-2.5 py-1 rounded-full">
+              <ShieldCheck className="w-3 h-3 text-emerald-400" />
+              256-Bit AES Encryption
+            </span>
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 bg-slate-800/80 border border-slate-700/80 px-2.5 py-1 rounded-full">
+              <ShieldCheck className="w-3 h-3 text-blue-400" />
+              OAuth 2.0 Secure Auth
+            </span>
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 bg-slate-800/80 border border-slate-700/80 px-2.5 py-1 rounded-full">
+              <ShieldCheck className="w-3 h-3 text-purple-400" />
+              Zero Password Storage
+            </span>
+          </div>
+
+          <p className="text-[11px] text-slate-400 text-center font-medium leading-relaxed pt-1">
             By signing in, you agree to {BRAND_NAME}&apos;s{' '}
             <a href="/privacy" className="text-emerald-400 hover:underline">
               Privacy Policy

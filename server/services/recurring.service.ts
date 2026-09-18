@@ -160,6 +160,28 @@ export async function deleteRecurringExpense(userId: string, id: string) {
 }
 
 /**
+ * Skip the current execution run of a recurring item once
+ */
+export async function skipOnceRecurringExpense(userId: string, id: string) {
+  const existing = await prisma.recurringExpense.findFirst({
+    where: { id, userId },
+  });
+
+  if (!existing) {
+    throw new Error("Recurring expense not found");
+  }
+
+  const nextRunDate = calculateNextRunDate(existing.nextRun, existing.frequency);
+  return prisma.recurringExpense.update({
+    where: { id },
+    data: { nextRun: nextRunDate },
+    include: {
+      category: true,
+    },
+  });
+}
+
+/**
  * Process due recurring expenses inside a transaction
  */
 export async function processDueRecurringExpenses(userId?: string) {

@@ -1,21 +1,20 @@
-import {
-  signInWithPopup,
-  GoogleAuthProvider,
-  onAuthStateChanged,
-  User,
-  signOut,
-} from "firebase/auth";
-import { auth, isFirebaseConfigured } from "./firebase";
-
-const JWT_STORAGE_KEY = "spendtrack_jwt";
-const USER_PROFILE_KEY = "spendtrack_user_profile";
-const WORKSPACE_METADATA_KEY = "spendtrack_workspace_metadata";
-
 export interface UserProfile {
-  uid: string;
+  id: string;
   email: string;
   name: string;
-  photoURL?: string;
+  avatar?: string | null;
+  provider?: string;
+  createdAt?: string;
+}
+
+export interface UserSession {
+  id: string;
+  userId: string;
+  device: string;
+  ipAddress: string;
+  expiresAt: string;
+  createdAt: string;
+  isCurrent?: boolean;
 }
 
 export interface WorkspaceMetadata {
@@ -28,214 +27,239 @@ export interface SignInResult {
   token: string;
   user: UserProfile;
   workspace?: WorkspaceMetadata;
-  isNewUser?: boolean;
 }
 
-/* ---------------- Storage ---------------- */
+const USER_PROFILE_KEY = "trackpay_user_profile";
+const WORKSPACE_METADATA_KEY = "trackpay_workspace_metadata";
 
-export const getStoredJWT = () =>
-  localStorage.getItem(JWT_STORAGE_KEY);
+// In-memory access token storage (short-lived JWT)
+let inMemoryAccessToken: string | null = null;
+let refreshPromise: Promise<string | null> | null = null;
+
+export const getStoredJWT = (): string | null => {
+  return inMemoryAccessToken;
+};
 
 export const setStoredJWT = (token: string | null) => {
-  if (token) localStorage.setItem(JWT_STORAGE_KEY, token);
-  else localStorage.removeItem(JWT_STORAGE_KEY);
+  inMemoryAccessToken = token;
 };
 
 export const getStoredUserProfile = (): UserProfile | null => {
-  const raw = localStorage.getItem(USER_PROFILE_KEY);
-  return raw ? JSON.parse(raw) : null;
+  try {
+    const raw = localStorage.getItem(USER_PROFILE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 };
 
 export const setStoredUserProfile = (user: UserProfile | null) => {
-  if (user)
+  if (user) {
     localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(user));
-  else localStorage.removeItem(USER_PROFILE_KEY);
+  } else {
+    localStorage.removeItem(USER_PROFILE_KEY);
+  }
 };
 
 export const getStoredWorkspace = (): WorkspaceMetadata | null => {
-  const raw = localStorage.getItem(WORKSPACE_METADATA_KEY);
-  return raw ? JSON.parse(raw) : null;
+  try {
+    const raw = localStorage.getItem(WORKSPACE_METADATA_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 };
 
-export const setStoredWorkspace = (
-  ws: WorkspaceMetadata | null
-) => {
-  if (ws)
-    localStorage.setItem(
-      WORKSPACE_METADATA_KEY,
-      JSON.stringify(ws)
-    );
-  else localStorage.removeItem(WORKSPACE_METADATA_KEY);
+export const setStoredWorkspace = (ws: WorkspaceMetadata | null) => {
+  if (ws) {
+    localStorage.setItem(WORKSPACE_METADATA_KEY, JSON.stringify(ws));
+  } else {
+    localStorage.removeItem(WORKSPACE_METADATA_KEY);
+  }
 };
 
 export const clearAuthSession = () => {
-  localStorage.removeItem(JWT_STORAGE_KEY);
+  inMemoryAccessToken = null;
   localStorage.removeItem(USER_PROFILE_KEY);
   localStorage.removeItem(WORKSPACE_METADATA_KEY);
 };
 
-/* ---------------- Auth Listener ---------------- */
+/* ---------------- Auth Listener Subscription ---------------- */
 
-const authListeners = new Set<(user: User | null) => void>();
+const authListeners = new Set<(user: UserProfile | null) => void>();
 
-export const notifyAuthListeners = (user: User | null) => {
+export const notifyAuthListeners = (user: UserProfile | null) => {
   authListeners.forEach((cb) => {
     try {
       cb(user);
     } catch (err) {
-      console.warn("Auth listener notification error:", err);
+      console.warn("Auth listener notice:", err);
     }
   });
 };
 
 export const onAuthStateChange = (
-  callback: (user: User | null) => void
+  callback: (user: UserProfile | null) => void
 ) => {
   authListeners.add(callback);
-
-  if (!isFirebaseConfigured || !auth) {
-    const user = getStoredUserProfile();
-    const storedJWT = getStoredJWT();
-    if (user && storedJWT) {
-      callback({
-        uid: user.uid,
-        email: user.email,
-        displayName: user.name,
-        photoURL: user.photoURL,
-      } as any);
-    } else {
-      callback(null);
-    }
-    return () => {
-      authListeners.delete(callback);
-    };
-  }
-
-  let firebaseUnsubscribe = () => {};
-
-  try {
-    firebaseUnsubscribe = onAuthStateChanged(
-      auth,
-      (firebaseUser) => {
-        const storedJWT = getStoredJWT();
-        if (firebaseUser && storedJWT) {
-          callback(firebaseUser);
-        } else {
-          const user = getStoredUserProfile();
-          if (user && storedJWT) {
-            callback({
-              uid: user.uid,
-              email: user.email,
-              displayName: user.name,
-              photoURL: user.photoURL,
-            } as any);
-          } else {
-            callback(null);
-          }
-        }
-      },
-      (err) => {
-        console.warn("Firebase Auth listener notice:", err);
-        const user = getStoredUserProfile();
-        const storedJWT = getStoredJWT();
-        if (user && storedJWT) {
-          callback({
-            uid: user.uid,
-            email: user.email,
-            displayName: user.name,
-            photoURL: user.photoURL,
-          } as any);
-        } else {
-          callback(null);
-        }
-      }
-    );
-  } catch (err) {
-    console.warn("Firebase Auth listener notice:", err);
-    callback(null);
-  }
-
+  
+  // Return cleanup
   return () => {
     authListeners.delete(callback);
-    firebaseUnsubscribe();
   };
 };
 
-/* ---------------- Google Sign In ---------------- */
+/* ---------------- Silent Token Refresh ---------------- */
 
-export const signInWithGoogle = async (
-  onStepProgress?: (step: number) => void
-): Promise<SignInResult | null> => {
-  if (!isFirebaseConfigured || !auth) {
-    return null;
+export const refreshAccessToken = async (): Promise<string | null> => {
+  if (refreshPromise) {
+    return refreshPromise;
   }
 
-  const provider = new GoogleAuthProvider();
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch("/api/auth/refresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
 
-  provider.setCustomParameters({
-    prompt: "select_account",
-  });
+      if (!res.ok) {
+        clearAuthSession();
+        notifyAuthListeners(null);
+        return null;
+      }
 
-  provider.addScope("openid");
-  provider.addScope("email");
-  provider.addScope("profile");
+      const data = await res.json();
+      if (data.accessToken && data.user) {
+        setStoredJWT(data.accessToken);
+        setStoredUserProfile(data.user);
+        notifyAuthListeners(data.user);
+        return data.accessToken;
+      }
 
+      clearAuthSession();
+      notifyAuthListeners(null);
+      return null;
+    } catch (err) {
+      console.warn("Silent refresh failed:", err);
+      clearAuthSession();
+      notifyAuthListeners(null);
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+};
+
+/* ---------------- Google OAuth Sign-In Trigger ---------------- */
+
+export const signInWithGoogle = async () => {
+  // Redirect to Express Google OAuth Endpoint
+  window.location.href = "/api/auth/google";
+};
+
+/* ---------------- Handle OAuth Callback Hash ---------------- */
+
+export const handleOAuthHashCallback = async (): Promise<UserProfile | null> => {
+  if (typeof window === "undefined") return null;
+
+  const hash = window.location.hash;
+  if (!hash) return null;
+
+  const params = new URLSearchParams(hash.replace(/^#/, ""));
+  const token = params.get("access_token");
+
+  if (token) {
+    setStoredJWT(token);
+    // Remove hash from URL without reloading page
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+
+    // Fetch user details
+    try {
+      const res = await fetch("/api/auth/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) {
+          setStoredUserProfile(data.user);
+          notifyAuthListeners(data.user);
+          return data.user;
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching user profile after OAuth redirect:", err);
+    }
+  }
+
+  return null;
+};
+
+/* ---------------- Sign Out (Single Device) ---------------- */
+
+export const signOutApp = async () => {
   try {
-    onStepProgress?.(0);
-
-    const result = await signInWithPopup(auth, provider);
-    const credential = GoogleAuthProvider.credentialFromResult(result);
-    const idToken = credential?.idToken;
-    const accessToken = credential?.accessToken;
-
-    if (!idToken || !accessToken) {
-      throw new Error("Failed to obtain Google authentication credentials from sign-in.");
-    }
-
-    onStepProgress?.(1);
-
-    const response = await fetch("/api/auth/google", {
+    await fetch("/api/auth/logout", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        idToken,
-        accessToken,
-      }),
+      headers: { "Content-Type": "application/json" },
     });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || "Authentication failed");
-    }
-
-    const data: SignInResult = await response.json();
-
-    setStoredJWT(data.token);
-    setStoredUserProfile(data.user);
-    if (data.workspace) {
-      setStoredWorkspace(data.workspace);
-    }
-
-    onStepProgress?.(5);
-
-    return data;
-  } catch (err: any) {
+  } catch (err) {
+    console.warn("Sign out request error:", err);
+  } finally {
     clearAuthSession();
-    console.error("Google Sign-In error:", err);
-    throw err;
+    notifyAuthListeners(null);
   }
 };
 
-/* ---------------- Sign Out ---------------- */
+/* ---------------- Logout All Devices ---------------- */
 
-export const signOutApp = async () => {
-  clearAuthSession();
-
-  if (isFirebaseConfigured && auth) {
-    await signOut(auth).catch(() => {});
+export const logoutAllDevices = async () => {
+  const token = getStoredJWT();
+  try {
+    await fetch("/api/auth/logout-all", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+  } catch (err) {
+    console.warn("Logout all devices error:", err);
+  } finally {
+    clearAuthSession();
+    notifyAuthListeners(null);
   }
+};
 
-  notifyAuthListeners(null);
+/* ---------------- Active Sessions Management ---------------- */
+
+export const getActiveSessions = async (): Promise<UserSession[]> => {
+  const token = getStoredJWT();
+  if (!token) return [];
+  try {
+    const res = await fetch("/api/auth/sessions", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.sessions || [];
+  } catch {
+    return [];
+  }
+};
+
+export const revokeSession = async (sessionId: string): Promise<boolean> => {
+  const token = getStoredJWT();
+  if (!token) return false;
+  try {
+    const res = await fetch(`/api/auth/sessions/${sessionId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 };

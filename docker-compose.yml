@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: trackpay_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: trackpay_user
+      POSTGRES_PASSWORD: trackpay_password
+      POSTGRES_DB: trackpay_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trackpay_user -d trackpay_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  trackpay_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trackpay_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: "postgresql://trackpay_user:trackpay_password@postgres:5432/trackpay_db?schema=public"
+      JWT_SECRET: "super-secret-trackpay-jwt-key-2026-production"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

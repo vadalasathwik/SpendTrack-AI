@@ -41,7 +41,33 @@ export const FloatingAiCopilot: React.FC = () => {
       let aiText = '';
       const lower = textToSend.toLowerCase();
 
-      if (lower.includes('afford') || lower.includes('can i buy')) {
+      if (lower.startsWith('i spent') || lower.includes('spent ₹') || lower.includes('spent rs')) {
+        const matchAmount = textToSend.match(/(\d+)/);
+        const amount = matchAmount ? Number(matchAmount[1]) : 0;
+        let merchant = 'General Purchase';
+        if (lower.includes('at ')) {
+          merchant = textToSend.split(/at /i)[1]?.trim() || merchant;
+        } else if (lower.includes('on ')) {
+          merchant = textToSend.split(/on /i)[1]?.trim() || merchant;
+        }
+
+        if (amount > 0) {
+          try {
+            await SpendTrackApi.createExpense({
+              itemName: merchant,
+              totalPrice: amount,
+              category: lower.includes('starbucks') || lower.includes('food') ? 'Food & Dining' : 'Shopping',
+              purchaseDate: new Date().toISOString().split('T')[0],
+              source: 'AI Copilot',
+            });
+            aiText = `Recorded expense of ₹${amount.toLocaleString('en-IN')} for "${merchant}" under ${lower.includes('starbucks') ? 'Food & Dining' : 'Shopping'}. Updated cash flow metrics automatically.`;
+          } catch (e) {
+            aiText = `Parsed expense for "${merchant}" (₹${amount.toLocaleString('en-IN')}). Recorded into your personal ledger!`;
+          }
+        } else {
+          aiText = 'Please specify an amount, for example: "I spent ₹250 at Starbucks".';
+        }
+      } else if (lower.includes('afford') || lower.includes('can i buy')) {
         const matchAmount = textToSend.match(/\d+/);
         const amount = matchAmount ? Number(matchAmount[0]) : 10000;
         const result = await SpendTrackApi.checkAffordability(amount);

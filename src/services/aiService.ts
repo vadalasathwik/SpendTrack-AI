@@ -67,4 +67,15 @@ export const SpendTrackAIService = {
     const data = await res.json();
     return data.reply;
   },
+
+  async askGeminiFinancialAssistant(params: any): Promise<string> {
+    return this.sendMessage({
+      message: params.question || params.message || '',
+      history: params.history || [],
+      dateRange: params.dateRange || { preset: 'currentMonth', startDate: '', endDate: '' },
+      expenses: params.expenses || [],
+      recurringExpenses: params.recurringExpenses || [],
+      categories: params.categories || [],
+    });
+  },
 };

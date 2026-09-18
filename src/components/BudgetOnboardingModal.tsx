@@ -20,20 +20,38 @@ export const BudgetOnboardingModal: React.FC<BudgetOnboardingModalProps> = ({
 
   if (!isOpen) return null;
 
+  const budgetNum = parseFloat(monthlyBudget) || 0;
+  const startDayNum = parseInt(budgetStartDay, 10);
+  const isStartDayValid = !isNaN(startDayNum) && startDayNum >= 1 && startDayNum <= 31;
+  const isValid = budgetNum > 0 && isStartDayValid;
+
+  const handleBudgetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value;
+    const cleanDigits = rawVal.replace(/[^\d]/g, '');
+    setMonthlyBudget(cleanDigits);
+  };
+
+  const handleStartDayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value;
+    const cleanDigits = rawVal.replace(/[^\d]/g, '');
+    if (cleanDigits === '') {
+      setBudgetStartDay('');
+      return;
+    }
+    const val = parseInt(cleanDigits, 10);
+    if (val >= 1 && val <= 31) {
+      setBudgetStartDay(val.toString());
+    } else if (val > 31) {
+      setBudgetStartDay('31');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    const budgetNum = parseFloat(monthlyBudget);
-    const startDayNum = parseInt(budgetStartDay, 10);
-
-    if (isNaN(budgetNum) || budgetNum <= 0) {
-      setError('Please enter a valid positive monthly budget amount.');
-      return;
-    }
-
-    if (isNaN(startDayNum) || startDayNum < 1 || startDayNum > 31) {
-      setError('Budget start day must be between 1 and 31.');
+    if (!isValid) {
+      setError('Please provide a valid budget amount (> 0) and start day (1 - 31).');
       return;
     }
 
@@ -93,18 +111,18 @@ export const BudgetOnboardingModal: React.FC<BudgetOnboardingModalProps> = ({
                 {currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '₹'}
               </span>
               <input
-                type="number"
-                step="any"
+                type="text"
+                inputMode="numeric"
                 required
                 id="onboarding-monthly-budget"
-                placeholder="30000"
+                placeholder="50,000"
                 value={monthlyBudget}
-                onChange={(e) => setMonthlyBudget(e.target.value)}
+                onChange={handleBudgetChange}
                 className="w-full pl-9 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-black text-slate-900"
               />
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
-              Total amount allocated for purchases, bills, and household expenses each month.
+              Total household spending budget for one month.
             </p>
           </div>
 
@@ -116,17 +134,16 @@ export const BudgetOnboardingModal: React.FC<BudgetOnboardingModalProps> = ({
               </label>
               <div className="relative">
                 <input
-                  type="number"
-                  min="1"
-                  max="31"
+                  type="text"
+                  inputMode="numeric"
                   required
                   id="onboarding-budget-start-day"
                   value={budgetStartDay}
-                  onChange={(e) => setBudgetStartDay(e.target.value)}
+                  onChange={handleStartDayChange}
                   className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-bold text-slate-900"
                 />
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Day of month (e.g. 1 for 1st of month)</p>
+              <p className="text-[11px] text-slate-400 mt-1">Day of month (1 - 31)</p>
             </div>
 
             {/* Currency */}
@@ -149,9 +166,13 @@ export const BudgetOnboardingModal: React.FC<BudgetOnboardingModalProps> = ({
           {/* Submit */}
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={!isValid || isSubmitting}
             id="onboarding-submit-btn"
-            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-sm rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+            className={`w-full py-3 text-white font-bold text-sm rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 mt-2 ${
+              !isValid || isSubmitting
+                ? 'bg-slate-400 opacity-40 pointer-events-none'
+                : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800'
+            }`}
           >
             <span>{isSubmitting ? 'Saving Settings...' : 'Save & Initialize Dashboard'}</span>
             <ArrowRight className="w-4 h-4" />

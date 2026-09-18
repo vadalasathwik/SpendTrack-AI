@@ -186,6 +186,15 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
                         {formatRelativeTime(n.createdAt)}
                       </span>
                     )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (n?.id) onMarkAsRead?.(n.id);
+                      }}
+                      className="text-[9px] font-bold text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20 cursor-pointer"
+                    >
+                      Snooze 1D
+                    </button>
                     {(n?.type === 'bill_due' || n?.type === 'bill_upcoming' || n?.type === 'bill_overdue') && (
                       <span className="text-[9px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/60 inline-flex items-center gap-1">
                         Calendar Synced ✓

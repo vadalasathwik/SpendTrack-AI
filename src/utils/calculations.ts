@@ -872,6 +872,84 @@ export function sanitizeErrorMessage(msg?: string | null): string {
   }
   return msg;
 }
+export interface DynamicHealthScoreResult {
+  score: number;
+  rating: 'Poor' | 'Good' | 'Excellent';
+  trend: number;
+}
+
+export function calculateDynamicHealthScore(params: {
+  savingRate: number;
+  totalIncome: number;
+  totalExpenses: number;
+  totalEmis: number;
+  monthlyBudget: number;
+  savingsTotal?: number;
+  portfolioValue?: number;
+  hasInvestments?: boolean;
+}): DynamicHealthScoreResult {
+  const {
+    savingRate = 0,
+    totalIncome = 0,
+    totalExpenses = 0,
+    totalEmis = 0,
+    monthlyBudget = 0,
+    savingsTotal = 0,
+    portfolioValue = 0,
+    hasInvestments = false,
+  } = params;
+
+  if (totalIncome <= 0 && totalExpenses <= 0) {
+    return { score: 100, rating: 'Excellent', trend: 0 };
+  }
+
+  // 1. Savings rate weight (20 points max)
+  const savingsScore = Math.min(20, Math.max(0, Math.round((savingRate / 25) * 20)));
+
+  // 2. EMI Ratio weight (20 points max)
+  const emiRatio = totalIncome > 0 ? totalEmis / totalIncome : 0;
+  let emiScore = 20;
+  if (emiRatio > 0.4) {
+    emiScore = Math.max(0, Math.round((1 - emiRatio) * 20));
+  } else if (emiRatio > 0.3) {
+    emiScore = 15;
+  }
+
+  // 3. Budget discipline weight (20 points max)
+  let budgetScore = 20;
+  if (monthlyBudget > 0) {
+    if (totalExpenses > monthlyBudget) {
+      const overspendRatio = (totalExpenses - monthlyBudget) / monthlyBudget;
+      budgetScore = Math.max(0, Math.round(20 - overspendRatio * 20));
+    }
+  }
+
+  // 4. Emergency Fund weight (15 points max)
+  const monthlyNeed = (totalExpenses || monthlyBudget || 30000);
+  const emergencyCoverageMonths = monthlyNeed > 0 ? savingsTotal / monthlyNeed : 0;
+  const emergencyScore = Math.min(15, Math.max(0, Math.round((emergencyCoverageMonths / 3) * 15)));
+
+  // 5. Net worth / Portfolio Growth weight (15 points max)
+  const wealthScore = portfolioValue > 0 || savingsTotal > 0 ? 15 : 8;
+
+  // 6. Investment consistency weight (10 points max)
+  const investmentScore = hasInvestments || portfolioValue > 0 ? 10 : 5;
+
+  const totalScore = Math.min(100, Math.max(0, savingsScore + emiScore + budgetScore + emergencyScore + wealthScore + investmentScore));
+
+  let rating: 'Poor' | 'Good' | 'Excellent' = 'Excellent';
+  if (totalScore < 60) rating = 'Poor';
+  else if (totalScore < 80) rating = 'Good';
+
+  const trend = totalScore >= 80 ? 3 : totalScore >= 60 ? 1 : -2;
+
+  return {
+    score: totalScore,
+    rating,
+    trend,
+  };
+}
+
 
 
 

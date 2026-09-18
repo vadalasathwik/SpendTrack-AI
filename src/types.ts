@@ -18,7 +18,7 @@ export interface Expense {
   receiptFileName?: string;
   receiptViewLink?: string;
   calendarEventId?: string;
-  source?: 'manual' | 'recurring' | 'receipt' | 'quick';
+  source?: 'manual' | 'recurring' | 'receipt' | 'quick' | 'ai' | 'AI Copilot';
   recurringId?: string;
   createdAt: string; // ISO
   updatedAt: string; // ISO
@@ -141,6 +141,8 @@ export interface UserSettings {
   dateFormat: string;
   monthlyBudget?: number;
   budgetStartDay?: number;
+  homeMode?: 'default' | 'calendar' | 'notebook' | 'quickadd' | 'aicfo';
+  onboardingCompleted?: boolean;
 }
 
 export interface BudgetMetrics {
@@ -451,4 +453,257 @@ export interface SmartCfoNotification {
   dueDate?: string;
   createdAt: string;
 }
+
+// TrackPay v4.7.0 AI Life Finance Ecosystem Interfaces
+
+export interface PropertyAsset {
+  id: string;
+  userId?: string;
+  title: string;
+  propertyType: 'RESIDENTIAL' | 'APARTMENT' | 'LAND' | 'COMMERCIAL';
+  purchaseValue: number;
+  currentMarketValue: number;
+  loanLinked: number;
+  rentalIncome: number;
+  appreciationRate: number;
+  documentsLinked: number;
+  notes?: string;
+  createdAt?: string;
+}
+
+export interface PropertyIntelligenceSummary {
+  properties: PropertyAsset[];
+  totalPropertyWealth: number;
+  totalEquityOwned: number;
+  totalLoansLinked: number;
+  totalMonthlyRental: number;
+  averageAppreciationRate: number;
+  overallRentalYield: number;
+  overallRoi: number;
+}
+
+export interface VehicleAsset {
+  id: string;
+  userId?: string;
+  name: string;
+  vehicleType: 'CAR' | 'BIKE';
+  purchasePrice: number;
+  insurance: number;
+  serviceHistoryCost: number;
+  fuelCost: number;
+  emi: number;
+  resaleValue: number;
+  purchaseYear: number;
+  notes?: string;
+  createdAt?: string;
+}
+
+export interface VehicleManagerSummary {
+  vehicles: VehicleAsset[];
+  totalPurchaseValue: number;
+  totalResaleValue: number;
+  totalDepreciation: number;
+  totalAnnualOwnershipCost: number;
+  bestResaleYear: number;
+}
+
+export interface EducationGoalItem {
+  id: string;
+  title: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetDate: string;
+  monthlyContribution: number;
+  category: string;
+  inflationRate: number;
+  futureCost: number;
+  requiredMonthly: number;
+  completionProbability: number;
+}
+
+export interface HealthcareFinanceSummary {
+  annualHealthcareSpend: number;
+  coverageAdequacy: number;
+  totalCoverageAmount: number;
+  remainingInsuredAmount: number;
+  medicalEmergencyFund: number;
+  recentMedicalExpenses: any[];
+  insurancePolicies: any[];
+}
+
+export interface CreditCardProfile {
+  id: string;
+  name: string;
+  bankName: string;
+  creditLimit: number;
+  currentBalance: number;
+  availableLimit: number;
+  utilizationPercent: number;
+  dueDate?: string;
+}
+
+export interface CreditWorkspaceSummary {
+  creditCards: CreditCardProfile[];
+  totalCreditLimit: number;
+  totalUsedCredit: number;
+  overallUtilization: number;
+  creditHealthScore: number;
+  improvementSuggestions: string[];
+  emiEligibility: 'EXCELLENT' | 'GOOD' | 'MODERATE' | 'CAUTION';
+}
+
+export interface PrepaymentSimulationResult {
+  originalOutstanding: number;
+  partPaymentAmount: number;
+  newBalance: number;
+  monthsSaved: number;
+  interestSaved: number;
+  newTenureMonths: number;
+  effectiveRoi: number;
+  investmentComparisonAdvice: string;
+}
+
+export interface FamilyWealthMemberNode {
+  id: string;
+  name: string;
+  relation: string;
+  role: string;
+  avatar?: string;
+  assignedAssetsCount: number;
+  assignedLiabilitiesCount: number;
+  nomineeStatus: 'COMPLETE' | 'PARTIAL' | 'PENDING';
+}
+
+export interface FamilyWealthTreeData {
+  familyMembers: FamilyWealthMemberNode[];
+  totalHouseholdAssets: number;
+  totalHouseholdLiabilities: number;
+  netFamilyWealth: number;
+  insuranceCoverageTotal: number;
+}
+
+export interface LegacyChecklistItem {
+  id: string;
+  title: string;
+  category: 'WILL' | 'NOMINEE' | 'INSURANCE' | 'PROPERTY' | 'LOAN';
+  status: 'COMPLETED' | 'PENDING' | 'ACTION_NEEDED';
+  critical: boolean;
+}
+
+export interface LegacyChecklistSummary {
+  completenessPercentage: number;
+  checklist: LegacyChecklistItem[];
+}
+
+// TrackPay v4.8.0 AI Financial Operating System Interfaces
+
+export interface SmartOcrExtractedData {
+  documentId?: string;
+  name?: string;
+  documentNumber?: string;
+  issueDate?: string;
+  expiryDate?: string;
+  institution?: string;
+  amount?: number;
+  propertyDetails?: string;
+  loanDetails?: string;
+  ocrConfidence: number;
+  summary: string;
+  tags: string[];
+}
+
+export interface StatementImportRow {
+  id: string;
+  date: string;
+  description: string;
+  merchant: string;
+  category: string;
+  type: 'DEBIT' | 'CREDIT';
+  amount: number;
+  gstAmount?: number;
+  isRecurring: boolean;
+  confidenceScore: number;
+  mappedAccount: string;
+}
+
+export interface StatementImportResult {
+  fileName: string;
+  totalRowsProcessed: number;
+  totalDebitAmount: number;
+  totalCreditAmount: number;
+  averageConfidence: number;
+  transactions: StatementImportRow[];
+}
+
+export interface TaxRegimeComparison {
+  regimeName: 'OLD' | 'NEW';
+  taxableIncome: number;
+  estimatedTax: number;
+  totalDeductionsClaimed: number;
+  breakdown: { label: string; amount: number }[];
+}
+
+export interface TaxPlannerProSummary {
+  selectedFy: string;
+  grossIncome: number;
+  oldRegime: TaxRegimeComparison;
+  newRegime: TaxRegimeComparison;
+  recommendedRegime: 'OLD' | 'NEW';
+  taxSavedWithRecommendation: number;
+  missingDeductions: { section: string; title: string; maxLimit: number; claimed: number; gap: number }[];
+  investmentDeadline: string;
+  taxUtilizationPercent: number;
+}
+
+export interface MarketIndexQuote {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  trend: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+}
+
+export interface MarketIntelligenceData {
+  indices: MarketIndexQuote[];
+  marketSentiment: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  goldTrend: string;
+  equityOutlook: string;
+  etfOpportunity: string;
+}
+
+export interface WatchlistItem {
+  id: string;
+  userId?: string;
+  symbol: string;
+  name: string;
+  assetType: 'STOCK' | 'ETF' | 'GOLD' | 'SILVER';
+  targetBuyPrice: number;
+  currentPrice: number;
+  alertPrice: number;
+  convictionScore: number;
+  notes?: string;
+  createdAt?: string;
+}
+
+export interface FinancialCalendarEvent {
+  id: string;
+  date: string; // YYYY-MM-DD
+  title: string;
+  category: 'SALARY' | 'EMI' | 'SIP' | 'INSURANCE' | 'GST' | 'PROPERTY_TAX' | 'VEHICLE_SERVICE' | 'BIRTHDAY' | 'ANNIVERSARY';
+  amount?: number;
+  status: 'UPCOMING' | 'COMPLETED' | 'OVERDUE';
+}
+
+export interface AutomationTriggerAlert {
+  id: string;
+  title: string;
+  message: string;
+  severity: 'CRITICAL' | 'WARNING' | 'INFO';
+  triggerType: 'EMI_DUE' | 'SIP_DUE' | 'SALARY_CREDIT' | 'INSURANCE_RENEWAL' | 'PROPERTY_TAX' | 'GOLD_TARGET' | 'BUDGET_EXCEEDED' | 'CREDIT_UTILIZATION_HIGH';
+  triggerDate: string;
+  actionRequired?: string;
+}
+
+
 

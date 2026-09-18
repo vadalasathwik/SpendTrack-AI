@@ -38,6 +38,62 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
 
   const menuItems = [
     {
+      id: 'inbox',
+      title: '📥 Financial Inbox',
+      subtitle: 'Today, Tomorrow & This Week categorized commitments',
+      icon: Sparkles,
+      color: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60',
+    },
+    {
+      id: 'portfolio',
+      title: '📈 Investment Portfolio',
+      subtitle: 'Stocks, ETFs, Mutual Funds, CAGR & risk advisor',
+      icon: TrendingUp,
+      color: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60',
+    },
+    {
+      id: 'gold',
+      title: '🪙 Gold & Silver Hub',
+      subtitle: 'MMTC PAMP, 100g goal milestone & DIP strategy',
+      icon: PiggyBank,
+      color: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60',
+    },
+    {
+      id: 'insurance',
+      title: '🛡️ Insurance & Warranty Vault',
+      subtitle: 'Health, life, vehicle insurance & gadget warranties',
+      icon: Vault,
+      color: 'text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60',
+    },
+    {
+      id: 'documents',
+      title: '📄 Financial Document Vault',
+      subtitle: 'Aadhaar, PAN, loan papers, GST invoices & AI OCR',
+      icon: BookOpen,
+      color: 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60',
+    },
+    {
+      id: 'salary',
+      title: '💼 Salary & Payslips',
+      subtitle: 'Basic, HRA, PF deductions & increment coaching',
+      icon: Package,
+      color: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60',
+    },
+    {
+      id: 'tax',
+      title: '🧮 Tax & FY Dashboard',
+      subtitle: 'FY 2025-26 rules, Old vs New Regime & 80C/80D',
+      icon: PieChart,
+      color: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60',
+    },
+    {
+      id: 'ai-executive',
+      title: '🤖 AI Executive Hub',
+      subtitle: '7 AI specialist personas with live context',
+      icon: Sparkles,
+      color: 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60',
+    },
+    {
       id: 'aicfo',
       title: '🤖 AI CFO & Affordability',
       subtitle: 'Simulate purchases, daily spend allowance & monthly reports',

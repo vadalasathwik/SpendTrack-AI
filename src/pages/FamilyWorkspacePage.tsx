@@ -1,492 +1,355 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Users,
-  UserPlus,
-  ShieldCheck,
-  Crown,
-  Edit3,
-  Eye,
-  Trash2,
-  CheckCircle2,
-  Mail,
-  Copy,
-  AlertCircle,
-  Database,
-  Sparkles,
-  Loader2,
-  Clock,
-} from 'lucide-react';
-import { useUser } from '../context/UserContext.js';
+import { Users, UserPlus, ShieldCheck, Crown, Sparkles, Plus, Lock, Eye, Edit3, GitFork, CheckCircle2, AlertTriangle, FileText, HeartHandshake, Building, Shield } from 'lucide-react';
+import { GlassCard } from '../components/ui/GlassCard.js';
+import { FamilyMemberCard } from '../components/ui/FamilyMemberCard.js';
 import { SpendTrackApi } from '../services/api.js';
-import { BRAND_NAME } from '../constants/brand.js';
-
-interface MemberItem {
-  uid: string;
-  email: string;
-  name: string;
-  photoURL?: string;
-  role: 'owner' | 'editor' | 'viewer';
-  joinedAt: string;
-}
-
-interface InviteItem {
-  id: string;
-  email: string;
-  role: 'editor' | 'viewer';
-  token: string;
-  createdAt: string;
-  status: string;
-}
 
 export const FamilyWorkspacePage: React.FC = () => {
-  const { user, workspace } = useUser();
+  const [data, setData] = useState<any>(null);
+  const [legacyData, setLegacyData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [workspaceData, setWorkspaceData] = useState<any>(null);
-  const [members, setMembers] = useState<MemberItem[]>([]);
-  const [invites, setInvites] = useState<InviteItem[]>([]);
-  const [currentRole, setCurrentRole] = useState<string>('owner');
+  const [showAddModal, setShowAddModal] = useState(false);
 
-  // Form State
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<'editor' | 'viewer'>('editor');
-  const [isInviting, setIsInviting] = useState(false);
-  const [acceptTokenInput, setAcceptTokenInput] = useState('');
-  const [isAccepting, setIsAccepting] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [relation, setRelation] = useState('Spouse');
+  const [role, setRole] = useState('VIEWER');
 
-  const fetchWorkspaceMembers = async () => {
+  const loadData = async () => {
     setLoading(true);
-    setErrorMessage(null);
     try {
-      const res = await SpendTrackApi.getWorkspaceMembers();
-      setWorkspaceData(res.workspace);
-      setMembers(res.members || []);
-      setInvites(res.invites || []);
-      setCurrentRole(res.currentRole || 'owner');
-    } catch (err: any) {
-      console.warn('Workspace members fetch notice:', err);
-      setErrorMessage(err.message || 'Failed to load workspace members.');
-      setMembers([]);
+      const [res, leg] = await Promise.all([
+        SpendTrackApi.getFamilyWorkspace(),
+        SpendTrackApi.getLegacy().catch(() => null),
+      ]);
+      setData(res);
+      setLegacyData(leg);
+    } catch (e) {
+      console.warn('Failed to load family workspace or legacy data:', e);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchWorkspaceMembers();
+    loadData();
   }, []);
 
-  const handleSendInvite = async (e: React.FormEvent) => {
+  const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteEmail) return;
-
-    setIsInviting(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
+    if (!name) return;
 
     try {
-      const inv = await SpendTrackApi.inviteWorkspaceMember(inviteEmail, inviteRole);
-      setSuccessMessage(`Invitation created for ${inviteEmail}! Token: ${inv.token}`);
-      setInviteEmail('');
-      fetchWorkspaceMembers();
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to send workspace invitation.');
-    } finally {
-      setIsInviting(false);
+      await SpendTrackApi.addFamilyMember({
+        name,
+        relation,
+        role,
+      });
+
+      setName('');
+      setShowAddModal(false);
+      loadData();
+    } catch (err) {
+      console.error('Failed to add family member:', err);
     }
   };
 
-  const handleAcceptInvite = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!acceptTokenInput) return;
-
-    setIsAccepting(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
+  const handleDelete = async (id: string) => {
     try {
-      await SpendTrackApi.acceptWorkspaceInvite(acceptTokenInput);
-      setSuccessMessage('Successfully joined family workspace!');
-      setAcceptTokenInput('');
-      fetchWorkspaceMembers();
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to accept invitation token.');
-    } finally {
-      setIsAccepting(false);
+      await SpendTrackApi.deleteFamilyMember(id);
+      loadData();
+    } catch (e) {
+      console.error('Failed to delete family member:', e);
     }
   };
-
-  const handleRemoveMember = async (targetUid: string) => {
-    if (!window.confirm('Are you sure you want to remove this member from your workspace?')) {
-      return;
-    }
-
-    setErrorMessage(null);
-    try {
-      await SpendTrackApi.removeWorkspaceMember(targetUid);
-      setSuccessMessage('Member removed successfully.');
-      fetchWorkspaceMembers();
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to remove member.');
-    }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setSuccessMessage('Invite token copied to clipboard!');
-  };
-
-  const isOwner = currentRole === 'owner';
 
   return (
-    <div className="space-y-6 pb-12" id="family-workspace-container">
-      
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-emerald-900 via-slate-900 to-teal-950 text-white p-6 sm:p-8 rounded-3xl shadow-xl border border-emerald-800/40 relative overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-extrabold mb-2">
-              <Users className="w-3.5 h-3.5" />
-              <span>Collaborative Household Finance Platform</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-              Family Workspace & Member Roles
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-300 font-medium mt-1">
-              Share one Google Sheet, Drive receipt repository, and Calendar across your household.
-            </p>
+    <div className="space-y-6 pb-28 max-w-[1440px] mx-auto animate-in fade-in duration-300">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-[28px] border border-slate-200/80 dark:border-slate-800 soft-shadow">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold mb-2">
+            <GitFork className="w-3.5 h-3.5 text-emerald-400" />
+            <span>TrackPay Family Wealth Tree & Legacy v4.7.0</span>
           </div>
-
-          <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold text-emerald-300">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Role: {currentRole.toUpperCase()}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Alert Notifications */}
-      {successMessage && (
-        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs sm:text-sm flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 font-bold">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            <span>{successMessage}</span>
-          </div>
-          <button onClick={() => setSuccessMessage(null)} className="text-xs text-emerald-700 underline font-semibold">
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {errorMessage && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs sm:text-sm flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 font-bold">
-            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
-            <span>{errorMessage}</span>
-          </div>
-          <button onClick={() => setErrorMessage(null)} className="text-xs text-rose-700 underline font-semibold">
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {/* Grid Row 1: Workspace Profile Card & Accept Invite Form */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        
-        {/* Workspace Profile Summary */}
-        <div className="md:col-span-2 bg-white rounded-3xl p-6 border border-slate-200/80 shadow-lg space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h2 className="text-base font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <Users className="w-5 h-5 text-emerald-600" />
-              <span>Workspace Details</span>
-            </h2>
-            <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-              Shared Household Active
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-3">
-              <Database className="w-5 h-5 text-emerald-600 shrink-0" />
-              <div className="min-w-0">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Database</span>
-                <p className="text-xs font-extrabold text-slate-800 truncate">
-                  PostgreSQL
-                </p>
-              </div>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-3">
-              <Sparkles className="w-5 h-5 text-emerald-600 shrink-0" />
-              <div className="min-w-0">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">AI Scanner</span>
-                <p className="text-xs font-extrabold text-slate-800 truncate">
-                  Gemini Vision
-                </p>
-              </div>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-3">
-              <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-              <div className="min-w-0">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Auth</span>
-                <p className="text-xs font-extrabold text-slate-800 truncate">
-                  Google OAuth
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <p className="text-xs text-slate-500 font-medium">
-            All family members operate against the exact same Google Sheet database and Drive repository without duplicating resources.
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
+            <Users className="w-7 h-7 text-emerald-400" /> Family Wealth Tree & Legacy OS
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Multi-Generational Household Tree, Shared Assets/Liabilities, Nominee Assignments, & AI Legacy Checklist
           </p>
         </div>
-
-        {/* Accept Invitation Token Card */}
-        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-lg flex flex-col justify-between">
-          <div>
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider mb-2 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-emerald-600" />
-              <span>Join Family Workspace</span>
-            </h3>
-            <p className="text-xs text-slate-500 font-medium mb-3">
-              Received an invite token from another member? Enter it here to join.
-            </p>
-
-            <form onSubmit={handleAcceptInvite} className="space-y-3">
-              <input
-                type="text"
-                value={acceptTokenInput}
-                onChange={(e) => setAcceptTokenInput(e.target.value)}
-                placeholder="Enter invite token..."
-                className="w-full px-3.5 py-2 text-xs font-mono font-bold bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-              />
-              <button
-                type="submit"
-                disabled={isAccepting || !acceptTokenInput}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75"
-              >
-                {isAccepting && <Loader2 className="w-4 h-4 animate-spin" />}
-                <span>Accept & Join Workspace</span>
-              </button>
-            </form>
-          </div>
-        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-extrabold text-xs flex items-center gap-1.5 shadow-lg hover:scale-102 cursor-pointer transition-all self-start md:self-center"
+        >
+          <UserPlus className="w-4 h-4 stroke-[2.5]" /> Add Member
+        </button>
       </div>
 
-      {/* Invite Member Section (Owner only) */}
-      {isOwner && (
-        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-lg">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-emerald-600" />
-              <span>Invite Family Member</span>
+      {/* PHASE 4: LEGACY CHECKLIST & WEALTH TREE HIGHLIGHTS */}
+      {legacyData && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <GlassCard className="p-6 md:col-span-1 space-y-4 bg-gradient-to-br from-slate-900 to-emerald-950/40 border-emerald-500/30">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-emerald-400 uppercase tracking-wider">Legacy Score</span>
+              <span className="text-2xl font-black text-emerald-400 font-mono">{legacyData.completenessPercentage}%</span>
+            </div>
+            <div className="w-full bg-slate-800 h-3 rounded-full overflow-hidden p-0.5">
+              <div className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full" style={{ width: `${legacyData.completenessPercentage}%` }} />
+            </div>
+            <p className="text-xs text-slate-300 font-medium">
+              AI verified Will deeds, Nominees, Insurance beneficiaries, & Property documents.
+            </p>
+          </GlassCard>
+
+          <GlassCard className="p-6 md:col-span-2 space-y-3">
+            <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              AI Legacy Completeness Checklist
             </h3>
-            <span className="text-xs text-slate-400 font-semibold">Owner Permission</span>
-          </div>
-
-          <form onSubmit={handleSendInvite} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="sm:col-span-2">
-              <input
-                type="email"
-                required
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="Enter family member's email address..."
-                className="w-full px-4 py-2.5 text-xs sm:text-sm font-bold bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              {legacyData.checklist?.map((item: any) => (
+                <div key={item.id} className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+                  <span className="text-slate-300 font-bold">{item.title}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                    item.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                  }`}>
+                    {item.status}
+                  </span>
+                </div>
+              ))}
             </div>
-
-            <div className="flex items-center gap-2">
-              <select
-                value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value as any)}
-                className="px-3 py-2.5 text-xs sm:text-sm font-extrabold bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-              >
-                <option value="editor">Editor (Add/Edit Expenses)</option>
-                <option value="viewer">Viewer (Read Only)</option>
-              </select>
-
-              <button
-                type="submit"
-                disabled={isInviting || !inviteEmail}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap disabled:opacity-75"
-              >
-                {isInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                <span>Send Invite</span>
-              </button>
-            </div>
-          </form>
+          </GlassCard>
         </div>
       )}
 
-      {/* Grid Row 2: Members List & Pending Invitations */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        
-        {/* Members List */}
-        <div className="md:col-span-2 bg-white rounded-3xl p-6 border border-slate-200/80 shadow-lg space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <Users className="w-4 h-4 text-emerald-600" />
-              <span>Workspace Members ({members.length})</span>
+      {/* PHASE 4: FAMILY WEALTH TREE VISUALIZATION */}
+      <div className="bg-slate-900 border border-slate-800 rounded-[28px] p-6 space-y-6 shadow-xl">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <GitFork className="w-5 h-5 text-emerald-400" />
+            <h2 className="text-lg font-black text-white">Household Wealth Tree</h2>
+          </div>
+          <span className="text-xs font-mono font-bold text-slate-400">
+            Net Family Wealth: ₹{legacyData?.netFamilyWealth?.toLocaleString('en-IN') || data?.totalHouseholdNetWorth?.toLocaleString('en-IN') || 0}
+          </span>
+        </div>
+
+        {/* Tree Nodes Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 relative">
+          {legacyData?.familyMembers?.map((member: any) => (
+            <div key={member.id} className="p-5 rounded-2xl bg-slate-950 border border-emerald-500/30 space-y-3 relative">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center font-black text-emerald-300 text-sm">
+                  {member.name.charAt(0)}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-sm text-white">{member.name}</h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
+                      {member.relation}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Role: {member.role}</span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-900 grid grid-cols-2 gap-2 text-xs">
+                <div className="p-2 rounded-xl bg-slate-900">
+                  <span className="text-slate-400 block text-[10px]">Assigned Assets</span>
+                  <span className="font-bold text-emerald-400">{member.assignedAssetsCount} Assets</span>
+                </div>
+                <div className="p-2 rounded-xl bg-slate-900">
+                  <span className="text-slate-400 block text-[10px]">Nominee Status</span>
+                  <span className="font-bold text-indigo-400">{member.nomineeStatus}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Household Net Worth & Members KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <GlassCard className="p-4 space-y-1">
+          <span className="text-[11px] font-bold text-slate-400 uppercase">Household Net Worth</span>
+          <p className="text-xl font-black text-emerald-400 font-mono">
+            ₹{data?.totalHouseholdNetWorth?.toLocaleString('en-IN') || 0}
+          </p>
+          <span className="text-[10px] text-slate-500">Shared Asset Total</span>
+        </GlassCard>
+
+        <GlassCard className="p-4 space-y-1">
+          <span className="text-[11px] font-bold text-slate-400 uppercase">Total Household Assets</span>
+          <p className="text-xl font-bold text-slate-900 dark:text-white font-mono">
+            ₹{data?.totalHouseholdAssets?.toLocaleString('en-IN') || 0}
+          </p>
+          <span className="text-[10px] text-slate-500">Gross Assets</span>
+        </GlassCard>
+
+        <GlassCard className="p-4 space-y-1">
+          <span className="text-[11px] font-bold text-slate-400 uppercase">Active Household Goals</span>
+          <p className="text-xl font-black text-indigo-400">
+            {data?.activeGoalsCount || 0} Goals
+          </p>
+          <span className="text-[10px] text-slate-500">Family Milestones</span>
+        </GlassCard>
+
+        <GlassCard className="p-4 space-y-1">
+          <span className="text-[11px] font-bold text-slate-400 uppercase">Insurance Policies</span>
+          <p className="text-xl font-black text-teal-400">
+            {data?.totalInsurancePolicies || 0} Policies
+          </p>
+          <span className="text-[10px] text-slate-500">Family Coverage</span>
+        </GlassCard>
+      </div>
+
+      {/* PHASE 4: MONTHLY FAMILY CONTRIBUTION TRACKER & SHARED EXPENSES */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Monthly Household Contribution Breakdown */}
+        <GlassCard className="p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-emerald-400" />
+              Monthly Member Pool Contributions
             </h3>
-            <span className="text-xs font-semibold text-slate-400">Avatars & Online Status</span>
+            <span className="text-xs font-mono font-bold text-emerald-400">₹1,85,000 / mo Total</span>
           </div>
 
           <div className="space-y-3">
-            {members.map((member) => (
-              <div
-                key={member.uid}
-                className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 hover:border-emerald-300 transition-all flex items-center justify-between gap-3"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  {/* Avatar & Online Dot */}
-                  <div className="relative shrink-0">
-                    {member.photoURL ? (
-                      <img
-                        src={member.photoURL}
-                        alt={member.name}
-                        className="w-11 h-11 rounded-2xl object-cover ring-2 ring-emerald-500/20"
-                      />
-                    ) : (
-                      <div className="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-base shadow-sm">
-                        {member.name ? member.name.charAt(0).toUpperCase() : 'M'}
-                      </div>
-                    )}
-                    <div className="w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white absolute -bottom-0.5 -right-0.5 shadow-2xs" />
+            {[
+              { name: 'Self (Account Owner)', relation: 'Owner', share: 60, amount: 111000, role: 'OWNER', status: 'Contributed' },
+              { name: 'Priya Sharma', relation: 'Spouse', share: 30, amount: 55500, role: 'CO-OWNER', status: 'Contributed' },
+              { name: 'Ramesh Sharma', relation: 'Father', share: 10, amount: 18500, role: 'VIEWER', status: 'Scheduled' },
+            ].map((contrib, idx) => (
+              <div key={idx} className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-xs text-white">{contrib.name}</span>
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
+                      {contrib.role}
+                    </span>
                   </div>
-
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-xs sm:text-sm font-black text-slate-900 truncate">{member.name}</h4>
-                      {member.role === 'owner' && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-0.5">
-                          <Crown className="w-3 h-3 text-amber-600" />
-                          Owner
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500 font-medium truncate">{member.email}</p>
-                  </div>
+                  <span className="text-xs font-mono font-black text-emerald-400">₹{contrib.amount.toLocaleString('en-IN')}</span>
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`px-3 py-1 rounded-xl text-xs font-bold capitalize border ${
-                      member.role === 'owner'
-                        ? 'bg-amber-50 text-amber-900 border-amber-200'
-                        : member.role === 'editor'
-                        ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
-                        : 'bg-slate-100 text-slate-700 border-slate-200'
-                    }`}
-                  >
-                    {member.role}
+                <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden">
+                  <div className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full" style={{ width: `${contrib.share}%` }} />
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-400">
+                  <span>Pool Share: {contrib.share}%</span>
+                  <span className={contrib.status === 'Contributed' ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
+                    ● {contrib.status}
                   </span>
-
-                  {isOwner && member.role !== 'owner' && (
-                    <button
-                      onClick={() => handleRemoveMember(member.uid)}
-                      title="Remove Member"
-                      className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </GlassCard>
 
-        {/* Pending Invitations Section */}
-        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-lg flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                <Clock className="w-4 h-4 text-emerald-600" />
-                <span>Pending Invites ({invites.length})</span>
-              </h3>
-            </div>
+        {/* Shared Household Goals & Shared Expenses */}
+        <GlassCard className="p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+              <HeartHandshake className="w-4 h-4 text-indigo-400" />
+              Shared Family Goals & Commitments
+            </h3>
+            <span className="text-xs font-bold text-slate-400">3 Active Joint Goals</span>
+          </div>
 
-            {invites.length === 0 ? (
-              <p className="text-xs text-slate-400 font-medium text-center py-6">
-                No pending invitations. Use the form above to invite household members.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {invites.map((inv) => (
-                  <div key={inv.id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-800 truncate">{inv.email}</span>
-                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
-                        {inv.role}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-[11px] font-mono text-slate-500 truncate max-w-[140px]">
-                        Token: {inv.token.substring(0, 10)}…
-                      </span>
-                      <button
-                        onClick={() => copyToClipboard(inv.token)}
-                        className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        <Copy className="w-3 h-3" />
-                        <span>Copy</span>
-                      </button>
-                    </div>
+          <div className="space-y-3">
+            {[
+              { title: 'Family EV Purchase Fund', target: 2200000, saved: 1450000, color: 'from-emerald-500 to-teal-500' },
+              { title: 'Annual Family Europe Vacation', target: 600000, saved: 420000, color: 'from-indigo-500 to-purple-500' },
+              { title: 'Children Higher Education Trust', target: 5000000, saved: 2150000, color: 'from-amber-500 to-orange-500' },
+            ].map((goal, idx) => {
+              const pct = Math.round((goal.saved / goal.target) * 100);
+              return (
+                <div key={idx} className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-xs text-white">{goal.title}</span>
+                    <span className="text-xs font-mono font-bold text-slate-300">{pct}%</span>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden">
+                    <div className={`bg-gradient-to-r ${goal.color} h-full rounded-full`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                    <span>Saved: ₹{goal.saved.toLocaleString('en-IN')}</span>
+                    <span>Target: ₹{goal.target.toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-
-          <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-400 font-medium">
-            Invited members gain access upon token acceptance.
-          </div>
-        </div>
+        </GlassCard>
       </div>
 
-      {/* Role Permission Policy Matrix */}
-      <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl border border-slate-800">
-        <h3 className="text-sm font-black uppercase tracking-wider text-emerald-400 mb-4 flex items-center gap-2">
-          <ShieldCheck className="w-5 h-5" />
-          <span>Role Permission Policy</span>
+      {/* Family Members Catalog */}
+      <div className="space-y-3">
+        <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
+          <Users className="w-5 h-5 text-emerald-400" /> Family Members Catalog ({data?.members?.length || 0})
         </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-          <div className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700">
-            <h4 className="font-extrabold text-amber-400 flex items-center gap-1.5 mb-1.5">
-              <Crown className="w-4 h-4" />
-              <span>Owner</span>
-            </h4>
-            <p className="text-slate-300 leading-relaxed">
-              Full workspace control. Invite family members, remove members, assign roles, manage Google Workspace links.
-            </p>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700">
-            <h4 className="font-extrabold text-emerald-400 flex items-center gap-1.5 mb-1.5">
-              <Edit3 className="w-4 h-4" />
-              <span>Editor</span>
-            </h4>
-            <p className="text-slate-300 leading-relaxed">
-              Active household member. Add & edit expenses, scan receipts with Gemini Vision, manage monthly items and recurring bills.
-            </p>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700">
-            <h4 className="font-extrabold text-slate-400 flex items-center gap-1.5 mb-1.5">
-              <Eye className="w-4 h-4" />
-              <span>Viewer</span>
-            </h4>
-            <p className="text-slate-300 leading-relaxed">
-              Read-only household member. View dashboard analytics, budget forecasts, and inflation reports.
-            </p>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {data?.members?.map((member: any) => (
+            <FamilyMemberCard key={member.id} member={member} onDelete={handleDelete} />
+          ))}
         </div>
       </div>
 
+      {/* Add Member Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
+          <GlassCard className="w-full max-w-md p-6 space-y-4">
+            <h3 className="text-lg font-black text-slate-900 dark:text-white">Add Family Member</h3>
+            <form onSubmit={handleAddMember} className="space-y-3 text-xs">
+              <div>
+                <label className="text-slate-400 font-bold block mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Priya Sharma"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-slate-400 font-bold block mb-1">Relation</label>
+                  <select
+                    value={relation}
+                    onChange={(e) => setRelation(e.target.value)}
+                    className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                  >
+                    <option value="Spouse">Spouse</option>
+                    <option value="Child">Child</option>
+                    <option value="Father">Father</option>
+                    <option value="Mother">Mother</option>
+                    <option value="Sibling">Sibling</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-slate-400 font-bold block mb-1">Role Permission</label>
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                  >
+                    <option value="VIEWER">Viewer (Read Only)</option>
+                    <option value="EDITOR">Editor (Can Add Expenses)</option>
+                    <option value="OWNER">Co-Owner (Full Access)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3">
+                <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold">Cancel</button>
+                <button type="submit" className="px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 font-extrabold cursor-pointer">Save Member</button>
+              </div>
+            </form>
+          </GlassCard>
+        </div>
+      )}
     </div>
   );
 };

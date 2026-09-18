@@ -6,16 +6,19 @@ import { registerSW } from "virtual:pwa-register";
 import App from "./App";
 import "./index.css";
 import { UserProvider } from "./context/UserContext";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Register PWA service worker automatically
 registerSW({ immediate: true });
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <UserProvider>
-        <App />
-      </UserProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <UserProvider>
+          <App />
+        </UserProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>
 );

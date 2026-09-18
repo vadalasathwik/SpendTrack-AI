@@ -7,7 +7,7 @@ import {
   AppNotification,
   AIChatRecord,
 } from "../types";
-import { getStoredJWT, clearAuthSession } from "./authService";
+import { getStoredJWT, refreshAccessToken, clearAuthSession } from "./authService";
 
 /* -------------------------------------------------------
    Universal authenticated fetch
@@ -16,15 +16,22 @@ async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = getStoredJWT();
+  let token = getStoredJWT();
 
   if (!token) {
+    token = await refreshAccessToken();
+  }
+
+  if (!token) {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("spendtrack_401_unauthorized"));
+    }
     throw new Error(
       "Not authenticated. Please sign in with Google."
     );
   }
 
-  const res = await fetch(endpoint, {
+  let res = await fetch(endpoint, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -32,6 +39,21 @@ async function apiFetch<T>(
       ...(options.headers || {}),
     },
   });
+
+  if (res.status === 401) {
+    // Retry once after refreshing token
+    token = await refreshAccessToken();
+    if (token) {
+      res = await fetch(endpoint, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          ...(options.headers || {}),
+        },
+      });
+    }
+  }
 
   if (!res.ok) {
     if (res.status === 401) {
@@ -207,6 +229,19 @@ export const SpendTrackApi = {
     });
   },
 
+  async patchRecurringExpense(id: string, patch: any): Promise<any> {
+    return apiFetch<any>(`/api/recurring/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+  },
+
+  async skipOnceRecurringExpense(id: string): Promise<any> {
+    return apiFetch<any>(`/api/recurring/${id}/skip`, {
+      method: "POST",
+    });
+  },
+
   async deleteRecurringExpense(id: string) {
     return apiFetch<{ success: boolean }>(`/api/recurring/${id}`, {
       method: "DELETE",
@@ -221,6 +256,18 @@ export const SpendTrackApi = {
     }>("/api/recurring/process", {
       method: "POST",
     });
+  },
+
+  async getNetWorthHistory(range: string = "6M"): Promise<any> {
+    return apiFetch<any>(`/api/history/networth?range=${encodeURIComponent(range)}`);
+  },
+
+  async getAnalyticsSummary(): Promise<any> {
+    return apiFetch<any>("/api/analytics");
+  },
+
+  async getMonthlyExecutiveReport(period: string = "monthly"): Promise<any> {
+    return apiFetch<any>(`/api/reports/monthly?period=${encodeURIComponent(period)}`);
   },
 
   async generateDueRecurringExpenses() {
@@ -618,10 +665,28 @@ export const SpendTrackApi = {
     return apiFetch<any>("/api/cfo/cashflow");
   },
 
-  async checkAffordability(amount: number, category?: string) {
-    return apiFetch<any>("/api/cfo/can-afford", {
+  async checkAffordability(
+    dataOrAmount:
+      | number
+      | {
+          amount: number;
+          category?: string;
+          itemName?: string;
+          cashback?: number;
+          isEmi?: boolean;
+          emiMonths?: number;
+          interestRate?: number;
+          downPayment?: number;
+        },
+    category?: string
+  ) {
+    const payload =
+      typeof dataOrAmount === "number"
+        ? { amount: dataOrAmount, category }
+        : dataOrAmount;
+    return apiFetch<any>("/api/cfo/affordability", {
       method: "POST",
-      body: JSON.stringify({ amount, category }),
+      body: JSON.stringify(payload),
     });
   },
 
@@ -690,6 +755,414 @@ export const SpendTrackApi = {
   async deleteLiability(id: string) {
     return apiFetch<{ success: boolean }>(`/api/networth/liabilities/${id}`, {
       method: "DELETE",
+    });
+  },
+
+  // Phase 1 API Methods
+  async getInbox() {
+    return apiFetch<any[]>("/api/inbox");
+  },
+
+  async completeInboxItem(id: string, itemType: string) {
+    return apiFetch<{ success: boolean }>(`/api/inbox/${id}/complete`, {
+      method: "PATCH",
+      body: JSON.stringify({ itemType }),
+    });
+  },
+
+  async snoozeInboxItem(id: string, itemType: string, days: number = 3) {
+    return apiFetch<{ success: boolean }>(`/api/inbox/${id}/snooze`, {
+      method: "PATCH",
+      body: JSON.stringify({ itemType, days }),
+    });
+  },
+
+  async getSubscriptions() {
+    return apiFetch<any[]>("/api/subscriptions");
+  },
+
+  async getCashflowForecast() {
+    return apiFetch<any>("/api/cashflow/forecast");
+  },
+
+  async getDailyBrief() {
+    return apiFetch<any>("/api/daily-brief");
+  },
+
+  // Phase 2 API Methods
+  async getDynamicWealthAllocation() {
+    return apiFetch<any>("/api/cfo/wealth-allocation");
+  },
+
+  async getCfoInsights() {
+    return apiFetch<Record<string, any>>("/api/cfo/insights");
+  },
+
+  // TrackPay v4.2.0 Workspace API Methods
+  async getPortfolioSummary() {
+    return apiFetch<any>("/api/workspace/portfolio");
+  },
+
+  async addPortfolioHolding(data: any) {
+    return apiFetch<any>("/api/workspace/portfolio", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deletePortfolioHolding(id: string) {
+    return apiFetch<{ success: boolean }>(`/api/workspace/portfolio/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getGoldWorkspace() {
+    return apiFetch<any>("/api/workspace/gold");
+  },
+
+  async addGoldHolding(data: any) {
+    return apiFetch<any>("/api/workspace/gold", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteGoldHolding(id: string) {
+    return apiFetch<{ success: boolean }>(`/api/workspace/gold/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getLoanIntelligence() {
+    return apiFetch<any>("/api/workspace/loans/intelligence");
+  },
+
+  async simulateLoanPartPayment(data: {
+    outstanding: number;
+    interestRate: number;
+    currentEmi: number;
+    partPaymentAmount: number;
+  }) {
+    return apiFetch<any>("/api/workspace/loans/part-payment-sim", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getInsuranceVault() {
+    return apiFetch<any>("/api/workspace/insurance");
+  },
+
+  async addInsurancePolicy(data: any) {
+    return apiFetch<any>("/api/workspace/insurance", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteInsurancePolicy(id: string) {
+    return apiFetch<{ success: boolean }>(`/api/workspace/insurance/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getDocuments(category?: string, query?: string) {
+    const params = new URLSearchParams();
+    if (category) params.append("category", category);
+    if (query) params.append("q", query);
+    const q = params.toString() ? `?${params.toString()}` : "";
+    return apiFetch<any>(`/api/workspace/documents${q}`);
+  },
+
+  async addDocument(data: any) {
+    return apiFetch<any>("/api/workspace/documents", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteDocument(id: string) {
+    return apiFetch<{ success: boolean }>(`/api/workspace/documents/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getSalaryIntelligence() {
+    return apiFetch<any>("/api/workspace/salary");
+  },
+
+  async saveSalaryRecord(data: any) {
+    return apiFetch<any>("/api/workspace/salary", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getFamilyWorkspace() {
+    return apiFetch<any>("/api/workspace/family");
+  },
+
+  async addFamilyMember(data: any) {
+    return apiFetch<any>("/api/workspace/family", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteFamilyMember(id: string) {
+    return apiFetch<{ success: boolean }>(`/api/workspace/family/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async getTaxDashboard(fy: string = "FY 2025-26") {
+    return apiFetch<any>(`/api/workspace/tax?fy=${encodeURIComponent(fy)}`);
+  },
+
+  async queryAiSpecialist(persona: string, query: string) {
+    return apiFetch<any>("/api/workspace/ai-specialist", {
+      method: "POST",
+      body: JSON.stringify({ persona, query }),
+    });
+  },
+
+  // v4.4.0 Banking Intelligence & Financial Ledger OS Methods
+  async getAccounts() {
+    return apiFetch<any>("/api/accounts");
+  },
+
+  async createAccount(data: any) {
+    return apiFetch<any>("/api/accounts", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateAccount(id: string, data: any) {
+    return apiFetch<any>(`/api/accounts/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getLedger(params: any = {}) {
+    const query = new URLSearchParams(params).toString();
+    return apiFetch<any>(`/api/ledger${query ? `?${query}` : ""}`);
+  },
+
+  async createLedgerEntry(data: any) {
+    return apiFetch<any>("/api/ledger", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getReconciliationStatus() {
+    return apiFetch<any>("/api/reconciliation");
+  },
+
+  async updateReconciliation(id: string, data: any) {
+    return apiFetch<any>(`/api/reconciliation/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getEnvelopes(month?: number, year?: number) {
+    const params = new URLSearchParams();
+    if (month) params.append("month", month.toString());
+    if (year) params.append("year", year.toString());
+    return apiFetch<any>(`/api/envelopes?${params.toString()}`);
+  },
+
+  async updateEnvelope(id: string, data: any) {
+    return apiFetch<any>(`/api/envelopes/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async createSpendingRule(data: any) {
+    return apiFetch<any>("/api/envelopes/rules", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getExecutiveCfoReport(period: string = "monthly") {
+    return apiFetch<any>(`/api/reports/cfo?period=${encodeURIComponent(period)}`);
+  },
+
+  async getAuditLogs(limit: number = 50) {
+    return apiFetch<any>(`/api/audit?limit=${limit}`);
+  },
+
+  // v4.5.0 Autonomous AI Finance OS Methods
+  async getBankSyncStatus() {
+    return apiFetch<any>("/api/accounts/sync");
+  },
+
+  async importTransactions(transactions: any[]) {
+    return apiFetch<any>("/api/ledger/import", {
+      method: "POST",
+      body: JSON.stringify({ transactions }),
+    });
+  },
+
+  async get90DayForecast() {
+    return apiFetch<any>("/api/forecast/90days");
+  },
+
+  async getFinancialHealth3() {
+    return apiFetch<any>("/api/health");
+  },
+
+  async getBoardroomReport(period: "weekly" | "monthly" | "quarterly" = "monthly") {
+    return apiFetch<any>(`/api/reports/${period}`);
+  },
+
+  // v4.6.0 Enterprise Finance Intelligence & Wealth OS Methods
+  async getRetirementPlan(params: any = {}) {
+    const query = new URLSearchParams(params).toString();
+    return apiFetch<any>(`/api/retirement${query ? `?${query}` : ""}`);
+  },
+
+  async calculateRetirement(data: any) {
+    return apiFetch<any>("/api/retirement", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getEstatePlanner() {
+    return apiFetch<any>("/api/estate");
+  },
+
+  async getPassiveIncomeTracker() {
+    return apiFetch<any>("/api/passive-income");
+  },
+
+  async getBusinessWorkspace() {
+    return apiFetch<any>("/api/business");
+  },
+
+  async createInvoice(data: any) {
+    return apiFetch<any>("/api/invoices", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async runDecisionSimulation(scenario: any) {
+    return apiFetch<any>("/api/simulation", {
+      method: "POST",
+      body: JSON.stringify(scenario),
+    });
+  },
+
+  async getAnnualBoardroomReport() {
+    return apiFetch<any>("/api/reports/annual");
+  },
+
+  // v4.7.0 AI Life Finance Ecosystem Methods
+  async getProperty() {
+    return apiFetch<any>("/api/property");
+  },
+
+  async createProperty(data: any) {
+    return apiFetch<any>("/api/property", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getVehicles() {
+    return apiFetch<any>("/api/vehicles");
+  },
+
+  async createVehicle(data: any) {
+    return apiFetch<any>("/api/vehicles", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getEducation() {
+    return apiFetch<any>("/api/education");
+  },
+
+  async getHealthcare() {
+    return apiFetch<any>("/api/healthcare");
+  },
+
+  async getCredit() {
+    return apiFetch<any>("/api/credit");
+  },
+
+  async simulatePrepayment(data: { outstanding: number; interestRate: number; currentEmi: number; partPaymentAmount: number }) {
+    return apiFetch<any>("/api/loan/prepayment/simulate", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getLegacy() {
+    return apiFetch<any>("/api/legacy");
+  },
+
+  // v4.8.0 AI Financial Operating System Methods
+  async getMarket() {
+    return apiFetch<any>("/api/market");
+  },
+
+  async getWatchlist() {
+    return apiFetch<any>("/api/watchlist");
+  },
+
+  async addToWatchlist(data: any) {
+    return apiFetch<any>("/api/watchlist", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async processDocumentOcr(data: { title: string; category: string; fileUrl?: string; rawContentText?: string }) {
+    return apiFetch<any>("/api/documents/ocr", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async importBankStatement(data: { fileName: string; rawContent?: string }) {
+    return apiFetch<any>("/api/statements/import", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getAutomation() {
+    return apiFetch<any>("/api/automation");
+  },
+
+  async getTaxPlanner(fy: string = "FY 2025-26") {
+    return apiFetch<any>(`/api/tax/planner?fy=${encodeURIComponent(fy)}`);
+  },
+
+  async transferAccounts(data: { fromAccountId: string; toAccountId: string; amount: number; notes?: string }) {
+    return apiFetch<any>("/api/accounts/transfer", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async exportBackup() {
+    return apiFetch<any>("/api/backup/export");
+  },
+
+  async importBackup(data: any) {
+    return apiFetch<any>("/api/backup/restore", {
+      method: "POST",
+      body: JSON.stringify(data),
     });
   },
 };

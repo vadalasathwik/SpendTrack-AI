@@ -31,7 +31,9 @@ model User {
   email             String             @unique
   name              String
   avatar            String?
+  provider          String             @default("google")
   createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @default(now()) @updatedAt
 
   categories        Category[]
   expenses          Expense[]
@@ -46,6 +48,33 @@ model User {
   goals             Goal[]
   assets            AssetItem[]
   liabilities       LiabilityItem[]
+  portfolioHoldings PortfolioHolding[]
+  preciousMetals    PreciousMetalHolding[]
+  insurancePolicies InsurancePolicy[]
+  documents         FinancialDocument[]
+  salaryRecords     SalaryRecord[]
+  familyMembers     FamilyMember[]
+  bankAccounts      BankAccount[]
+  envelopes         EnvelopeBudget[]
+  spendingRules     TransactionRule[]
+  auditLogs         AuditLog[]
+  reconciliations   ReconciliationRecord[]
+  propertyAssets    PropertyAsset[]
+  vehicleAssets     VehicleAsset[]
+  watchlists        WatchlistItem[]
+  sessions          Session[]
+}
+
+model Session {
+  id               String   @id @default(cuid())
+  userId           String
+  refreshTokenHash String
+  device           String?
+  ipAddress        String?
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Category {
@@ -67,6 +96,7 @@ model Expense {
   amount      Float
   type        ExpenseType  @default(EXPENSE)
   note        String?
+  location    String?
   spentAt     DateTime
   categoryId  String
   userId      String
@@ -205,6 +235,7 @@ model Goal {
   targetDate          DateTime
   monthlyContribution Float    @default(0)
   category            String?  // "House", "Gold", "Car", "Vacation", "Wedding", "Emergency Fund"
+  inflationRate       Float?   @default(7.0)
   userId              String
   createdAt           DateTime @default(now())
 
@@ -232,3 +263,234 @@ model LiabilityItem {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+model PortfolioHolding {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  symbol       String?
+  assetType    String   // STOCKS, ETFS, MUTUAL_FUNDS, GOLD, SILVER, FD, RD, CRYPTO
+  quantity     Float
+  buyPrice     Float
+  currentPrice Float
+  invested     Float
+  currentValue Float
+  sector       String?  // Technology, Banking, Real Estate, Precious Metals, etc.
+  cagr         Float?   @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PreciousMetalHolding {
+  id                  String   @id @default(cuid())
+  userId              String
+  metalType           String   // GOLD, SILVER
+  form                String   // MMTC_PAMP, TANISHQ, PHYSICAL_GOLD, COIN, BAR, SILVER_COIN
+  grams               Float
+  buyPricePerGram     Float
+  currentPricePerGram Float
+  totalCost           Float
+  currentValue        Float
+  purchasedAt         DateTime @default(now())
+  notes               String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model InsurancePolicy {
+  id             String   @id @default(cuid())
+  userId         String
+  title          String
+  type           String   // HEALTH, VEHICLE, HOME, LIFE, ELECTRONICS_WARRANTY
+  provider       String
+  policyNumber   String?
+  premiumAmount  Float
+  renewalDate    DateTime
+  coverageAmount Float    @default(0)
+  attachmentUrl  String?
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FinancialDocument {
+  id         String   @id @default(cuid())
+  userId     String
+  title      String
+  category   String   // AADHAAR, PAN, LOAN_PAPERS, SALE_DEED, FD_CERTIFICATE, INSURANCE, GST_INVOICE, SALARY_SLIP, OTHER
+  fileUrl    String
+  fileType   String?  // pdf, png, jpg
+  ocrText    String?
+  summary         String?
+  tags            String?  // comma separated
+  documentNumber  String?
+  issueDate       DateTime?
+  expiryDate      DateTime?
+  institution     String?
+  extractedAmount Float?
+  ocrConfidence   Float?   @default(95.0)
+  uploadedAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SalaryRecord {
+  id               String   @id @default(cuid())
+  userId           String
+  month            Int
+  year             Int
+  basic            Float
+  hra              Float
+  da               Float    @default(0)
+  bonus            Float    @default(0)
+  pfDeduction      Float    @default(0)
+  profTaxDeduction Float    @default(0)
+  otherDeductions  Float    @default(0)
+  netSalary        Float
+  grossSalary      Float
+  createdAt        DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FamilyMember {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  relation    String   // Wife, Father, Mother, Child, Sibling, Self
+  role        String   @default("VIEWER") // OWNER, EDITOR, VIEWER, ACCOUNTANT
+  permissions String?  @default("view_only") // view_only, edit_expenses, manage_investments, full_access
+  avatar      String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BankAccount {
+  id               String   @id @default(cuid())
+  userId           String
+  name             String   // e.g. "HDFC Savings", "SBI Salary", "ICICI", "UPI Wallet", "Cash Wallet", "Credit Card"
+  type             String   // "SAVINGS", "CURRENT", "CREDIT_CARD", "WALLET", "CASH", "JOINT"
+  bankName         String?
+  accountNumber    String?
+  currentBalance   Float    @default(0)
+  availableBalance Float    @default(0)
+  isDefault        Boolean  @default(false)
+  color            String?  @default("#10B981")
+  syncHealth       String?  @default("HEALTHY") // "HEALTHY", "WARNING", "OFFLINE"
+  lastSync         DateTime @default(now())
+  logoUrl          String?
+  createdAt        DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EnvelopeBudget {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String   // Groceries, Fuel, EMI, Bills, Shopping, Gold, Emergency, Entertainment
+  allocated    Float
+  spent        Float    @default(0)
+  carryForward Boolean  @default(false)
+  month        Int
+  year         Int
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TransactionRule {
+  id         String   @id @default(cuid())
+  userId     String
+  keyword    String   // e.g. "Swiggy", "HP", "EMI", "MMTC"
+  category   String?
+  accountId  String?
+  tag        String?
+  envelope   String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  userId        String
+  action        String   // CREATE, UPDATE, DELETE
+  entity        String   // Expense, Account, Envelope, Goal, etc.
+  entityId      String?
+  previousValue String?
+  newValue      String?
+  timestamp     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ReconciliationRecord {
+  id         String   @id @default(cuid())
+  userId     String
+  expenseId  String?
+  bankTxId   String?
+  status     String   @default("PENDING") // MATCHED, PENDING, DUPLICATE, MANUAL
+  notes      String?
+  matchedAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PropertyAsset {
+  id                 String   @id @default(cuid())
+  userId             String
+  title              String
+  propertyType       String   // "RESIDENTIAL", "APARTMENT", "LAND", "COMMERCIAL"
+  purchaseValue      Float
+  currentMarketValue Float
+  loanLinked         Float    @default(0)
+  rentalIncome       Float    @default(0) // Monthly rental income
+  appreciationRate   Float    @default(6.5) // Annual appreciation rate %
+  documentsLinked    Int      @default(0)
+  notes              String?
+  createdAt          DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VehicleAsset {
+  id                 String   @id @default(cuid())
+  userId             String
+  name               String
+  vehicleType        String   // "CAR", "BIKE"
+  purchasePrice      Float
+  insurance          Float    @default(0) // Annual insurance cost
+  serviceHistoryCost Float    @default(0) // Annual service & maintenance
+  fuelCost           Float    @default(0) // Monthly fuel cost
+  emi                Float    @default(0) // Monthly EMI cost
+  resaleValue        Float    @default(0) // Estimated current resale value
+  purchaseYear       Int      @default(2022)
+  notes              String?
+  createdAt          DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WatchlistItem {
+  id              String   @id @default(cuid())
+  userId          String
+  symbol          String
+  name            String
+  assetType       String   // "STOCK", "ETF", "GOLD", "SILVER"
+  targetBuyPrice  Float
+  currentPrice    Float
+  alertPrice      Float
+  convictionScore Float    @default(85.0)
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+
+

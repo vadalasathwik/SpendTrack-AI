@@ -16,6 +16,7 @@ import {
 import { RecurringExpense, CategoryItem } from '../types.js';
 import { formatCurrency } from '../utils/calculations.js';
 import { CATEGORY_COLORS } from '../data/defaults.js';
+import { SpendTrackApi } from '../services/api.js';
 
 interface RecurringPageProps {
   recurringExpenses: RecurringExpense[];
@@ -366,12 +367,26 @@ export const RecurringPage: React.FC<RecurringPageProps> = ({
                   )}
 
                   {/* CARD ACTIONS */}
-                  <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 w-full">
+                  <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800 w-full">
                     <button
                       onClick={() => handleToggleActive(item)}
                       className="px-2 py-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-[12px] transition-colors cursor-pointer text-center"
                     >
                       Pause
+                    </button>
+
+                    <button
+                      onClick={async () => {
+                        try {
+                          await SpendTrackApi.skipOnceRecurringExpense(item.id);
+                          showToast('Skipped current execution run ✓');
+                        } catch (e: any) {
+                          showToast(e.message || 'Failed to skip');
+                        }
+                      }}
+                      className="px-2 py-1.5 text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 rounded-[12px] transition-colors cursor-pointer text-center"
+                    >
+                      Skip Once
                     </button>
 
                     <button

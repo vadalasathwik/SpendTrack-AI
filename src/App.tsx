@@ -10,6 +10,7 @@ import {
   Bell,
   User,
   Search,
+  BookOpen,
 } from 'lucide-react';
 import {
   Expense,
@@ -28,8 +29,16 @@ import {
 import { getDateRangeFromPreset } from './utils/dateRanges.js';
 import { calculateMonthlyItemIntelligence, sanitizeErrorMessage, findMatchingRecurringBill } from './utils/calculations.js';
 import { SpendTrackApi } from './services/api.js';
-import { signInWithGoogle, signOutApp, onAuthStateChange, clearAuthSession, getStoredJWT } from './services/authService.js';
-import { isFirebaseConfigured } from './services/firebase.js';
+import {
+  signInWithGoogle,
+  signOutApp,
+  onAuthStateChange,
+  clearAuthSession,
+  getStoredJWT,
+  refreshAccessToken,
+  handleOAuthHashCallback,
+  getStoredUserProfile,
+} from './services/authService.js';
 import { BRAND_NAME } from './constants/brand.js';
 
 // UI Components
@@ -49,6 +58,16 @@ import { QuickAddFAB } from './components/QuickAddFAB.js';
 import { ProfileSheet } from './components/ProfileSheet.js';
 import { GlobalSearchModal } from './components/GlobalSearchModal.js';
 import { FloatingAiCopilot } from './components/FloatingAiCopilot.js';
+import { FinanceOnboardingWizard } from './components/FinanceOnboardingWizard.js';
+import { HeaderLogo } from './components/ui/HeaderLogo.js';
+import { SearchTrigger } from './components/ui/SearchTrigger.js';
+import { MenuTrigger } from './components/ui/MenuTrigger.js';
+import { MonthSelectorPill } from './components/ui/MonthSelectorPill.js';
+import { FloatingDock } from './components/ui/FloatingDock.js';
+import { BottomSheet } from './components/ui/BottomSheet.js';
+import { EmptyWorkspace } from './components/ui/EmptyWorkspace.js';
+import { ToastProvider } from './context/ToastContext.js';
+import { ToastContainer } from './components/ui/ToastContainer.js';
 
 // Pages
 import { DashboardPage } from './pages/DashboardPage.js';
@@ -80,6 +99,14 @@ import { FinanceHealthPage } from './pages/FinanceHealthPage.js';
 import { NetWorthPage } from './pages/NetWorthPage.js';
 import { GoalForecastPage } from './pages/GoalForecastPage.js';
 import { AiCfoPage } from './pages/AiCfoPage.js';
+import { FinancialInboxPage } from './pages/FinancialInboxPage.js';
+import { PortfolioPage } from './pages/PortfolioPage.js';
+import { GoldWorkspacePage } from './pages/GoldWorkspacePage.js';
+import { InsuranceVaultPage } from './pages/InsuranceVaultPage.js';
+import { DocumentVaultPage } from './pages/DocumentVaultPage.js';
+import { SalaryIntelligencePage } from './pages/SalaryIntelligencePage.js';
+import { TaxDashboardPage } from './pages/TaxDashboardPage.js';
+import { AiExecutiveWorkspacePage } from './pages/AiExecutiveWorkspacePage.js';
 
 const DATE_RANGE_STORAGE_KEY = 'spendtrack_date_range';
 const ACTIVE_TAB_STORAGE_KEY = 'spendtrack_active_tab';
@@ -117,6 +144,7 @@ export function App() {
   >(getInitialActiveTab);
   const [isMoreDrawerOpen, setIsMoreDrawerOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isQuickAddSheetOpen, setIsQuickAddSheetOpen] = useState(false);
   const [goals, setGoals] = useState<any[]>([]);
 
   const handleSelectTab = (tab: string) => {
@@ -125,6 +153,35 @@ export function App() {
       localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, tab);
     } catch (err) {}
   };
+
+  // Theme State with Persistence
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
+    try {
+      const saved = localStorage.getItem('trackpay_theme');
+      if (saved === 'light' || saved === 'dark' || saved === 'system') return saved;
+    } catch (e) {}
+    return 'dark';
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    try {
+      localStorage.setItem('trackpay_theme', theme);
+    } catch (e) {}
+
+    if (theme === 'system') {
+      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (systemDark) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+    } else if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [theme]);
 
   // Splash Screen State
   const [showSplash, setShowSplash] = useState(true);
@@ -201,6 +258,8 @@ export function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [workspaceStatus, setWorkspaceStatus] = useState<any>(null);
 
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+
   // Modals & Assistant State
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [autoOpenRecurringModal, setAutoOpenRecurringModal] = useState(false);
@@ -223,12 +282,21 @@ export function App() {
   // Ref to prevent simultaneous workspace requests on startup
   const isWorkspaceLoadingRef = React.useRef(false);
 
-  // Global Ctrl+K / Cmd+K search shortcut
+  // Global Keyboard Shortcuts: Ctrl+K / Cmd+K (Search), Ctrl+J / Cmd+J (AI Copilot), Ctrl+N / Cmd+N (Notebook)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      const key = e.key.toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && key === 'k') {
         e.preventDefault();
         setIsSearchOpen((prev) => !prev);
+      }
+      if ((e.ctrlKey || e.metaKey) && key === 'j') {
+        e.preventDefault();
+        setActiveTab('ai');
+      }
+      if ((e.ctrlKey || e.metaKey) && key === 'n') {
+        e.preventDefault();
+        setActiveTab('notebook');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -283,27 +351,44 @@ export function App() {
 
   // Auth Listener: Resolves auth state before triggering any workspace data loading
   useEffect(() => {
-    const unsubscribe = onAuthStateChange((firebaseUser) => {
-      const token = getStoredJWT();
-      if (firebaseUser && token) {
-        setUser(firebaseUser);
-      } else {
-        setUser(null);
-        setExpenses([]);
-        setRecurringExpenses([]);
-        setMonthlyItems([]);
-        setConsumptionLogs([]);
-        setPersistedNotifications([]);
-        setIsMoreDrawerOpen(false);
-        setIsProfileSheetOpen(false);
-        setIsNotificationDrawerOpen(false);
-        setSyncStatus({ state: 'idle' });
-        setActiveTab('dashboard');
-        clearAuthSession();
+    let isMounted = true;
+
+    const initAuth = async () => {
+      try {
+        // 1. Check for OAuth hash callback fragment (#access_token=...)
+        const oauthUser = await handleOAuthHashCallback();
+        if (oauthUser && isMounted) {
+          setUser(oauthUser);
+          setAuthLoading(false);
+          return;
+        }
+
+        // 2. Otherwise attempt silent token refresh via HTTP-only cookie
+        const token = await refreshAccessToken();
+        if (token && isMounted) {
+          setUser(getStoredUserProfile());
+        } else if (isMounted) {
+          setUser(null);
+        }
+      } catch (err) {
+        console.warn('Auth init notice:', err);
+      } finally {
+        if (isMounted) setAuthLoading(false);
       }
-      setAuthLoading(false);
+    };
+
+    initAuth();
+
+    const unsubscribe = onAuthStateChange((currentUser) => {
+      if (isMounted) {
+        setUser(currentUser);
+      }
     });
-    return () => unsubscribe();
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   // Data Loading Trigger: Only loads workspace data when auth state is resolved and authenticated
@@ -324,46 +409,29 @@ export function App() {
     loadDataFromWorkspace();
   }, [authLoading, user]);
 
-  // Google Sign-In & Workspace Provisioning Handler
+  // Google Sign-In Handler
   const handleGoogleSignIn = async () => {
     try {
       setIsProvisioning(true);
       setProvisioningStep(0);
       setSyncStatus({ state: 'syncing' });
-
-      const res = await signInWithGoogle((stepIndex) => {
-        setProvisioningStep(stepIndex);
-      });
-
-      if (res?.user) {
-        setUser(res.user);
-        await loadDataFromWorkspace();
-      } else {
-        setSyncStatus({ state: 'idle' });
-      }
+      await signInWithGoogle();
     } catch (err: any) {
       console.error('Google Sign In failed:', err);
-      let errorMsg = err.message || 'Google Sign-In failed';
-      if (errorMsg.includes('auth/api-key-not-valid') || errorMsg.includes('api-key-not-valid')) {
-        errorMsg = 'Invalid Firebase API Key in .env.local. Please update VITE_FIREBASE_API_KEY with a valid Firebase Web API Key.';
-      }
       setSyncStatus({
         state: 'error',
-        errorMessage: errorMsg,
+        errorMessage: err.message || 'Google Sign-In failed',
       });
-    } finally {
-      setTimeout(() => {
-        setIsProvisioning(false);
-      }, 500);
+      setIsProvisioning(false);
     }
   };
 
   // Load all Workspace Data
-  const loadDataFromWorkspace = async () => {
+  const loadDataFromWorkspace = async (force: boolean = false) => {
     if (authLoading || !user || !getStoredJWT()) {
       return;
     }
-    if (isWorkspaceLoadingRef.current) return;
+    if (isWorkspaceLoadingRef.current && !force) return;
     isWorkspaceLoadingRef.current = true;
     setSyncStatus({ state: 'syncing' });
 
@@ -1237,24 +1305,6 @@ export function App() {
               <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mb-2" />
               <p className="text-sm font-semibold text-slate-500">Initializing {BRAND_NAME} Workspace...</p>
             </div>
-          ) : !isFirebaseConfigured ? (
-            <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center font-sans text-slate-800 p-4">
-              <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-200 shadow-xl text-center">
-                <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4 font-bold text-xl">
-                  !
-                </div>
-                <h2 className="text-xl font-bold text-slate-900 mb-2">Firebase Configuration Required</h2>
-                <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-                  {BRAND_NAME} requires valid Firebase Authentication configuration. Please ensure <code className="bg-slate-100 px-1.5 py-0.5 rounded text-rose-600 font-mono text-xs">VITE_FIREBASE_API_KEY</code>, <code className="bg-slate-100 px-1.5 py-0.5 rounded text-rose-600 font-mono text-xs">VITE_FIREBASE_AUTH_DOMAIN</code>, and <code className="bg-slate-100 px-1.5 py-0.5 rounded text-rose-600 font-mono text-xs">VITE_FIREBASE_PROJECT_ID</code> are configured.
-                </p>
-                <button
-                  onClick={() => window.location.reload()}
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition-all cursor-pointer shadow-md active:scale-95"
-                >
-                  Retry Configuration
-                </button>
-              </div>
-            </div>
           ) : !user ? (
             <WelcomePage
               onSignIn={handleGoogleSignIn}
@@ -1262,120 +1312,35 @@ export function App() {
               errorMessage={syncStatus.state === 'error' ? syncStatus.errorMessage : null}
             />
           ) : (
-            <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800" id="spendtrack-root">
+            <div className="min-h-screen bg-[var(--bg)] flex flex-col font-sans text-[var(--text-primary)] transition-colors duration-200" id="spendtrack-root">
               {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} durationMs={800} />}
 
-      {/* Top Application Header */}
-      <header className="sticky top-0 z-40 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-2xs">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-5 lg:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4 overflow-hidden">
-          {/* Left: TrackPay Logo */}
-          <div className="flex items-center shrink-0 select-none">
-            <div
-              onClick={() => setActiveTab('dashboard')}
-              className="cursor-pointer"
-            >
-              <TrackPayLogo size="md" showText />
+      {/* Top Application Header (Apple Wallet Style) */}
+      <header className="sticky top-0 z-40 h-[72px] sm:h-[84px] bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/90 px-4 sm:px-6 flex items-center justify-between shadow-sm dark:shadow-md transition-colors">
+        <div className="max-w-[1440px] w-full mx-auto flex items-center justify-between gap-4">
+          {/* Left: Logo & OS Badge */}
+          <div className="flex items-center gap-3">
+            <HeaderLogo onClick={() => handleSelectTab('dashboard')} />
+            <div className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full uppercase tracking-widest hidden md:inline-block">
+              Finance OS v4.2.5
             </div>
           </div>
 
-          {/* Center: Global Date Range Dropdown */}
-          <div className="flex-1 flex justify-center min-w-0 px-1">
-            <DateRangePicker
-              value={dateRange}
-              onChange={handleDateRangeChange}
+          {/* Center: Month Selector Pill */}
+          <div className="flex-1 max-w-xs justify-center flex">
+            <MonthSelectorPill
+              dateRange={dateRange}
+              onChangeDateRange={handleDateRangeChange}
             />
           </div>
 
-          {/* Center (Desktop): Exactly 4 Primary Navigation Tabs (Home, Expenses, Payments, AI) */}
-          <nav className="hidden md:flex items-center space-x-1 bg-slate-100/80 dark:bg-slate-800/80 p-1 rounded-[16px] border border-slate-200/60 dark:border-slate-700/60 shrink-0">
-            {[
-              { key: 'dashboard', label: 'Home', icon: Home },
-              { key: 'expenses', label: 'Expenses', icon: Receipt },
-              { key: 'recurring', label: 'Payments', icon: CreditCard },
-              { key: 'ai', label: 'AI', icon: Sparkles },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  id={`header-nav-${tab.key}`}
-                  onClick={() => handleSelectTab(tab.key)}
-                  className={`px-3.5 py-1.5 rounded-[12px] text-xs font-bold flex items-center gap-1.5 transition-all duration-200 cursor-pointer ${
-                    isActive
-                      ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-400 shadow-xs font-black'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  <Icon className="w-4 h-4 stroke-[2]" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Right: Sync Status + Bell + ☰ Hamburger Menu + Profile Avatar */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <div className="hidden xs:block">
-              <SyncStatusBadge
-                status={syncStatus}
-                isOnline={isOnline}
-                onRetry={loadDataFromWorkspace}
-                compact={true}
-              />
-            </div>
-
-            {/* Search Button */}
-            <button
-              onClick={() => setIsSearchOpen(true)}
-              className="w-11 h-11 min-w-[44px] min-h-[44px] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-[14px] hover:bg-slate-100 dark:hover:bg-slate-800 relative cursor-pointer flex items-center justify-center border border-slate-200/80 dark:border-slate-800 transition-colors"
-              aria-label="Global Search"
-              title="Global Search"
-            >
-              <Search className="w-4 h-4 text-emerald-500" />
-            </button>
-
-            {/* Notification Bell Button */}
-            <button
-              onClick={() => setActiveTab('notifications')}
-              className="w-11 h-11 min-w-[44px] min-h-[44px] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-[14px] hover:bg-slate-100 dark:hover:bg-slate-800 relative cursor-pointer flex items-center justify-center border border-slate-200/80 dark:border-slate-800 transition-colors"
-              aria-label="Notifications"
-            >
-              <Bell className="w-4 h-4 text-slate-700 dark:text-slate-300" />
-              {persistedNotifications.filter((n) => !n.read).length > 0 && (
-                <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black ring-2 ring-white dark:ring-slate-900">
-                  {persistedNotifications.filter((n) => !n.read).length}
-                </span>
-              )}
-            </button>
-
-            {/* ☰ Hamburger Menu Button (Opens More Drawer) */}
-            <button
-              id="header-hamburger-menu-btn"
-              onClick={() => setIsMoreDrawerOpen(true)}
-              className="w-11 h-11 min-w-[44px] min-h-[44px] text-slate-700 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white rounded-[14px] hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-center border border-slate-200/80 dark:border-slate-800 transition-colors"
-              aria-label="More Features Menu"
-              title="More Features (☰)"
-            >
-              <Menu className="w-4 h-4" />
-            </button>
-
-            {/* User Profile Avatar (Opens Profile Sheet) */}
-            <button
-              id="header-profile-avatar-btn"
-              onClick={() => setIsProfileSheetOpen(true)}
-              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-[14px] bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 font-bold border-2 border-emerald-500 flex items-center justify-center text-xs cursor-pointer shadow-xs overflow-hidden transition-transform hover:scale-105 active:scale-95 shrink-0"
-              aria-label="Profile and Account Settings"
-              title="Profile & Account"
-            >
-              {user?.photoURL ? (
-                <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
-              ) : user?.email ? (
-                user.email.substring(0, 2).toUpperCase()
-              ) : (
-                <User className="w-4 h-4" />
-              )}
-            </button>
+          {/* Right: Search & Menu Triggers */}
+          <div className="flex items-center gap-2 shrink-0">
+            <SearchTrigger onOpenSearch={() => setIsSearchOpen(true)} />
+            <MenuTrigger
+              onOpenMenu={() => setIsMoreDrawerOpen(true)}
+              badgeCount={persistedNotifications.filter((n) => !n.read).length}
+            />
           </div>
         </div>
       </header>
@@ -1390,6 +1355,10 @@ export function App() {
             expenses={expenses}
             dateRange={dateRange}
             userSettings={userSettings}
+            incomes={incomes}
+            emis={emis}
+            investments={investments}
+            savings={savings}
             onOpenAddExpense={() => {
               setEditingExpense(null);
               setInitialMonthlyItem(null);
@@ -1397,6 +1366,19 @@ export function App() {
             }}
             onNavigateToTab={(tab) => setActiveTab(tab as any)}
             onOpenScanReceipt={() => setIsScanReceiptOpen(true)}
+            onOpenWizard={() => setIsWizardOpen(true)}
+          />
+        )}
+
+        {activeTab === 'inbox' && (
+          <FinancialInboxPage
+            emis={emis}
+            investments={investments}
+            savings={savings}
+            recurringExpenses={recurringExpenses}
+            reminders={reminders}
+            onNavigateToTab={(tab) => setActiveTab(tab as any)}
+            onSaveNote={handleSaveNote}
           />
         )}
 
@@ -1646,6 +1628,34 @@ export function App() {
           <AiCfoPage />
         )}
 
+        {activeTab === 'portfolio' && (
+          <PortfolioPage />
+        )}
+
+        {activeTab === 'gold' && (
+          <GoldWorkspacePage />
+        )}
+
+        {activeTab === 'insurance' && (
+          <InsuranceVaultPage />
+        )}
+
+        {activeTab === 'documents' && (
+          <DocumentVaultPage />
+        )}
+
+        {activeTab === 'salary' && (
+          <SalaryIntelligencePage />
+        )}
+
+        {activeTab === 'tax' && (
+          <TaxDashboardPage />
+        )}
+
+        {activeTab === 'ai-executive' && (
+          <AiExecutiveWorkspacePage />
+        )}
+
         {activeTab === 'receipt-scanner' && (
           <ReceiptScannerPage
             categories={categories}
@@ -1671,100 +1681,83 @@ export function App() {
             userEmail={user?.email}
             workspaceStatus={workspaceStatus}
             onRefreshWorkspace={loadDataFromWorkspace}
+            themeMode={theme}
+            onChangeThemeMode={(mode) => setTheme(mode)}
+          />
+        )}
+
+        {!['dashboard', 'inbox', 'notifications', 'budget', 'family', 'expenses', 'monthly-items', 'items', 'analytics', 'notebook', 'planner', 'wealth', 'emis', 'investments', 'savings', 'recurring', 'ai', 'categories', 'health', 'networth', 'goals', 'aicfo', 'portfolio', 'gold', 'insurance', 'documents', 'salary', 'tax', 'ai-executive', 'receipt-scanner', 'settings'].includes(activeTab) && (
+          <EmptyWorkspace
+            title="Workspace Page Not Found"
+            subtitle="The requested tab does not match any active workspace module."
+            onAction={() => setActiveTab('dashboard')}
+            actionLabel="Return to Dashboard"
           />
         )}
       </main>
 
-      {/* EXPANDABLE QUICK ADD FAB */}
-      <QuickAddFAB
-        onOpenExpense={() => {
-          setEditingExpense(null);
-          setInitialMonthlyItem(null);
-          setIsAddExpenseOpen(true);
-        }}
-        onOpenStock={() => {
-          setSelectedConsumeItem(null);
-          setIsConsumeModalOpen(true);
-        }}
-        onOpenBill={() => {
-          setAutoOpenRecurringModal(true);
-          setActiveTab('recurring');
-        }}
-        onOpenScanReceipt={() => {
-          setIsScanReceiptOpen(true);
-        }}
+      {/* FLOATING DOCK NAVIGATION */}
+      <FloatingDock
+        activeTab={activeTab}
+        onSelectTab={(tab) => setActiveTab(tab as any)}
+        onOpenQuickAdd={() => setIsQuickAddSheetOpen(true)}
       />
 
-      {/* STREAMLINED 5-TAB MOBILE BOTTOM NAVIGATION */}
-      <nav
-        id="mobile-bottom-nav"
-        className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200/90 dark:border-slate-800/90 z-40 grid grid-cols-5 items-center h-16 pb-[env(safe-area-inset-bottom)] shadow-xl w-full max-w-[100vw]"
+      {/* QUICK ADD ACTION BOTTOM SHEET */}
+      <BottomSheet
+        isOpen={isQuickAddSheetOpen}
+        onClose={() => setIsQuickAddSheetOpen(false)}
+        title="Quick Add Action"
+        subtitle="Create a record across TrackPay Finance OS"
       >
-        {/* 1. Home */}
-        <button
-          id="mobile-nav-dashboard"
-          onClick={() => setActiveTab('dashboard')}
-          className={`flex flex-col items-center justify-center py-1 text-[11px] font-bold transition-all duration-200 cursor-pointer w-full h-full min-h-[44px] ${
-            activeTab === 'dashboard' ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-slate-500 dark:text-slate-400'
-          }`}
-        >
-          <Home className="w-[22px] h-[22px] mb-0.5 stroke-[2]" />
-          <span>Home</span>
-        </button>
-
-        {/* 2. Expenses */}
-        <button
-          id="mobile-nav-expenses"
-          onClick={() => setActiveTab('expenses')}
-          className={`flex flex-col items-center justify-center py-1 text-[11px] font-bold transition-all duration-200 cursor-pointer w-full h-full min-h-[44px] ${
-            activeTab === 'expenses' ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-slate-500 dark:text-slate-400'
-          }`}
-        >
-          <Receipt className="w-[22px] h-[22px] mb-0.5 stroke-[2]" />
-          <span>Expenses</span>
-        </button>
-
-        {/* 3. Center Elevated + Add Button */}
-        <div className="flex items-center justify-center w-full h-full">
+        <div className="grid grid-cols-2 gap-3">
           <button
-            id="mobile-nav-add-btn"
             onClick={() => {
+              setIsQuickAddSheetOpen(false);
               setEditingExpense(null);
               setInitialMonthlyItem(null);
               setIsAddExpenseOpen(true);
             }}
-            className="w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white flex items-center justify-center shadow-lg shadow-emerald-600/35 border-4 border-slate-50 dark:border-slate-900 active:scale-95 transition-all duration-200 cursor-pointer -mt-5 shrink-0"
-            title="Add Expense"
-            aria-label="Add Expense"
+            className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 hover:border-emerald-500 text-emerald-400 font-extrabold text-xs flex flex-col items-center justify-center gap-2 cursor-pointer transition-all hover:scale-105 active:scale-95"
           >
-            <Plus className="w-6 h-6 stroke-[2.5]" />
+            <Plus className="w-6 h-6 text-emerald-400" />
+            <span>Add Expense</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsQuickAddSheetOpen(false);
+              setIsScanReceiptOpen(true);
+            }}
+            className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20 hover:border-purple-500 text-purple-400 font-extrabold text-xs flex flex-col items-center justify-center gap-2 cursor-pointer transition-all hover:scale-105 active:scale-95"
+          >
+            <Receipt className="w-6 h-6 text-purple-400" />
+            <span>Scan Receipt</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsQuickAddSheetOpen(false);
+              setActiveTab('notebook');
+            }}
+            className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 hover:border-amber-500 text-amber-400 font-extrabold text-xs flex flex-col items-center justify-center gap-2 cursor-pointer transition-all hover:scale-105 active:scale-95"
+          >
+            <BookOpen className="w-6 h-6 text-amber-400" />
+            <span>Add Note</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsQuickAddSheetOpen(false);
+              setActiveTab('notifications');
+            }}
+            className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20 hover:border-blue-500 text-blue-400 font-extrabold text-xs flex flex-col items-center justify-center gap-2 cursor-pointer transition-all hover:scale-105 active:scale-95"
+          >
+            <Bell className="w-6 h-6 text-blue-400" />
+            <span>Add Reminder</span>
           </button>
         </div>
-
-        {/* 4. Payments */}
-        <button
-          id="mobile-nav-payments"
-          onClick={() => setActiveTab('recurring')}
-          className={`flex flex-col items-center justify-center py-1 text-[11px] font-bold transition-all duration-200 cursor-pointer w-full h-full min-h-[44px] ${
-            activeTab === 'recurring' ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-slate-500 dark:text-slate-400'
-          }`}
-        >
-          <CreditCard className="w-[22px] h-[22px] mb-0.5 stroke-[2]" />
-          <span>Payments</span>
-        </button>
-
-        {/* 5. AI */}
-        <button
-          id="mobile-nav-ai"
-          onClick={() => setActiveTab('ai')}
-          className={`flex flex-col items-center justify-center py-1 text-[11px] font-bold transition-all duration-200 cursor-pointer w-full h-full min-h-[44px] ${
-            activeTab === 'ai' ? 'text-emerald-600 dark:text-emerald-400 font-black' : 'text-slate-500 dark:text-slate-400'
-          }`}
-        >
-          <Sparkles className="w-[22px] h-[22px] mb-0.5 stroke-[2]" />
-          <span>AI</span>
-        </button>
-      </nav>
+      </BottomSheet>
 
       {/* Mobile More Features Drawer */}
       <MobileMoreDrawer
@@ -1855,6 +1848,24 @@ export function App() {
       {/* Floating AI CFO Copilot */}
       <FloatingAiCopilot />
 
+      {/* 6-Step Setup Wizard Modal */}
+      <FinanceOnboardingWizard
+        isOpen={isWizardOpen}
+        onClose={() => setIsWizardOpen(false)}
+        onComplete={async (homeMode) => {
+          setIsWizardOpen(false);
+          setUserSettings((prev) => ({ ...prev, homeMode: homeMode as any }));
+          await loadDataFromWorkspace(true);
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('✓ Workspace refreshed');
+            console.log('✓ Dashboard recalculated');
+          }
+        }}
+      />
+
+      {/* Global Toast Container */}
+      <ToastContainer />
+
       {/* Global Search Overlay Modal */}
       <GlobalSearchModal
         isOpen={isSearchOpen}
@@ -1875,4 +1886,10 @@ export function App() {
   );
 }
 
-export default App;
+export default function AppWithProviders() {
+  return (
+    <ToastProvider>
+      <App />
+    </ToastProvider>
+  );
+}

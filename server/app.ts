@@ -87,21 +87,6 @@ export function createExpressApp() {
     }
   });
 
-  // User Settings Routes
-  let inMemorySettings: Record<string, any> = {
-    currency: "USD",
-    theme: "dark",
-    notifications: true,
-  };
-
-  app.get("/api/settings", (req, res) => {
-    res.json(inMemorySettings);
-  });
-
-  app.post("/api/settings", (req, res) => {
-    inMemorySettings = { ...inMemorySettings, ...(req.body || {}) };
-    res.json(inMemorySettings);
-  });
 
   // Budget AI Prediction
   app.post("/api/budget/predict", (req, res) => {
