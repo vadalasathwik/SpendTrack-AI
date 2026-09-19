@@ -30,6 +30,7 @@ model User {
   googleId          String             @unique
   email             String             @unique
   name              String
+  picture           String?
   avatar            String?
   provider          String             @default("google")
   createdAt         DateTime           @default(now())

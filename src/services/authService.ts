@@ -2,6 +2,8 @@ export interface UserProfile {
   id: string;
   email: string;
   name: string;
+  picture?: string | null;
+  googleId?: string | null;
   avatar?: string | null;
   provider?: string;
   createdAt?: string;
