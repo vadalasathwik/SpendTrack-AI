@@ -34,6 +34,7 @@ import {
   getCategoryBreakdown,
   getWeeklySpending,
   getTopMerchants,
+  getLiveFinancialIntelligence,
 } from "./services/analytics.service.js";
 import {
   getRecurringExpenses,
@@ -302,6 +303,20 @@ router.post("/api/settings", async (req: any, res: any) => {
 
 
 // Analytics Endpoints
+router.get("/api/analytics/financial-intelligence", async (req: any, res: any) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const intel = await getLiveFinancialIntelligence(userId);
+    res.json(intel);
+  } catch (err: any) {
+    console.error("GET /api/analytics/financial-intelligence error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch financial intelligence" });
+  }
+});
+
 router.get("/api/analytics/stats", async (req: any, res: any) => {
   try {
     const userId = req.user?.userId || req.user?.uid;

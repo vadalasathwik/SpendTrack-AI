@@ -209,12 +209,11 @@ export const getUserActiveSessions = async (userId: string) => {
 
 const initializeNewUserWorkspace = async (userId: string) => {
   try {
-    // 1. Default Bank Accounts
+    // 1. Default Bank Accounts (Initial zero balance)
     await prisma.bankAccount.createMany({
       data: [
-        { userId, name: "HDFC Primary Salary", type: "SAVINGS", bankName: "HDFC Bank", currentBalance: 150000, availableBalance: 150000, isDefault: true, color: "#10B981" },
-        { userId, name: "ICICI Emergency Fund", type: "SAVINGS", bankName: "ICICI Bank", currentBalance: 75000, availableBalance: 75000, isDefault: false, color: "#3B82F6" },
-        { userId, name: "UPI Cash Wallet", type: "WALLET", bankName: "GPay Wallet", currentBalance: 5000, availableBalance: 5000, isDefault: false, color: "#8B5CF6" },
+        { userId, name: "Primary Bank Account", type: "SAVINGS", bankName: "Bank Account", currentBalance: 0, availableBalance: 0, isDefault: true, color: "#10B981" },
+        { userId, name: "Cash Wallet", type: "WALLET", bankName: "UPI / Cash", currentBalance: 0, availableBalance: 0, isDefault: false, color: "#8B5CF6" },
       ],
     });
 
@@ -229,25 +228,13 @@ const initializeNewUserWorkspace = async (userId: string) => {
       ],
     });
 
-    // 3. Default Monthly Budget
-    const currentMonth = new Date().getMonth() + 1;
-    const currentYear = new Date().getFullYear();
-    await prisma.monthlyBudget.create({
-      data: {
-        userId,
-        month: currentMonth,
-        year: currentYear,
-        budget: 120000,
-      },
-    });
-
-    // 4. Welcome Audit Log
+    // 3. Welcome Audit Log
     await prisma.auditLog.create({
       data: {
         userId,
         action: "CREATE",
         entity: "UserWorkspace",
-        newValue: "Initial TrackPay v5.2.1 AI Finance Workspace initialized via Google OAuth 2.0",
+        newValue: "Initial TrackPay v5.3 Personal Finance Workspace initialized with zero balances",
       },
     });
   } catch (err) {

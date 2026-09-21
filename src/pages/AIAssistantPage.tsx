@@ -17,43 +17,46 @@ import {
   Award,
 } from 'lucide-react';
 import { Expense, RecurringExpense, CategoryItem, DateRange } from '../types.js';
-import { SpendTrackAIService, AIChatMessage } from '../services/aiService.js';
-import { GlassCard } from '../components/ui/GlassCard.js';
+import { AIChatMessage } from '../services/aiService.js';
+import { parseAndExecuteLocalAiIntent } from '../services/localAiParser.js';
 
 interface AIAssistantPageProps {
   expenses: Expense[];
   recurringExpenses: RecurringExpense[];
-  categories: CategoryItem[];
-  dateRange: DateRange;
+  categories?: CategoryItem[];
+  dateRange?: DateRange;
   initialQuestion?: string | null;
   onClearInitialQuestion?: () => void;
+  onRefreshData?: () => void;
 }
 
 const QUICK_PROMPTS = [
-  'Can I buy this?',
-  'Summarize this month',
-  'Reduce EMI burden',
-  'Increase SIP',
-  'Build emergency fund',
+  'I spent ₹240 at Swiggy',
+  'Add ₹5000 salary',
+  'Show this month\'s spending',
+  'How much can I save?',
+  'When is my next EMI?',
 ];
 
 const AI_COACHES = [
-  { id: 'budget-coach', name: 'Budget Coach', icon: Wallet, prompt: 'Analyze my living budget efficiency and point out savings.' },
-  { id: 'invest-coach', name: 'Investment Coach', icon: TrendingUp, prompt: 'How can I step up my SIPs to reach ₹1 Crore faster?' },
-  { id: 'loan-advisor', name: 'Loan Advisor', icon: CreditCard, prompt: 'Create an EMI foreclosure strategy to save interest.' },
-  { id: 'gold-planner', name: 'Gold Planner', icon: Award, prompt: 'What percentage of my wealth should be in Sovereign Gold Bonds?' },
+  { id: 'swiggy', name: 'Record Swiggy Spend', icon: Wallet, prompt: 'I spent ₹240 at Swiggy' },
+  { id: 'salary', name: 'Add Salary Income', icon: TrendingUp, prompt: 'Add ₹5000 salary' },
+  { id: 'monthly', name: 'Monthly Spending Summary', icon: Activity, prompt: 'Show this month\'s spending' },
+  { id: 'savings', name: 'Calculate Savings Buffer', icon: Award, prompt: 'How much can I save?' },
+  { id: 'emi', name: 'Upcoming EMI Dates', icon: CreditCard, prompt: 'When is my next EMI?' },
 ];
 
 const DEFAULT_WELCOME_MESSAGE: AIChatMessage = {
   id: 'welcome-msg',
   role: 'assistant',
-  content: `Hello! I'm your **TrackPay AI CFO**.\n\nI automatically receive live financial context from your PostgreSQL database (Income, Living Expenses, EMIs, Free Cash, and Net Worth).\n\nAsk me anything or choose an AI Coach on the left:`,
+  content: `Hello! I'm your **SpendTrack Local AI CFO**.\n\nI can execute database operations, parse expenses/incomes, and analyze your PostgreSQL metrics locally without external API dependencies.\n\nTry clicking any quick prompt below or type your question:`,
   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 };
 
 export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
   expenses = [],
   recurringExpenses = [],
+  onRefreshData,
 }) => {
   const [messages, setMessages] = useState<AIChatMessage[]>([DEFAULT_WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
@@ -90,24 +93,16 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
     setIsLoading(true);
 
     try {
-      const responseText = await SpendTrackAIService.askGeminiFinancialAssistant({
-        question: textToSend,
+      const result = await parseAndExecuteLocalAiIntent(textToSend, {
         expenses,
         recurringExpenses,
-        contextMetrics: {
-          income: totalIncome,
-          expenses: totalLivingExpenses,
-          freeCash,
-          emiRatio,
-          savingRate,
-          netWorth: 850000,
-        },
+        onRefreshData,
       });
 
       const assistantMsg: AIChatMessage = {
         id: `ast_${Date.now()}`,
         role: 'assistant',
-        content: responseText,
+        content: result.message,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -118,7 +113,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
         {
           id: `err_${Date.now()}`,
           role: 'assistant',
-          content: `Apologies, I encountered an issue: ${err.message || 'Network error'}`,
+          content: `Apologies, I encountered an error: ${err.message || 'Processing error'}`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -135,7 +130,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
 
   return (
     <div className="h-[calc(100vh-140px)] min-h-[600px] max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4 pb-20 animate-in fade-in duration-300">
-      {/* PANEL 1: Left Panel - AI Coaches & Sessions (3 cols) */}
+      {/* PANEL 1: Left Panel - AI Quick Intents & Sessions (3 cols) */}
       <div className="hidden lg:flex lg:col-span-3 glass-panel rounded-[32px] p-4 flex-col justify-between overflow-y-auto custom-scrollbar shadow-2xl space-y-4">
         <div className="space-y-4">
           <button
@@ -148,7 +143,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
 
           <div className="space-y-2">
             <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 px-2">
-              Specialized AI Coaches
+              Quick AI Actions
             </span>
             <div className="space-y-1.5">
               {AI_COACHES.map((coach) => {
@@ -173,8 +168,8 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
         </div>
 
         <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 text-[11px] text-slate-400 space-y-1">
-          <span className="font-black text-white block">Gemini 2.5 Flash CFO</span>
-          <p>Automatic live Prisma PostgreSQL context feed.</p>
+          <span className="font-black text-white block">Local AI Intent Engine</span>
+          <p>Direct PostgreSQL API execution & zero API keys required.</p>
         </div>
       </div>
 
@@ -228,7 +223,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
           {isLoading && (
             <div className="flex items-center gap-2 text-violet-400 text-xs font-bold animate-pulse p-2">
               <Sparkles className="w-4 h-4 animate-spin" />
-              <span>AI CFO is synthesizing answer...</span>
+              <span>AI CFO is processing query & updating PostgreSQL...</span>
             </div>
           )}
 
@@ -242,7 +237,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
               <button
                 key={prompt}
                 onClick={() => handleSendMessage(prompt)}
-                className="px-3 py-1.5 rounded-full bg-slate-900/80 border border-white/10 hover:border-emerald-500/30 text-[11px] font-bold text-slate-300 hover:text-white transition-all whitespace-nowrap cursor-pointer"
+                className="px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-white/10 hover:border-emerald-500/40 text-[11px] font-bold text-slate-200 hover:text-white transition-all whitespace-nowrap cursor-pointer shadow-sm"
               >
                 💡 {prompt}
               </button>
@@ -252,7 +247,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
           <div className="relative flex items-center">
             <input
               type="text"
-              placeholder="Ask your AI CFO anything (e.g., 'Can I afford a ₹25,000 phone?')"
+              placeholder="Ask AI Copilot (e.g., 'I spent ₹240 at Swiggy' or 'Add ₹5000 salary')"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
@@ -306,9 +301,10 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
         </div>
 
         <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold">
-          ✓ Realtime Prisma Context Connected
+          ✓ Realtime PostgreSQL Connected
         </div>
       </div>
     </div>
   );
 };
+

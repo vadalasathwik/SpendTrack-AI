@@ -18,6 +18,7 @@ import {
   Target,
   Activity,
   Sparkles,
+  QrCode,
 } from 'lucide-react';
 import { BRAND_NAME } from '../constants/brand.js';
 
@@ -57,6 +58,13 @@ export const MobileMoreDrawer: React.FC<MobileMoreDrawerProps> = ({
       subtitle: 'MMTC PAMP, 100g goal milestone & DIP strategy',
       icon: PiggyBank,
       color: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60',
+    },
+    {
+      id: 'qr-vault',
+      title: '📱 QR Code Vault',
+      subtitle: 'Apple Wallet glass style offline encrypted QR vault',
+      icon: QrCode,
+      color: 'text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/60',
     },
     {
       id: 'insurance',
