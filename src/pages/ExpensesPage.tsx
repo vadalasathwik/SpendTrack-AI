@@ -1,368 +1,632 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Search,
   Filter,
-  ArrowUpDown,
-  Calendar,
-  Tag,
-  Edit2,
-  Trash2,
-  ExternalLink,
   Plus,
   Receipt,
-  FileSpreadsheet,
-  Download,
-  Eye,
-  CheckCircle2,
-  Clock,
+  TrendingDown,
+  TrendingUp,
+  ChevronRight,
   Sparkles,
   Zap,
   ShieldCheck,
-  ToggleLeft,
-  ToggleRight,
+  Calendar,
+  Utensils,
+  Car,
+  ShoppingBag,
+  Film,
+  Activity,
+  CreditCard,
+  Building2,
+  Trash2,
+  Edit2,
+  ExternalLink,
+  Award,
+  DollarSign,
+  ArrowUpDown,
+  Store,
+  BarChart2,
+  PieChart as PieChartIcon,
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+} from 'recharts';
 import { Expense, CategoryItem, DateRange } from '../types.js';
 import { formatCurrency } from '../utils/calculations.js';
 import { formatDisplayDate } from '../utils/dateRanges.js';
 import { CATEGORY_COLORS } from '../data/defaults.js';
-import { SpendTrackApi } from '../services/api.js';
 
 interface ExpensesPageProps {
   expenses: Expense[];
   categories: CategoryItem[];
   dateRange: DateRange;
+  incomes?: any[];
   onOpenAddExpense: () => void;
   onEditExpense: (expense: Expense) => void;
   onDeleteExpense: (expense: Expense) => void;
   onSelectItemAnalytics: (itemName: string) => void;
 }
 
+const CATEGORY_ICONS: Record<string, any> = {
+  'Food & Dining': Utensils,
+  Transportation: Car,
+  'Shopping & Retail': ShoppingBag,
+  'Bills & Utilities': Zap,
+  Entertainment: Film,
+  'Health & Medical': Activity,
+  Housing: Building2,
+  Personal: CreditCard,
+};
+
+const PALETTE = ['#10B981', '#06B6D4', '#8B5CF6', '#F59E0B', '#EF4444', '#3B82F6', '#EC4899'];
+
 export const ExpensesPage: React.FC<ExpensesPageProps> = ({
-  expenses,
-  categories,
-  dateRange,
+  expenses = [],
+  categories = [],
+  incomes = [],
   onOpenAddExpense,
   onEditExpense,
   onDeleteExpense,
   onSelectItemAnalytics,
 }) => {
-  const [activeTab, setActiveTab] = useState<'ALL' | 'SUBSCRIPTIONS'>('ALL');
+  const [activeTab, setActiveTab] = useState<'timeline' | 'insights' | 'charts' | 'merchants'>('timeline');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [selectedAccount, setSelectedAccount] = useState<string>('ALL');
   const [sortBy, setSortBy] = useState<'date' | 'price' | 'name'>('date');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
 
-  // Subscriptions state
-  const [subscriptions, setSubscriptions] = useState<any[]>([]);
-  const [subsLoading, setSubsLoading] = useState<boolean>(false);
+  // -------------------------------------------------------------------
+  // 1. TIMELINE CATEGORIZATION & FILTERS
+  // -------------------------------------------------------------------
+  const filtered = useMemo(() => {
+    return expenses.filter((exp) => {
+      const name = (exp.merchant || exp.itemName || '').toLowerCase();
+      const notes = (exp.notes || '').toLowerCase();
+      const query = searchQuery.toLowerCase();
+      const matchesSearch = name.includes(query) || notes.includes(query);
 
-  // Reconciliation state
-  const [reconData, setReconData] = useState<any>(null);
+      const matchesCat = selectedCategory === 'ALL' || exp.category === selectedCategory;
 
-  useEffect(() => {
-    const fetchSubs = async () => {
-      try {
-        setSubsLoading(true);
-        const data = await SpendTrackApi.getSubscriptions();
-        setSubscriptions(data || []);
-        const recon = await SpendTrackApi.getReconciliationStatus();
-        setReconData(recon);
-      } catch (err) {
-        console.error("Failed to load subscriptions or reconciliation:", err);
-      } finally {
-        setSubsLoading(false);
+      const acc = exp.account || (exp.source === 'AI Copilot' ? 'Google Pay' : 'HDFC Bank');
+      const matchesAcc = selectedAccount === 'ALL' || acc.toLowerCase().includes(selectedAccount.toLowerCase());
+
+      return matchesSearch && matchesCat && matchesAcc;
+    });
+  }, [expenses, searchQuery, selectedCategory, selectedAccount]);
+
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'date') {
+        const diff = (a.purchaseDate || '').localeCompare(b.purchaseDate || '');
+        return sortOrder === 'desc' ? -diff : diff;
       }
+      if (sortBy === 'price') {
+        const diff = (a.totalPrice || 0) - (b.totalPrice || 0);
+        return sortOrder === 'desc' ? -diff : diff;
+      }
+      if (sortBy === 'name') {
+        const nameA = a.merchant || a.itemName;
+        const nameB = b.merchant || b.itemName;
+        const diff = nameA.localeCompare(nameB);
+        return sortOrder === 'desc' ? -diff : diff;
+      }
+      return 0;
+    });
+  }, [filtered, sortBy, sortOrder]);
+
+  // Group sorted transactions by time buckets
+  const timelineGroups = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const yesterdayDate = new Date();
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+
+    const groups: {
+      today: Expense[];
+      yesterday: Expense[];
+      thisWeek: Expense[];
+      earlier: Expense[];
+    } = {
+      today: [],
+      yesterday: [],
+      thisWeek: [],
+      earlier: [],
     };
-    fetchSubs();
-  }, []);
 
-  const toggleAutoPay = (id: string) => {
-    setSubscriptions((prev) =>
-      prev.map((sub) => (sub.id === id ? { ...sub, autoPay: !sub.autoPay } : sub))
-    );
-  };
+    sorted.forEach((exp) => {
+      const dStr = exp.purchaseDate || '';
+      const expDate = new Date(dStr);
 
-  const toggleActiveStatus = (id: string) => {
-    setSubscriptions((prev) =>
-      prev.map((sub) => (sub.id === id ? { ...sub, isActive: !sub.isActive } : sub))
-    );
-  };
+      if (dStr === todayStr) {
+        groups.today.push(exp);
+      } else if (dStr === yesterdayStr) {
+        groups.yesterday.push(exp);
+      } else if (expDate >= weekAgo) {
+        groups.thisWeek.push(exp);
+      } else {
+        groups.earlier.push(exp);
+      }
+    });
 
-  // Filter expenses by search query and category
-  const filtered = expenses.filter((exp) => {
-    const matchesSearch =
-      exp.itemName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (exp.notes && exp.notes.toLowerCase().includes(searchQuery.toLowerCase()));
+    return groups;
+  }, [sorted]);
 
-    const matchesCategory = selectedCategory === 'ALL' || exp.category === selectedCategory;
+  // -------------------------------------------------------------------
+  // 2. FINANCIAL INSIGHTS MATH
+  // -------------------------------------------------------------------
+  const insightsMetrics = useMemo(() => {
+    const totalSpent = sorted.reduce((sum, e) => sum + (Number(e.totalPrice) || 0), 0);
+    const now = new Date();
+    const daysInMonthSoFar = Math.max(1, now.getDate());
+    const avgPerDay = Math.round(totalSpent / daysInMonthSoFar);
 
-    return matchesSearch && matchesCategory;
-  });
+    // Highest category
+    const catTotals: Record<string, number> = {};
+    sorted.forEach((e) => {
+      catTotals[e.category] = (catTotals[e.category] || 0) + (Number(e.totalPrice) || 0);
+    });
+    const sortedCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+    const highestCategory = sortedCats[0] ? sortedCats[0][0] : 'None';
+    const highestCatAmount = sortedCats[0] ? sortedCats[0][1] : 0;
 
-  // Sort expenses
-  const sorted = [...filtered].sort((a, b) => {
-    if (sortBy === 'date') {
-      const diff = (a.purchaseDate || '').localeCompare(b.purchaseDate || '');
-      return sortOrder === 'desc' ? -diff : diff;
+    // Biggest single expense
+    const biggestExp = [...sorted].sort((a, b) => (b.totalPrice || 0) - (a.totalPrice || 0))[0];
+
+    // Previous month comparison
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    let prevMonth = currentMonth - 1;
+    let prevYear = currentYear;
+    if (prevMonth < 0) {
+      prevMonth = 11;
+      prevYear--;
     }
-    if (sortBy === 'price') {
-      const diff = (a.totalPrice || 0) - (b.totalPrice || 0);
-      return sortOrder === 'desc' ? -diff : diff;
-    }
-    if (sortBy === 'name') {
-      const diff = a.itemName.localeCompare(b.itemName);
-      return sortOrder === 'desc' ? -diff : diff;
-    }
-    return 0;
-  });
 
-  const totalFilteredSpending = sorted.reduce((sum, e) => sum + (Number(e.totalPrice) || 0), 0);
-  const totalMonthlySubs = subscriptions.filter(s => s.isActive).reduce((sum, s) => sum + s.monthlyAmount, 0);
+    const prevMonthExpenses = expenses.filter((e) => {
+      const d = new Date(e.purchaseDate);
+      return d.getMonth() === prevMonth && d.getFullYear() === prevYear;
+    });
+    const prevMonthTotal = prevMonthExpenses.reduce((sum, e) => sum + (Number(e.totalPrice) || 0), 0);
+
+    let momChange = 0;
+    if (prevMonthTotal > 0) {
+      momChange = Math.round(((totalSpent - prevMonthTotal) / prevMonthTotal) * 100);
+    }
+
+    return {
+      totalSpent,
+      avgPerDay,
+      highestCategory,
+      highestCatAmount,
+      biggestExp,
+      momChange,
+      prevMonthTotal,
+    };
+  }, [sorted, expenses]);
+
+  // -------------------------------------------------------------------
+  // 3. RECHARTS DATA PREPARATION
+  // -------------------------------------------------------------------
+  const areaChartData = useMemo(() => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const last7 = Array.from({ length: 7 }).map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      const dateStr = d.toISOString().split('T')[0];
+      const dayName = days[d.getDay()];
+
+      const dayTotal = sorted
+        .filter((e) => e.purchaseDate === dateStr)
+        .reduce((sum, e) => sum + (Number(e.totalPrice) || 0), 0);
+
+      return {
+        day: dayName,
+        date: dateStr,
+        amount: dayTotal,
+      };
+    });
+    return last7;
+  }, [sorted]);
+
+  const pieChartData = useMemo(() => {
+    const catTotals: Record<string, number> = {};
+    sorted.forEach((e) => {
+      catTotals[e.category] = (catTotals[e.category] || 0) + (Number(e.totalPrice) || 0);
+    });
+
+    return Object.entries(catTotals).map(([name, value]) => ({
+      name,
+      value,
+    }));
+  }, [sorted]);
+
+  const barChartData = useMemo(() => {
+    const totalInflow = incomes.reduce((s, i) => s + (Number(i.amount) || 0), 0) || 140000;
+    const totalOutflow = sorted.reduce((s, e) => s + (Number(e.totalPrice) || 0), 0);
+
+    return [
+      { name: 'Income', amount: totalInflow },
+      { name: 'Expenses', amount: totalOutflow },
+    ];
+  }, [sorted, incomes]);
+
+  // -------------------------------------------------------------------
+  // 4. MERCHANT INTELLIGENCE (Top 5 Leaderboard)
+  // -------------------------------------------------------------------
+  const merchantIntelligence = useMemo(() => {
+    const merchantMap: Record<
+      string,
+      { merchant: string; category: string; visitCount: number; totalSpent: number }
+    > = {};
+
+    sorted.forEach((e) => {
+      const name = e.merchant || e.itemName || 'General Merchant';
+      if (!merchantMap[name]) {
+        merchantMap[name] = {
+          merchant: name,
+          category: e.category || 'General',
+          visitCount: 0,
+          totalSpent: 0,
+        };
+      }
+      merchantMap[name].visitCount += 1;
+      merchantMap[name].totalSpent += Number(e.totalPrice) || 0;
+    });
+
+    const leaderboard = Object.values(merchantMap)
+      .sort((a, b) => b.totalSpent - a.totalSpent)
+      .slice(0, 5);
+
+    return leaderboard;
+  }, [sorted]);
 
   return (
-    <div className="space-y-5 pb-16 max-w-[1440px] mx-auto" id="expenses-page-container">
-      {/* 1. Header & Tab Navigation */}
-      <div className="bg-white dark:bg-slate-900 p-5 rounded-[20px] border border-slate-200/80 dark:border-slate-800 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4 pb-20 animate-in fade-in duration-200" id="expenses-page-container">
+      {/* ------------------------------------------------------------- */}
+      {/* Header Banner & Add Action                                    */}
+      {/* ------------------------------------------------------------- */}
+      <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-950 p-5 text-white border border-emerald-500/30 shadow-2xl backdrop-blur-xl">
+        <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                Expenses & Subscriptions
-              </h1>
-              <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                Phase 1 Active
-              </span>
+            <div className="flex items-center gap-1.5 text-[11px] font-black text-emerald-300 uppercase tracking-widest mb-1">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Google Pay Workspace</span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Manage transaction ledger & intelligent recurring subscription detection.
+            <h1 className="text-2xl font-black text-white tracking-tight">
+              Transactions
+            </h1>
+            <p className="text-xs text-slate-300 mt-0.5">
+              Intelligent ledger, merchant ranks & Recharts analytics
             </p>
           </div>
 
           <button
-            id="expenses-add-new-btn"
             onClick={onOpenAddExpense}
-            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm rounded-[14px] shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap self-start sm:self-center"
+            className="px-4 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/30 hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
           >
-            <Plus className="w-4 h-4" />
-            <span>Add Expense</span>
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>Add Spend</span>
           </button>
         </div>
-
-        {/* BANK RECONCILIATION SUMMARY CARD */}
-        {reconData && (
-          <div className="mt-4 p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-black">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="text-[10px] font-extrabold uppercase text-indigo-400">Bank Reconciliation Engine</span>
-                <h4 className="font-extrabold text-white">
-                  {reconData.reconciliationProgress}% Statements Reconciled
-                </h4>
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  Matched: {reconData.matchedCount} • Pending: {reconData.pendingCount} • AI Duplicates: {reconData.duplicateCount}
-                </p>
-              </div>
-            </div>
-            {reconData.duplicateCandidates?.length > 0 && (
-              <div className="px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 font-bold text-[11px] flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" /> {reconData.duplicateCandidates.length} AI Duplicate Flagged
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* View Switcher Tabs */}
-        <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-          <button
-            onClick={() => setActiveTab('ALL')}
-            className={`px-4 py-2 rounded-[12px] text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'ALL'
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
-            }`}
-          >
-            All Ledger Transactions ({sorted.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('SUBSCRIPTIONS')}
-            className={`px-4 py-2 rounded-[12px] text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'SUBSCRIPTIONS'
-                ? 'bg-purple-600 text-white'
-                : 'bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-300 hover:bg-purple-100'
-            }`}
-          >
-            <Zap className="w-3.5 h-3.5" />
-            <span>Subscription Intelligence ({subscriptions.length})</span>
-          </button>
-        </div>
-
-        {/* Filters Bar for Ledger */}
-        {activeTab === 'ALL' && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-            {/* Search Box */}
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3.5 top-2.5 text-slate-400" />
-              <input
-                type="text"
-                id="expense-search-input"
-                placeholder="Search expenses..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-[12px] focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-              />
-            </div>
-
-            {/* Category Filter */}
-            <div>
-              <select
-                id="filter-category-select"
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-[12px] focus:ring-2 focus:ring-emerald-500 focus:outline-none font-medium"
-              >
-                <option value="ALL">All Categories</option>
-                {categories.map((c) => (
-                  <option key={c.name} value={c.name}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Sort By & Order */}
-            <div className="flex items-center gap-2">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="flex-1 px-3 py-2 text-xs sm:text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-[12px] focus:ring-2 focus:ring-emerald-500 focus:outline-none font-medium"
-              >
-                <option value="date">Sort by Date</option>
-                <option value="price">Sort by Price</option>
-                <option value="name">Sort by Name</option>
-              </select>
-              <button
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                className="px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 font-bold text-slate-700 dark:text-slate-300 rounded-[12px] cursor-pointer"
-                title="Toggle sort order"
-              >
-                {sortOrder === 'desc' ? '↓ Desc' : '↑ Asc'}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* 2. TAB CONTENT: ALL LEDGER */}
-      {activeTab === 'ALL' && (
-        sorted.length > 0 ? (
-          <div className="bg-white dark:bg-slate-900 rounded-[20px] border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {sorted.map((exp) => (
-                <TransactionCardRow
-                  key={exp.id}
-                  exp={exp}
+      {/* ------------------------------------------------------------- */}
+      {/* Filter Segment Pills & Search Bar                             */}
+      {/* ------------------------------------------------------------- */}
+      <div className="space-y-2">
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search transactions by merchant, item or note..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 shadow-xs"
+          />
+        </div>
+
+        {/* Tab Segment Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+          {[
+            { id: 'timeline', label: `Timeline (${sorted.length})` },
+            { id: 'insights', label: 'Insights' },
+            { id: 'charts', label: 'Charts' },
+            { id: 'merchants', label: 'Merchants' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`px-4 py-2 rounded-2xl text-xs font-black transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === tab.id
+                  ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 scale-105'
+                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ------------------------------------------------------------- */}
+      {/* 1. TIMELINE TAB (Categorized Time Groups)                     */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === 'timeline' && (
+        <div className="space-y-4">
+          {sorted.length === 0 ? (
+            <div className="p-8 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+                <Receipt className="w-6 h-6" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">No Transactions Found</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
+                {searchQuery
+                  ? 'No transactions match your search filter.'
+                  : 'Record your first expense to populate your Google Pay timeline.'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* TODAY */}
+              {timelineGroups.today.length > 0 && (
+                <TimelineGroupSection
+                  title="Today"
+                  items={timelineGroups.today}
                   onSelectItemAnalytics={onSelectItemAnalytics}
                   onEditExpense={onEditExpense}
-                  onDeleteExpense={(item) => setExpenseToDelete(item)}
+                  onDeleteExpense={(exp) => setExpenseToDelete(exp)}
                 />
-              ))}
+              )}
+
+              {/* YESTERDAY */}
+              {timelineGroups.yesterday.length > 0 && (
+                <TimelineGroupSection
+                  title="Yesterday"
+                  items={timelineGroups.yesterday}
+                  onSelectItemAnalytics={onSelectItemAnalytics}
+                  onEditExpense={onEditExpense}
+                  onDeleteExpense={(exp) => setExpenseToDelete(exp)}
+                />
+              )}
+
+              {/* THIS WEEK */}
+              {timelineGroups.thisWeek.length > 0 && (
+                <TimelineGroupSection
+                  title="This Week"
+                  items={timelineGroups.thisWeek}
+                  onSelectItemAnalytics={onSelectItemAnalytics}
+                  onEditExpense={onEditExpense}
+                  onDeleteExpense={(exp) => setExpenseToDelete(exp)}
+                />
+              )}
+
+              {/* EARLIER */}
+              {timelineGroups.earlier.length > 0 && (
+                <TimelineGroupSection
+                  title="Earlier"
+                  items={timelineGroups.earlier}
+                  onSelectItemAnalytics={onSelectItemAnalytics}
+                  onEditExpense={onEditExpense}
+                  onDeleteExpense={(exp) => setExpenseToDelete(exp)}
+                />
+              )}
             </div>
-          </div>
-        ) : (
-          <div className="bg-white dark:bg-slate-900 p-10 sm:p-14 text-center rounded-[20px] border border-slate-200/80 dark:border-slate-800 text-slate-400 my-4">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-3">
-              <Receipt className="w-7 h-7 stroke-[1.8]" />
-            </div>
-            <h3 className="text-base font-extrabold text-slate-900 dark:text-white">No expenses yet</h3>
-            <p className="text-xs mt-1 text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-              {searchQuery || selectedCategory !== 'ALL'
-                ? 'No expenditures match your active search or category filters.'
-                : 'You have not recorded any expenses yet.'}
-            </p>
-          </div>
-        )
+          )}
+        </div>
       )}
 
-      {/* 3. TAB CONTENT: SUBSCRIPTION INTELLIGENCE */}
-      {activeTab === 'SUBSCRIPTIONS' && (
-        <div className="space-y-4">
-          <div className="p-4 rounded-[20px] bg-gradient-to-r from-purple-900/30 via-slate-900 to-indigo-900/30 border border-purple-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-purple-400">Total Monthly Recurring Commitment</span>
-              <h2 className="text-2xl font-black text-white mt-0.5">₹{totalMonthlySubs.toLocaleString('en-IN')}/mo <span className="text-xs text-slate-400 font-normal">(Annualized: ₹{(totalMonthlySubs * 12).toLocaleString('en-IN')})</span></h2>
+      {/* ------------------------------------------------------------- */}
+      {/* 2. INSIGHTS TAB (Metrics & Comparisons)                       */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === 'insights' && (
+        <div className="space-y-3.5">
+          <div className="grid grid-cols-2 gap-3">
+            {/* Metric 1: Total Spending */}
+            <div className="p-4 rounded-[28px] bg-gradient-to-br from-emerald-600 to-teal-700 text-white shadow-lg border border-emerald-400/20">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-200">Total Spending</span>
+              <p className="text-xl sm:text-2xl font-black text-white mt-1">
+                {formatCurrency(insightsMetrics.totalSpent)}
+              </p>
+              <span className="text-[10px] text-emerald-200 mt-1 block">Current month outflow</span>
             </div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-purple-300">
-              <Sparkles className="w-4 h-4 text-purple-400" />
-              <span>AI Auto-Detect Active</span>
+
+            {/* Metric 2: Average / Day */}
+            <div className="p-4 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Average / Day</span>
+              <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mt-1">
+                {formatCurrency(insightsMetrics.avgPerDay)}
+              </p>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">Daily burn rate</span>
+            </div>
+
+            {/* Metric 3: Highest Category */}
+            <div className="p-4 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Highest Category</span>
+              <p className="text-sm font-black text-slate-900 dark:text-white mt-1 truncate">
+                {insightsMetrics.highestCategory}
+              </p>
+              <span className="text-[10px] text-teal-600 dark:text-teal-400 font-bold mt-1 block">
+                {formatCurrency(insightsMetrics.highestCatAmount)}
+              </span>
+            </div>
+
+            {/* Metric 4: MoM Comparison */}
+            <div className="p-4 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">MoM Change</span>
+              <p className={`text-xl sm:text-2xl font-black mt-1 ${insightsMetrics.momChange > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                {insightsMetrics.momChange > 0 ? `+${insightsMetrics.momChange}%` : `${insightsMetrics.momChange}%`}
+              </p>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">vs last month</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {subscriptions.map((sub) => (
-              <div
-                key={sub.id}
-                className="p-5 rounded-[24px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-3 soft-shadow"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-purple-500/15 border border-purple-500/30 text-purple-400 flex items-center justify-center font-bold text-sm shrink-0">
-                      {sub.merchant.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <h3 className="font-black text-sm text-slate-900 dark:text-white">{sub.merchant}</h3>
-                      <span className="text-[11px] font-semibold text-slate-400">{sub.category}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => toggleActiveStatus(sub.id)}
-                      className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full border cursor-pointer ${
-                        sub.isActive
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                          : 'bg-slate-800 text-slate-500 border-slate-700'
-                      }`}
-                    >
-                      {sub.isActive ? 'Active' : 'Paused'}
-                    </button>
-                  </div>
+          {/* Metric 5: Biggest Expense */}
+          {insightsMetrics.biggestExp && (
+            <div className="p-4 rounded-[28px] bg-slate-900 text-white border border-slate-800 flex items-center justify-between shadow-md">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs shrink-0">
+                  <Award className="w-5 h-5" />
                 </div>
-
-                <div className="grid grid-cols-2 gap-2 p-3 rounded-[16px] bg-slate-50 dark:bg-slate-800/50">
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Monthly</span>
-                    <div className="text-base font-black text-slate-900 dark:text-white">₹{sub.monthlyAmount.toLocaleString('en-IN')}</div>
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Annual Cost</span>
-                    <div className="text-base font-black text-purple-400">₹{sub.annualAmount.toLocaleString('en-IN')}</div>
-                  </div>
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Biggest Single Expense</span>
+                  <h4 className="font-extrabold text-sm text-white">
+                    {insightsMetrics.biggestExp.merchant || insightsMetrics.biggestExp.itemName}
+                  </h4>
+                  <p className="text-[10px] text-slate-400">{insightsMetrics.biggestExp.category}</p>
                 </div>
+              </div>
+              <span className="text-base font-black text-amber-400 font-mono">
+                {formatCurrency(insightsMetrics.biggestExp.totalPrice)}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
-                <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100 dark:border-slate-800">
-                  <span className="text-slate-400 font-medium">Renews in {sub.daysToRenewal} days</span>
-                  <button
-                    onClick={() => toggleAutoPay(sub.id)}
-                    className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-purple-400 cursor-pointer"
+      {/* ------------------------------------------------------------- */}
+      {/* 3. CHARTS TAB (Recharts Area, Donut & Bar Charts)              */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === 'charts' && (
+        <div className="space-y-4">
+          {/* Chart 1: 7-Day Area Spending Trend */}
+          <div className="p-5 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <BarChart2 className="w-4 h-4 text-emerald-500" />
+                <span>7-Day Spending Trend</span>
+              </h3>
+            </div>
+
+            <div className="h-44 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={areaChartData}>
+                  <defs>
+                    <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#10B981" stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="day" stroke="#94A3B8" fontSize={10} tickLine={false} />
+                  <YAxis stroke="#94A3B8" fontSize={10} tickLine={false} />
+                  <Tooltip
+                    formatter={(value: any) => [formatCurrency(Number(value)), 'Spent']}
+                    contentStyle={{ backgroundColor: '#0F172A', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '11px' }}
+                  />
+                  <Area type="monotone" dataKey="amount" stroke="#10B981" strokeWidth={3} fillOpacity={1} fill="url(#colorUv)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Chart 2: Category Donut Chart */}
+          <div className="p-5 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <PieChartIcon className="w-4 h-4 text-cyan-500" />
+              <span>Category Breakdown</span>
+            </h3>
+
+            <div className="h-48 w-full flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieChartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={45}
+                    outerRadius={70}
+                    paddingAngle={3}
+                    dataKey="value"
                   >
-                    <span>Auto-pay</span>
-                    {sub.autoPay ? (
-                      <ToggleRight className="w-5 h-5 text-emerald-500" />
-                    ) : (
-                      <ToggleLeft className="w-5 h-5 text-slate-500" />
-                    )}
-                  </button>
+                    {pieChartData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={PALETTE[index % PALETTE.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(val: any) => [formatCurrency(Number(val)), 'Amount']}
+                    contentStyle={{ backgroundColor: '#0F172A', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '11px' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Chart 3: Income vs Expense Bar Chart */}
+          <div className="p-5 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <TrendingUp className="w-4 h-4 text-purple-500" />
+              <span>Income vs Expense Flow</span>
+            </h3>
+
+            <div className="h-44 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={barChartData}>
+                  <XAxis dataKey="name" stroke="#94A3B8" fontSize={10} tickLine={false} />
+                  <YAxis stroke="#94A3B8" fontSize={10} tickLine={false} />
+                  <Tooltip
+                    formatter={(val: any) => [formatCurrency(Number(val)), 'Total']}
+                    contentStyle={{ backgroundColor: '#0F172A', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '11px' }}
+                  />
+                  <Bar dataKey="amount" radius={[8, 8, 0, 0]}>
+                    {barChartData.map((entry, index) => (
+                      <Cell key={`bar-${index}`} fill={entry.name === 'Income' ? '#10B981' : '#EF4444'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* 4. MERCHANT INTELLIGENCE TAB (Top 5 Leaderboard)              */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === 'merchants' && (
+        <div className="space-y-3 px-1">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+              <Store className="w-4 h-4 text-amber-500" />
+              Top 5 Merchants Leaderboard
+            </h2>
+          </div>
+
+          <div className="space-y-2.5">
+            {merchantIntelligence.map((item, idx) => (
+              <div
+                key={item.merchant}
+                className="p-4 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between shadow-xs"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center font-black text-xs shrink-0">
+                    #{idx + 1}
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-xs text-slate-900 dark:text-white">{item.merchant}</h3>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                      {item.category} • {item.visitCount} visits
+                    </p>
+                  </div>
                 </div>
 
-                {sub.aiSuggestion && (
-                  <div className="p-3 rounded-[14px] bg-purple-500/10 border border-purple-500/20 text-[11px] text-purple-300 font-medium flex items-start gap-2">
-                    <Sparkles className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
-                    <span>{sub.aiSuggestion}</span>
-                  </div>
-                )}
+                <span className="font-black text-xs text-slate-900 dark:text-white font-mono">
+                  {formatCurrency(item.totalSpent)}
+                </span>
               </div>
             ))}
           </div>
@@ -371,17 +635,16 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
 
       {/* Delete Confirmation Modal */}
       {expenseToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white dark:bg-slate-900 w-[calc(100vw-24px)] max-w-[420px] rounded-[20px] shadow-2xl border border-slate-100 dark:border-slate-800 p-5 space-y-4">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">Delete Expense?</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-[380px] rounded-[28px] p-5 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+            <h3 className="text-sm font-black text-slate-900 dark:text-white">Delete Transaction?</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Are you sure you want to delete the expense{' '}
-              <strong className="text-slate-900 dark:text-white">"{expenseToDelete.itemName}"</strong> ({formatCurrency(expenseToDelete.totalPrice)})?
+              Are you sure you want to remove <strong className="text-slate-900 dark:text-white">"{expenseToDelete.merchant || expenseToDelete.itemName}"</strong> ({formatCurrency(expenseToDelete.totalPrice)}) from PostgreSQL?
             </p>
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 onClick={() => setExpenseToDelete(null)}
-                className="px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-[12px] cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 Cancel
               </button>
@@ -390,7 +653,7 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
                   await onDeleteExpense(expenseToDelete);
                   setExpenseToDelete(null);
                 }}
-                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-[12px] shadow-xs cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-black text-white bg-rose-600 hover:bg-rose-500 shadow-md cursor-pointer"
               >
                 Delete
               </button>
@@ -402,8 +665,46 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
   );
 };
 
-// Sub-component for individual transaction row with Touch Swipe gestures
-const TransactionCardRow: React.FC<{
+// -------------------------------------------------------------------
+// TIMELINE GROUP COMPONENT
+// -------------------------------------------------------------------
+const TimelineGroupSection: React.FC<{
+  title: string;
+  items: Expense[];
+  onSelectItemAnalytics: (name: string) => void;
+  onEditExpense: (exp: Expense) => void;
+  onDeleteExpense: (exp: Expense) => void;
+}> = ({ title, items, onSelectItemAnalytics, onEditExpense, onDeleteExpense }) => {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between px-1">
+        <h3 className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
+          {title}
+        </h3>
+        <span className="text-[10px] font-bold text-slate-400">
+          {items.length} items
+        </span>
+      </div>
+
+      <div className="p-2 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 space-y-1 shadow-xs">
+        {items.map((exp) => (
+          <TransactionRowItem
+            key={exp.id}
+            exp={exp}
+            onSelectItemAnalytics={onSelectItemAnalytics}
+            onEditExpense={onEditExpense}
+            onDeleteExpense={onDeleteExpense}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// -------------------------------------------------------------------
+// TRANSACTION ROW ITEM (With Swipe Delete Gesture)
+// -------------------------------------------------------------------
+const TransactionRowItem: React.FC<{
   exp: Expense;
   onSelectItemAnalytics: (name: string) => void;
   onEditExpense: (exp: Expense) => void;
@@ -412,127 +713,88 @@ const TransactionCardRow: React.FC<{
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
-  const minSwipeDistance = 50;
+  const name = exp.merchant || exp.itemName || 'Expense';
+  const amount = Number(exp.totalPrice) || 0;
+  const category = exp.category || 'General';
+  const CategoryIcon = CATEGORY_ICONS[category] || Receipt;
+  const account = exp.account || (exp.source === 'AI Copilot' ? 'Google Pay' : 'HDFC Bank');
 
-  const onTouchStartHandler = (e: React.TouchEvent) => {
+  const onTouchStart = (e: React.TouchEvent) => {
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
   };
 
-  const onTouchMoveHandler = (e: React.TouchEvent) => {
+  const onTouchMove = (e: React.TouchEvent) => {
     setTouchEnd(e.targetTouches[0].clientX);
   };
 
-  const onTouchEndHandler = () => {
+  const onTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
     const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
-
-    if (isLeftSwipe) {
+    if (distance > 50) {
       onDeleteExpense(exp);
-    } else if (isRightSwipe) {
+    } else if (distance < -50) {
       onEditExpense(exp);
     }
   };
 
   return (
     <div
-      id={`expense-row-${exp.id}`}
-      onTouchStart={onTouchStartHandler}
-      onTouchMove={onTouchMoveHandler}
-      onTouchEnd={onTouchEndHandler}
-      className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors select-none"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onClick={() => onEditExpense(exp)}
+      className="p-3 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors flex items-center justify-between cursor-pointer group"
     >
-      {/* Left side: Category Avatar + Details */}
       <div className="flex items-center gap-3 min-w-0 flex-1">
+        {/* Merchant Logo Avatar */}
         <div
-          className="w-10 h-10 rounded-[14px] flex items-center justify-center text-white font-bold text-sm shadow-2xs shrink-0"
-          style={{ backgroundColor: CATEGORY_COLORS[exp.category] || '#64748B' }}
+          className="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-black text-xs shrink-0 shadow-xs"
+          style={{ backgroundColor: CATEGORY_COLORS[category] || '#10B981' }}
         >
-          {exp.itemName.charAt(0).toUpperCase()}
+          {name.charAt(0).toUpperCase()}
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => onSelectItemAnalytics(exp.itemName)}
-              className="font-extrabold text-slate-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 text-xs sm:text-sm text-left cursor-pointer line-clamp-2 max-w-[180px] xs:max-w-[240px] sm:max-w-none"
-            >
-              {exp.itemName}
-            </button>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold">
-              {exp.category}
+          <div className="flex items-center gap-1.5">
+            <h4 className="font-extrabold text-xs text-slate-900 dark:text-white truncate">
+              {name}
+            </h4>
+            <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full shrink-0">
+              {account}
             </span>
-            {(exp.source === 'recurring' || exp.recurringId) && (
-              <span
-                className="text-[10px] text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded-full font-bold border border-purple-200 dark:border-purple-800/60 inline-flex items-center gap-1"
-                title="Auto-generated from Recurring Bill"
-              >
-                Recurring Bill
-              </span>
-            )}
-            {exp.receiptDriveFileId && (
-              <span
-                className="text-[10px] text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full font-bold border border-emerald-200 dark:border-emerald-800"
-                title="Receipt attached"
-              >
-                Receipt ✓
-              </span>
-            )}
-            {exp.calendarEventId && (
-              <span
-                className="text-[10px] text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-full font-bold border border-blue-200 dark:border-blue-800 inline-flex items-center gap-1"
-                title="Google Calendar reminder scheduled"
-              >
-                <Calendar className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-                Calendar Synced ✓
-              </span>
-            )}
           </div>
 
-          <div className="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5">
-            {formatDisplayDate(exp.purchaseDate)}
+          <div className="flex items-center gap-2 text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
+            <span className="flex items-center gap-1">
+              <CategoryIcon className="w-3 h-3" />
+              {category}
+            </span>
+            <span>•</span>
+            <span>{exp.purchaseDate || 'Today'}</span>
           </div>
         </div>
       </div>
 
-      {/* Right side: Amount + Actions */}
-      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
-        <div className="text-right">
-          <div className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
-            {formatCurrency(exp.totalPrice)}
-          </div>
+      <div className="text-right shrink-0 flex items-center gap-2">
+        <div>
+          <span className="font-black text-xs text-slate-900 dark:text-white font-mono block">
+            -{formatCurrency(amount)}
+          </span>
         </div>
 
-        <div className="flex items-center gap-1">
-          {exp.receiptViewLink && (
-            <a
-              href={exp.receiptViewLink}
-              target="_blank"
-              rel="noreferrer"
-              className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-[10px] hover:bg-emerald-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-              title="View Receipt"
-            >
-              <ExternalLink className="w-4 h-4" />
-            </a>
-          )}
-          <button
-            onClick={() => onEditExpense(exp)}
-            className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-[10px] hover:bg-blue-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-            title="Edit Expense"
-          >
-            <Edit2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => onDeleteExpense(exp)}
-            className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-[10px] hover:bg-rose-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-            title="Delete Expense"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDeleteExpense(exp);
+          }}
+          className="p-1 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   );
 };
+
+

@@ -68,6 +68,11 @@ import { BottomSheet } from './components/ui/BottomSheet.js';
 import { EmptyWorkspace } from './components/ui/EmptyWorkspace.js';
 import { ToastProvider } from './context/ToastContext.js';
 import { ToastContainer } from './components/ui/ToastContainer.js';
+import { ConflictResolutionModal } from './components/ConflictResolutionModal.js';
+import { offlineSyncManager } from './services/offlineSyncManager.js';
+import { getCachedItems, saveAllCachedItems, OfflineMutation } from './services/offlineStore.js';
+import { getStoredThemeMode, applyThemeMode } from './utils/theme.js';
+
 
 // Pages
 import { DashboardPage } from './pages/DashboardPage.js';
@@ -107,6 +112,9 @@ import { DocumentVaultPage } from './pages/DocumentVaultPage.js';
 import { SalaryIntelligencePage } from './pages/SalaryIntelligencePage.js';
 import { TaxDashboardPage } from './pages/TaxDashboardPage.js';
 import { AiExecutiveWorkspacePage } from './pages/AiExecutiveWorkspacePage.js';
+import { QRVaultPage } from './pages/QRVaultPage.js';
+import { WalletPage } from './pages/WalletPage.js';
+
 
 const DATE_RANGE_STORAGE_KEY = 'spendtrack_date_range';
 const ACTIVE_TAB_STORAGE_KEY = 'spendtrack_active_tab';
@@ -273,6 +281,37 @@ export function App() {
   const [initialMonthlyItem, setInitialMonthlyItem] = useState<MonthlyItem | null>(null);
   const [selectedAnalyticsItem, setSelectedAnalyticsItem] = useState<string | null>(null);
   const [aiInitialQuestion, setAiInitialQuestion] = useState<string | null>(null);
+
+  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
+  const [activeConflict, setActiveConflict] = useState<OfflineMutation | null>(null);
+
+  // Load domain data from IndexedDB cache immediately on boot
+  useEffect(() => {
+    applyThemeMode(getStoredThemeMode());
+
+    Promise.all([
+      getCachedItems<Expense>('expenses'),
+      getCachedItems<any>('incomes'),
+      getCachedItems<any>('notes'),
+      getCachedItems<any>('planner'),
+    ]).then(([cachedExp, cachedInc, cachedNotes, cachedPlanner]) => {
+      if (cachedExp && cachedExp.length > 0) setExpenses(cachedExp);
+      if (cachedInc && cachedInc.length > 0) setIncomes(cachedInc);
+      if (cachedNotes && cachedNotes.length > 0) setNotes(cachedNotes);
+      if (cachedPlanner && cachedPlanner.length > 0) setReminders(cachedPlanner);
+    }).catch(err => {
+      console.warn('IndexedDB initial boot read notice:', err);
+    });
+
+    const unsubscribe = offlineSyncManager.subscribe((info) => {
+      setIsOnline(offlineSyncManager.isOnline());
+      if (info.activeConflict) {
+        setActiveConflict(info.activeConflict);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
 
   const handleOpenAIWithQuestion = (question: string) => {
     setAiInitialQuestion(question);
@@ -492,6 +531,13 @@ export function App() {
       setPlannerSummary(loadedPlanner || { income: 0, emi: 0, investments: 0, savings: 0, living: 55000, buffer: 0 });
       setCashFlow(loadedCashFlow || { income: 0, expenses: 0, emi: 0, investments: 0, savings: 0, freeCash: 0, savingRate: 0, emiRatio: 0 });
       setUpcomingTimeline(loadedUpcoming || []);
+
+      // Cache to IndexedDB for offline access
+      saveAllCachedItems('expenses', loadedExpenses || []).catch(() => {});
+      saveAllCachedItems('incomes', loadedIncomes || []).catch(() => {});
+      saveAllCachedItems('notes', loadedNotes || []).catch(() => {});
+      saveAllCachedItems('planner', loadedReminders || []).catch(() => {});
+
 
       const parsedSettings: UserSettings = {
         currencySymbol: loadedSettings.currencySymbol || '₹',
@@ -713,11 +759,24 @@ export function App() {
     setSyncStatus({ state: 'saving' });
     try {
       if (editingExpense) {
-        const updated = await SpendTrackApi.updateExpense(editingExpense.id, expenseData);
-        setExpenses((prev) => prev.map((e) => (e.id === editingExpense.id ? updated : e)));
+        const { result } = await offlineSyncManager.executeMutation<Expense>(
+          'expenses',
+          'UPDATE',
+          expenseData,
+          editingExpense.id,
+          () => SpendTrackApi.updateExpense(editingExpense.id, expenseData)
+        );
+        setExpenses((prev) => prev.map((e) => (e.id === editingExpense.id ? result : e)));
       } else {
-        const created = await SpendTrackApi.createExpense(expenseData);
-        setExpenses((prev) => [created, ...prev]);
+        const tempId = `exp_${Date.now()}`;
+        const { result } = await offlineSyncManager.executeMutation<Expense>(
+          'expenses',
+          'CREATE',
+          expenseData,
+          tempId,
+          () => SpendTrackApi.createExpense(expenseData)
+        );
+        setExpenses((prev) => [result, ...prev]);
       }
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
@@ -733,8 +792,15 @@ export function App() {
     try {
       const createdItems: Expense[] = [];
       for (const exp of expenseList) {
-        const created = await SpendTrackApi.createExpense(exp);
-        createdItems.push(created);
+        const tempId = `exp_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
+        const { result } = await offlineSyncManager.executeMutation<Expense>(
+          'expenses',
+          'CREATE',
+          exp,
+          tempId,
+          () => SpendTrackApi.createExpense(exp)
+        );
+        createdItems.push(result);
       }
       setExpenses((prev) => [...createdItems, ...prev]);
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
@@ -747,7 +813,13 @@ export function App() {
   const handleDeleteExpense = async (expense: Expense) => {
     setSyncStatus({ state: 'saving' });
     try {
-      await SpendTrackApi.deleteExpense(expense.id);
+      await offlineSyncManager.executeMutation(
+        'expenses',
+        'DELETE',
+        {},
+        expense.id,
+        () => SpendTrackApi.deleteExpense(expense.id)
+      );
       setExpenses((prev) => prev.filter((e) => e.id !== expense.id));
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
@@ -902,9 +974,16 @@ export function App() {
   const handleAddIncome = async (data: { title: string; amount: number }) => {
     setSyncStatus({ state: 'saving' });
     try {
-      const item = await SpendTrackApi.createIncome(data);
-      setIncomes((prev) => [...prev, item]);
-      const summary = await SpendTrackApi.getPlannerSummary();
+      const tempId = `inc_${Date.now()}`;
+      const { result } = await offlineSyncManager.executeMutation(
+        'incomes',
+        'CREATE',
+        data,
+        tempId,
+        () => SpendTrackApi.createIncome(data)
+      );
+      setIncomes((prev) => [...prev, result]);
+      const summary = await SpendTrackApi.getPlannerSummary().catch(() => ({ income: 0, emi: 0, investments: 0, savings: 0, living: 55000, buffer: 0 }));
       setPlannerSummary(summary);
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
@@ -916,9 +995,15 @@ export function App() {
   const handleDeleteIncome = async (id: string) => {
     setSyncStatus({ state: 'saving' });
     try {
-      await SpendTrackApi.deleteIncome(id);
+      await offlineSyncManager.executeMutation(
+        'incomes',
+        'DELETE',
+        {},
+        id,
+        () => SpendTrackApi.deleteIncome(id)
+      );
       setIncomes((prev) => prev.filter((item) => item.id !== id));
-      const summary = await SpendTrackApi.getPlannerSummary();
+      const summary = await SpendTrackApi.getPlannerSummary().catch(() => ({ income: 0, emi: 0, investments: 0, savings: 0, living: 55000, buffer: 0 }));
       setPlannerSummary(summary);
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
@@ -1054,8 +1139,16 @@ export function App() {
   const handleSaveNote = async (content: string, title?: string, tags?: string, pinned?: boolean) => {
     setSyncStatus({ state: 'saving' });
     try {
-      const saved = await SpendTrackApi.saveNote(content, title, tags, pinned);
-      setNotes([saved]);
+      const tempId = `note_${Date.now()}`;
+      const payload = { content, title, tags, pinned };
+      const { result } = await offlineSyncManager.executeMutation(
+        'notes',
+        'CREATE',
+        payload,
+        tempId,
+        () => SpendTrackApi.saveNote(content, title, tags, pinned)
+      );
+      setNotes([result]);
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
       setSyncStatus({ state: 'error', errorMessage: err.message });
@@ -1066,9 +1159,16 @@ export function App() {
   const handleAddReminder = async (data: { title: string; description?: string; dueDate: string; priority?: string }) => {
     setSyncStatus({ state: 'saving' });
     try {
-      const item = await SpendTrackApi.createReminder(data);
-      setReminders((prev) => [...prev, item]);
-      const upcoming = await SpendTrackApi.getUpcomingReminders();
+      const tempId = `rem_${Date.now()}`;
+      const { result } = await offlineSyncManager.executeMutation(
+        'planner',
+        'CREATE',
+        data,
+        tempId,
+        () => SpendTrackApi.createReminder(data)
+      );
+      setReminders((prev) => [...prev, result]);
+      const upcoming = await SpendTrackApi.getUpcomingReminders().catch(() => []);
       setUpcomingTimeline(upcoming);
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
@@ -1080,9 +1180,15 @@ export function App() {
   const handleUpdateReminder = async (id: string, data: any) => {
     setSyncStatus({ state: 'saving' });
     try {
-      const updated = await SpendTrackApi.updateReminder(id, data);
-      setReminders((prev) => prev.map((r) => (r.id === id ? updated : r)));
-      const upcoming = await SpendTrackApi.getUpcomingReminders();
+      const { result } = await offlineSyncManager.executeMutation(
+        'planner',
+        'UPDATE',
+        data,
+        id,
+        () => SpendTrackApi.updateReminder(id, data)
+      );
+      setReminders((prev) => prev.map((r) => (r.id === id ? result : r)));
+      const upcoming = await SpendTrackApi.getUpcomingReminders().catch(() => []);
       setUpcomingTimeline(upcoming);
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
@@ -1094,9 +1200,15 @@ export function App() {
   const handleDeleteReminder = async (id: string) => {
     setSyncStatus({ state: 'saving' });
     try {
-      await SpendTrackApi.deleteReminder(id);
+      await offlineSyncManager.executeMutation(
+        'planner',
+        'DELETE',
+        {},
+        id,
+        () => SpendTrackApi.deleteReminder(id)
+      );
       setReminders((prev) => prev.filter((r) => r.id !== id));
-      const upcoming = await SpendTrackApi.getUpcomingReminders();
+      const upcoming = await SpendTrackApi.getUpcomingReminders().catch(() => []);
       setUpcomingTimeline(upcoming);
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
@@ -1315,38 +1427,44 @@ export function App() {
             <div className="min-h-screen bg-[var(--bg)] flex flex-col font-sans text-[var(--text-primary)] transition-colors duration-200" id="spendtrack-root">
               {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} durationMs={800} />}
 
-      {/* Top Application Header (Apple Wallet Style) */}
-      <header className="sticky top-0 z-40 h-[72px] sm:h-[84px] bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/90 px-4 sm:px-6 flex items-center justify-between shadow-sm dark:shadow-md transition-colors">
-        <div className="max-w-[1440px] w-full mx-auto flex items-center justify-between gap-4">
-          {/* Left: Logo & OS Badge */}
-          <div className="flex items-center gap-3">
+      {/* Top Application Header (Google Pay & Apple Wallet Style) */}
+      <header className="sticky top-0 z-40 h-[68px] sm:h-[76px] bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/90 px-4 flex items-center justify-between shadow-xs transition-colors">
+        <div className="max-w-[430px] w-full mx-auto flex items-center justify-between gap-2">
+          {/* Left: Logo */}
+          <div className="flex items-center gap-2">
             <HeaderLogo onClick={() => handleSelectTab('dashboard')} />
-            <div className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full uppercase tracking-widest hidden md:inline-block">
-              Finance OS v4.2.5
-            </div>
           </div>
 
           {/* Center: Month Selector Pill */}
-          <div className="flex-1 max-w-xs justify-center flex">
+          <div className="flex-1 justify-center flex">
             <MonthSelectorPill
               dateRange={dateRange}
               onChangeDateRange={handleDateRangeChange}
             />
           </div>
 
-          {/* Right: Search & Menu Triggers */}
+          {/* Right: Sync Badge, Search, and Google Profile Avatar */}
           <div className="flex items-center gap-2 shrink-0">
+            <SyncStatusBadge onOpenConflictModal={() => setIsConflictModalOpen(true)} />
             <SearchTrigger onOpenSearch={() => setIsSearchOpen(true)} />
-            <MenuTrigger
-              onOpenMenu={() => setIsMoreDrawerOpen(true)}
-              badgeCount={persistedNotifications.filter((n) => !n.read).length}
-            />
+            <button
+              id="google-profile-header-avatar"
+              onClick={() => setIsProfileSheetOpen(true)}
+              className="w-9 h-9 rounded-full bg-emerald-600 text-white font-black text-xs border-2 border-emerald-400 flex items-center justify-center shrink-0 overflow-hidden shadow-sm cursor-pointer hover:scale-105 transition-transform"
+              title="Account & Settings"
+            >
+              {user?.photoUrl ? (
+                <img src={user.photoUrl} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                user?.name ? user.name.substring(0, 2).toUpperCase() : (user?.email ? user.email.substring(0, 2).toUpperCase() : 'ST')
+              )}
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-24 md:pb-12">
+      {/* Main Content Area (Max Width 430px Desktop Shell) */}
+      <main className="flex-1 max-w-[430px] w-full mx-auto px-4 pt-4 pb-24">
         {activeTab === 'dashboard' && (
           <FinanceHomePage
             user={user}
@@ -1368,6 +1486,10 @@ export function App() {
             onOpenScanReceipt={() => setIsScanReceiptOpen(true)}
             onOpenWizard={() => setIsWizardOpen(true)}
           />
+        )}
+
+        {activeTab === 'wallet' && (
+          <WalletPage expenses={expenses} userSettings={userSettings} />
         )}
 
         {activeTab === 'inbox' && (
@@ -1599,7 +1721,10 @@ export function App() {
             categories={categories}
             dateRange={dateRange}
             initialQuestion={aiInitialQuestion}
-            onClearInitialQuestion={() => setAiInitialQuestion(null)}
+            onRefreshData={() => {
+              getCachedItems<Expense>('expenses').then(exp => exp && setExpenses(exp));
+              getCachedItems<any>('incomes').then(inc => inc && setIncomes(inc));
+            }}
           />
         )}
 
@@ -1654,6 +1779,10 @@ export function App() {
 
         {activeTab === 'ai-executive' && (
           <AiExecutiveWorkspacePage />
+        )}
+
+        {activeTab === 'qr-vault' && (
+          <QRVaultPage />
         )}
 
         {activeTab === 'receipt-scanner' && (
@@ -1877,6 +2006,16 @@ export function App() {
         goals={goals}
         reminders={reminders}
         onSelectTab={(tab) => setActiveTab(tab as any)}
+      />
+      {/* Conflict Resolution Modal */}
+      <ConflictResolutionModal
+        isOpen={isConflictModalOpen || activeConflict !== null}
+        onClose={() => setIsConflictModalOpen(false)}
+        conflict={activeConflict}
+        onResolve={async (mutationId, resolution) => {
+          await offlineSyncManager.resolveConflict(mutationId, resolution);
+          setActiveConflict(null);
+        }}
       />
     </div>
           )

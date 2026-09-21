@@ -80,6 +80,11 @@ async function apiFetch<T>(
    SpendTrack API
 -------------------------------------------------------- */
 export const SpendTrackApi = {
+  // Auth Sessions
+  async getSessions() {
+    return apiFetch<any[]>("/api/auth/sessions").catch(() => []);
+  },
+
   // Workspace Status
   async checkWorkspaceStatus() {
     return apiFetch<{
@@ -420,6 +425,27 @@ export const SpendTrackApi = {
   },
 
   // Analytics Dashboard
+  async getLiveFinancialIntelligence() {
+    return apiFetch<{
+      netWorth: number;
+      netWorthGrowthPct: number;
+      totalAssets: number;
+      totalLiabilities: number;
+      income: number;
+      expenses: number;
+      freeCash: number;
+      monthlyBurnRate: number;
+      savingsRate: number;
+      investmentRatio: number;
+      emergencyFund: number;
+      emergencyMonths: number;
+      passiveIncome: number;
+      investedAssets: number;
+      targetFireNumber: number;
+      fireProgressPct: number;
+    }>("/api/analytics/financial-intelligence");
+  },
+
   async getAnalyticsStats() {
     return apiFetch<{
       totalExpenses: number;

@@ -59,7 +59,7 @@ export const handleGoogleCallback = async (code: string, reqInfo: { userAgent?: 
     url: "https://www.googleapis.com/oauth2/v2/userinfo",
   });
 
-  const { id: googleId, email, name, picture: avatarUrl } = userinfoRes.data;
+  const { id: googleId, email, name, picture: pictureUrl } = userinfoRes.data;
 
   if (!email || !googleId) {
     throw new Error("Failed to retrieve profile from Google OAuth");
@@ -79,7 +79,8 @@ export const handleGoogleCallback = async (code: string, reqInfo: { userAgent?: 
         googleId,
         email,
         name: name || email.split("@")[0],
-        avatar: avatarUrl || null,
+        picture: pictureUrl || null,
+        avatar: pictureUrl || null,
         provider: "google",
       },
     });
@@ -92,22 +93,32 @@ export const handleGoogleCallback = async (code: string, reqInfo: { userAgent?: 
       where: { id: user.id },
       data: {
         name: name || user.name,
-        avatar: avatarUrl || user.avatar,
+        picture: pictureUrl || user.picture,
+        avatar: pictureUrl || user.avatar,
         googleId,
       },
     });
   }
 
-  // Generate Access Token (15m) & Refresh Token (30d)
+  // Generate Access Token (15m) & Refresh Token (7d)
   const accessToken = jwt.sign(
-    { userId: user.id, email: user.email, name: user.name },
+    {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        picture: user.picture || user.avatar || "",
+        googleId: user.googleId,
+        provider: user.provider,
+      },
+    },
     getJwtSecret(),
     { expiresIn: "15m" }
   );
 
   const rawRefreshToken = crypto.randomBytes(40).toString("hex");
   const refreshTokenHash = hashToken(rawRefreshToken);
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
   // Create Session in DB
   await prisma.session.create({
@@ -149,7 +160,16 @@ export const refreshSession = async (rawRefreshToken: string) => {
 
   // Issue fresh 15-minute access token
   const accessToken = jwt.sign(
-    { userId: session.user.id, email: session.user.email, name: session.user.name },
+    {
+      user: {
+        id: session.user.id,
+        email: session.user.email,
+        name: session.user.name,
+        picture: session.user.picture || session.user.avatar || "",
+        googleId: session.user.googleId,
+        provider: session.user.provider,
+      },
+    },
     getJwtSecret(),
     { expiresIn: "15m" }
   );
@@ -189,12 +209,11 @@ export const getUserActiveSessions = async (userId: string) => {
 
 const initializeNewUserWorkspace = async (userId: string) => {
   try {
-    // 1. Default Bank Accounts
+    // 1. Default Bank Accounts (Initial zero balance)
     await prisma.bankAccount.createMany({
       data: [
-        { userId, name: "HDFC Primary Salary", type: "SAVINGS", bankName: "HDFC Bank", currentBalance: 150000, availableBalance: 150000, isDefault: true, color: "#10B981" },
-        { userId, name: "ICICI Emergency Fund", type: "SAVINGS", bankName: "ICICI Bank", currentBalance: 75000, availableBalance: 75000, isDefault: false, color: "#3B82F6" },
-        { userId, name: "UPI Cash Wallet", type: "WALLET", bankName: "GPay Wallet", currentBalance: 5000, availableBalance: 5000, isDefault: false, color: "#8B5CF6" },
+        { userId, name: "Primary Bank Account", type: "SAVINGS", bankName: "Bank Account", currentBalance: 0, availableBalance: 0, isDefault: true, color: "#10B981" },
+        { userId, name: "Cash Wallet", type: "WALLET", bankName: "UPI / Cash", currentBalance: 0, availableBalance: 0, isDefault: false, color: "#8B5CF6" },
       ],
     });
 
@@ -209,25 +228,13 @@ const initializeNewUserWorkspace = async (userId: string) => {
       ],
     });
 
-    // 3. Default Monthly Budget
-    const currentMonth = new Date().getMonth() + 1;
-    const currentYear = new Date().getFullYear();
-    await prisma.monthlyBudget.create({
-      data: {
-        userId,
-        month: currentMonth,
-        year: currentYear,
-        budget: 120000,
-      },
-    });
-
-    // 4. Welcome Audit Log
+    // 3. Welcome Audit Log
     await prisma.auditLog.create({
       data: {
         userId,
         action: "CREATE",
         entity: "UserWorkspace",
-        newValue: "Initial TrackPay v5.2.1 AI Finance Workspace initialized via Google OAuth 2.0",
+        newValue: "Initial TrackPay v5.3 Personal Finance Workspace initialized with zero balances",
       },
     });
   } catch (err) {

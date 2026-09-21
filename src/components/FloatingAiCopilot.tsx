@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Sparkles, X, Send, Bot, DollarSign, Activity, FileText, ChevronUp, ChevronDown } from 'lucide-react';
-import { SpendTrackApi } from '../services/api.js';
+import { parseAndExecuteLocalAiIntent } from '../services/localAiParser.js';
 
 interface Message {
   id: string;
@@ -9,7 +9,11 @@ interface Message {
   timestamp: string;
 }
 
-export const FloatingAiCopilot: React.FC = () => {
+interface FloatingAiCopilotProps {
+  onRefreshData?: () => void;
+}
+
+export const FloatingAiCopilot: React.FC<FloatingAiCopilotProps> = ({ onRefreshData }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,7 +21,7 @@ export const FloatingAiCopilot: React.FC = () => {
     {
       id: 'init-1',
       sender: 'ai',
-      text: 'Good day! I am your TrackPay AI CFO. Ask me anything about your cash flow, purchase affordability, EMI exposure, or monthly savings targets.',
+      text: 'Good day! I am your SpendTrack AI CFO. Ask me to record spending, add salary, check EMI dates, or analyze savings.',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -38,59 +42,16 @@ export const FloatingAiCopilot: React.FC = () => {
     setLoading(true);
 
     try {
-      let aiText = '';
-      const lower = textToSend.toLowerCase();
-
-      if (lower.startsWith('i spent') || lower.includes('spent ₹') || lower.includes('spent rs')) {
-        const matchAmount = textToSend.match(/(\d+)/);
-        const amount = matchAmount ? Number(matchAmount[1]) : 0;
-        let merchant = 'General Purchase';
-        if (lower.includes('at ')) {
-          merchant = textToSend.split(/at /i)[1]?.trim() || merchant;
-        } else if (lower.includes('on ')) {
-          merchant = textToSend.split(/on /i)[1]?.trim() || merchant;
-        }
-
-        if (amount > 0) {
-          try {
-            await SpendTrackApi.createExpense({
-              itemName: merchant,
-              totalPrice: amount,
-              category: lower.includes('starbucks') || lower.includes('food') ? 'Food & Dining' : 'Shopping',
-              purchaseDate: new Date().toISOString().split('T')[0],
-              source: 'AI Copilot',
-            });
-            aiText = `Recorded expense of ₹${amount.toLocaleString('en-IN')} for "${merchant}" under ${lower.includes('starbucks') ? 'Food & Dining' : 'Shopping'}. Updated cash flow metrics automatically.`;
-          } catch (e) {
-            aiText = `Parsed expense for "${merchant}" (₹${amount.toLocaleString('en-IN')}). Recorded into your personal ledger!`;
-          }
-        } else {
-          aiText = 'Please specify an amount, for example: "I spent ₹250 at Starbucks".';
-        }
-      } else if (lower.includes('afford') || lower.includes('can i buy')) {
-        const matchAmount = textToSend.match(/\d+/);
-        const amount = matchAmount ? Number(matchAmount[0]) : 10000;
-        const result = await SpendTrackApi.checkAffordability(amount);
-        aiText = result.message;
-      } else if (lower.includes('health') || lower.includes('score')) {
-        const health = await SpendTrackApi.getCfoHealth();
-        aiText = `Your Financial Health Score is ${health.healthScore}/100 (${health.risk} Risk). Free cash remaining: ₹${health.freeCash.toLocaleString('en-IN')}. Saving rate: ${health.savingRate}%.`;
-      } else if (lower.includes('invest') || lower.includes('savings')) {
-        const cashflow = await SpendTrackApi.getCfoCashflow();
-        const safeInvestment = Math.round(cashflow.freeCash * 0.4);
-        aiText = `Based on your free cash buffer of ₹${cashflow.freeCash.toLocaleString('en-IN')}, you can safely allocate ₹${safeInvestment.toLocaleString('en-IN')}/month into index funds or Gold SIPs.`;
-      } else if (lower.includes('report') || lower.includes('summary')) {
-        const report = await SpendTrackApi.getMonthlyClosingReport();
-        aiText = report.aiSummary;
-      } else {
-        const health = await SpendTrackApi.getCfoHealth();
-        aiText = `Health Score: ${health.healthScore}/100. Free Cash: ₹${health.freeCash.toLocaleString('en-IN')}. ${health.insights[0] || 'Keep optimizing your monthly cash buffer.'}`;
-      }
+      const result = await parseAndExecuteLocalAiIntent(textToSend, {
+        expenses: [],
+        recurringExpenses: [],
+        onRefreshData,
+      });
 
       const aiMsg: Message = {
         id: `ai-${Date.now()}`,
         sender: 'ai',
-        text: aiText,
+        text: result.message,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -101,7 +62,7 @@ export const FloatingAiCopilot: React.FC = () => {
         {
           id: `ai-err-${Date.now()}`,
           sender: 'ai',
-          text: 'I was unable to retrieve live financial stats right now. Please try again.',
+          text: 'Unable to complete AI action right now. Please try again.',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -133,8 +94,8 @@ export const FloatingAiCopilot: React.FC = () => {
                 <Bot className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="font-extrabold text-sm text-white">TrackPay AI CFO</h3>
-                <p className="text-[10px] text-violet-300">Personal Financial Intelligence</p>
+                <h3 className="font-extrabold text-sm text-white">SpendTrack AI CFO</h3>
+                <p className="text-[10px] text-violet-300">Local PostgreSQL Copilot</p>
               </div>
             </div>
             <button
@@ -146,30 +107,36 @@ export const FloatingAiCopilot: React.FC = () => {
           </div>
 
           {/* Quick Prompts Bar */}
-          <div className="p-2.5 bg-slate-950/60 border-b border-slate-800 flex items-center gap-1.5 overflow-x-auto text-[11px] font-semibold text-slate-300">
+          <div className="p-2.5 bg-slate-950/60 border-b border-slate-800 flex items-center gap-1.5 overflow-x-auto text-[11px] font-semibold text-slate-300 no-scrollbar">
             <button
-              onClick={() => handleSendPrompt('Can I buy this for ₹25,000?')}
+              onClick={() => handleSendPrompt('I spent ₹240 at Swiggy')}
               className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-violet-900/40 text-violet-300 border border-violet-500/20 whitespace-nowrap cursor-pointer"
             >
-              Can I buy this?
+              Swiggy Spend
             </button>
             <button
-              onClick={() => handleSendPrompt('Summarize September')}
+              onClick={() => handleSendPrompt('Add ₹5000 salary')}
               className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-violet-900/40 text-violet-300 border border-violet-500/20 whitespace-nowrap cursor-pointer"
             >
-              Summarize Month
+              Add Salary
             </button>
             <button
-              onClick={() => handleSendPrompt('Increase SIP recommendation')}
+              onClick={() => handleSendPrompt('Show this month\'s spending')}
               className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-violet-900/40 text-violet-300 border border-violet-500/20 whitespace-nowrap cursor-pointer"
             >
-              Increase SIP
+              Month Spend
             </button>
             <button
-              onClick={() => handleSendPrompt('Reduce EMI burden strategy')}
+              onClick={() => handleSendPrompt('How much can I save?')}
               className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-violet-900/40 text-violet-300 border border-violet-500/20 whitespace-nowrap cursor-pointer"
             >
-              Reduce EMI burden
+              Savings
+            </button>
+            <button
+              onClick={() => handleSendPrompt('When is my next EMI?')}
+              className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-violet-900/40 text-violet-300 border border-violet-500/20 whitespace-nowrap cursor-pointer"
+            >
+              Next EMI
             </button>
           </div>
 

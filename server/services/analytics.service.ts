@@ -255,3 +255,142 @@ export async function getTopMerchants(userId: string) {
 
   return topMerchants;
 }
+
+export interface LiveFinancialIntelligence {
+  netWorth: number;
+  netWorthGrowthPct: number;
+  totalAssets: number;
+  totalLiabilities: number;
+
+  income: number;
+  expenses: number;
+  freeCash: number;
+  monthlyBurnRate: number;
+
+  savingsRate: number;
+  investmentRatio: number;
+
+  emergencyFund: number;
+  emergencyMonths: number;
+
+  passiveIncome: number;
+
+  investedAssets: number;
+  targetFireNumber: number;
+  fireProgressPct: number;
+}
+
+export async function getLiveFinancialIntelligence(userId: string): Promise<LiveFinancialIntelligence> {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+  const [
+    incomes,
+    expenses,
+    emis,
+    investments,
+    savings,
+    properties,
+    metals,
+    portfolioHoldings,
+    bankAccounts,
+    manualAssets,
+    manualLiabilities,
+    recurring,
+  ] = await Promise.all([
+    prisma.income.findMany({ where: { userId } }),
+    prisma.expense.findMany({
+      where: {
+        userId,
+        spentAt: { gte: startOfMonth, lte: endOfMonth },
+      },
+    }),
+    prisma.emiItem.findMany({ where: { userId } }),
+    prisma.investmentItem.findMany({ where: { userId, isActive: true } }),
+    prisma.savingItem.findMany({ where: { userId } }),
+    prisma.propertyAsset.findMany({ where: { userId } }),
+    prisma.preciousMetalHolding.findMany({ where: { userId } }),
+    prisma.portfolioHolding.findMany({ where: { userId } }),
+    prisma.bankAccount.findMany({ where: { userId } }),
+    prisma.assetItem.findMany({ where: { userId } }),
+    prisma.liabilityItem.findMany({ where: { userId } }),
+    prisma.recurringExpense.findMany({ where: { userId, isActive: true } }),
+  ]);
+
+  // Income & Outflows
+  const incomeTotal = incomes.reduce((sum, i) => sum + (i.amount || 0), 0);
+  const expensesTotal = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const emiTotal = emis.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const recurringTotal = recurring.reduce((sum, r) => sum + (r.amount || 0), 0);
+
+  const investmentsMonthly = investments.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+  const savingsMonthly = savings.reduce((sum, s) => sum + (s.monthlyContribution || 0), 0);
+
+  const monthlyBurnRate = expensesTotal + emiTotal + recurringTotal;
+  const totalOutflow = expensesTotal + emiTotal + investmentsMonthly + savingsMonthly;
+  const freeCash = incomeTotal - totalOutflow;
+
+  // Assets
+  const bankBalances = bankAccounts.reduce((sum, b) => sum + (b.currentBalance || 0), 0);
+  const savingCurrentAmounts = savings.reduce((sum, s) => sum + (s.currentAmount || 0), 0);
+  const portfolioValues = portfolioHoldings.reduce((sum, p) => sum + (p.currentValue || p.invested || 0), 0);
+  const metalValues = metals.reduce((sum, m) => sum + (m.currentValue || m.totalCost || 0), 0);
+  const propertyValues = properties.reduce((sum, p) => sum + (p.currentMarketValue || 0), 0);
+  const manualAssetValues = manualAssets.reduce((sum, a) => sum + (a.amount || 0), 0);
+
+  const totalAssets = bankBalances + savingCurrentAmounts + portfolioValues + metalValues + propertyValues + manualAssetValues;
+
+  // Liabilities
+  const emiOutstanding = emis.reduce((sum, e) => sum + (e.outstanding || 0), 0);
+  const propertyLoans = properties.reduce((sum, p) => sum + (p.loanLinked || 0), 0);
+  const manualLiabilityValues = manualLiabilities.reduce((sum, l) => sum + (l.amount || 0), 0);
+
+  const totalLiabilities = emiOutstanding + propertyLoans + manualLiabilityValues;
+  const netWorth = totalAssets - totalLiabilities;
+
+  // Ratios
+  const savingsRate = incomeTotal > 0 ? Number((((investmentsMonthly + savingsMonthly) / incomeTotal) * 100).toFixed(1)) : 0;
+  const investmentRatio = incomeTotal > 0 ? Number(((investmentsMonthly / incomeTotal) * 100).toFixed(1)) : 0;
+
+  // Emergency Fund
+  const emergencySavingItems = savings.filter((s) => s.type === 'EMERGENCY_FUND').reduce((sum, s) => sum + (s.currentAmount || 0), 0);
+  const liquidBankBalances = bankAccounts.filter((b) => b.type === 'SAVINGS' || b.type === 'WALLET' || b.isDefault).reduce((sum, b) => sum + (b.currentBalance || 0), 0);
+  const emergencyFund = emergencySavingItems > 0 ? emergencySavingItems : liquidBankBalances;
+
+  const emergencyMonths = monthlyBurnRate > 0 ? Number((emergencyFund / monthlyBurnRate).toFixed(1)) : 0;
+
+  // Passive Income
+  const propertyRentalIncome = properties.reduce((sum, p) => sum + (p.rentalIncome || 0), 0);
+  const passiveIncome = propertyRentalIncome;
+
+  // FIRE Calculation
+  const investedAssets = portfolioValues + metalValues + savingCurrentAmounts;
+  const annualBurn = monthlyBurnRate * 12;
+  const targetFireNumber = annualBurn * 25;
+  const fireProgressPct = targetFireNumber > 0 ? Number(Math.min(100, (investedAssets / targetFireNumber) * 100).toFixed(1)) : 0;
+
+  return {
+    netWorth,
+    netWorthGrowthPct: 0,
+    totalAssets,
+    totalLiabilities,
+
+    income: incomeTotal,
+    expenses: expensesTotal,
+    freeCash,
+    monthlyBurnRate,
+
+    savingsRate,
+    investmentRatio,
+
+    emergencyFund,
+    emergencyMonths,
+
+    passiveIncome,
+
+    investedAssets,
+    targetFireNumber,
+    fireProgressPct,
+  };
+}

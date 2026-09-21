@@ -3,9 +3,13 @@ import { Request, Response, NextFunction } from 'express';
 import { ApiErrorCodes, sendApiError } from '../middleware/apiError.js';
 
 export interface JWTUserPayload {
-  uid: string;
+  id: string;
   email: string;
   name: string;
+  picture?: string;
+  googleId?: string;
+  provider?: string;
+  uid?: string;
   photoURL?: string;
 }
 
@@ -62,9 +66,9 @@ function base64UrlDecode(str: string): string {
 }
 
 /**
- * Signs a JWT using HMAC-SHA256
+ * Signs a JWT access token using HMAC-SHA256 (default: 15 minutes)
  */
-export function signJWT(payloadData: Record<string, unknown>, expiresInSeconds: number = 7 * 24 * 3600): string {
+export function signJWT(payloadData: Record<string, unknown>, expiresInSeconds: number = 15 * 60): string {
   const header = { alg: 'HS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
   const payload = {
@@ -126,16 +130,20 @@ export function verifyJWT(token: string): JWTPayload {
 }
 
 /**
- * Middleware to protect API routes with JWT verification
+ * Middleware to protect API routes with JWT verification.
+ * Populates req.user.id for every protected API.
  */
 export function authenticateJWT(req: Request, res: Response, next: NextFunction) {
-  // Public non-API routes (e.g. /, static assets) or public auth/health endpoints bypass JWT check
+  // Public routes (health check & initial login/refresh endpoints) bypass JWT check
   const reqPath = req.path || req.originalUrl || '';
-  if (
-    !reqPath.startsWith('/api/') ||
-    reqPath.startsWith('/api/auth/') ||
-    reqPath === '/api/health'
-  ) {
+  const publicPaths = [
+    '/api/auth/google',
+    '/api/auth/google/callback',
+    '/api/auth/refresh',
+    '/api/health',
+  ];
+
+  if (!reqPath.startsWith('/api/') || publicPaths.some(p => reqPath === p || reqPath.startsWith(`${p}?`))) {
     return next();
   }
 
@@ -154,7 +162,31 @@ export function authenticateJWT(req: Request, res: Response, next: NextFunction)
 
   try {
     const decoded = verifyJWT(token);
-    (req as any).user = decoded.user;
+    const rawUser = decoded.user || (decoded as any);
+    const id = rawUser.id || (rawUser as any).userId || rawUser.uid;
+
+    if (!id) {
+      return sendApiError(
+        res,
+        req,
+        401,
+        ApiErrorCodes.UNAUTHORIZED,
+        'Unauthorized: Invalid user payload in JWT.'
+      );
+    }
+
+    const user: JWTUserPayload = {
+      id,
+      email: rawUser.email || '',
+      name: rawUser.name || '',
+      picture: rawUser.picture || rawUser.photoURL,
+      googleId: rawUser.googleId,
+      provider: rawUser.provider || 'google',
+      uid: id,
+      photoURL: rawUser.picture || rawUser.photoURL,
+    };
+
+    (req as any).user = user;
     next();
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Invalid authentication token.';
