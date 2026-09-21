@@ -22,9 +22,11 @@ import {
   FileText,
   ChevronRight,
   ExternalLink,
+  Download,
 } from 'lucide-react';
 import { getStoredThemeMode, applyThemeMode, ThemeMode } from '../utils/theme.js';
 import { SpendTrackApi } from '../services/api.js';
+import { QRVaultStore } from '../services/qrVaultStore.js';
 
 interface ProfileSheetProps {
   isOpen: boolean;
@@ -51,6 +53,7 @@ export const ProfileSheet: React.FC<ProfileSheetProps> = ({
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -74,6 +77,26 @@ export const ProfileSheet: React.FC<ProfileSheetProps> = ({
   const handleThemeChange = (mode: ThemeMode) => {
     setThemeMode(mode);
     applyThemeMode(mode);
+  };
+
+  const handleExportBackup = async () => {
+    try {
+      setIsExporting(true);
+      const jsonStr = await QRVaultStore.exportVaultData();
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `SpendTrack_Backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(`Export failed: ${err.message || 'Error exporting backup'}`);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -244,6 +267,26 @@ export const ProfileSheet: React.FC<ProfileSheetProps> = ({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* 6. Export Backup */}
+          <div className="space-y-2">
+            <h5 className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              Export Backup
+            </h5>
+            <button
+              onClick={handleExportBackup}
+              disabled={isExporting}
+              className="w-full p-3.5 rounded-[24px] bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <Download className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                <span>Export QR Vault & Encrypted Backup</span>
+              </div>
+              <span className="text-[10px] text-teal-600 dark:text-teal-400 bg-teal-500/15 px-2 py-0.5 rounded-full font-bold">
+                {isExporting ? 'Exporting...' : 'Download JSON'}
+              </span>
+            </button>
           </div>
 
           {/* 6. Privacy & Security */}

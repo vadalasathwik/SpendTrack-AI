@@ -1721,8 +1721,10 @@ export function App() {
             categories={categories}
             dateRange={dateRange}
             initialQuestion={aiInitialQuestion}
-            onClearInitialQuestion={() => setAiInitialQuestion(null)}
-            onRefreshData={fetchFinancialData}
+            onRefreshData={() => {
+              getCachedItems<Expense>('expenses').then(exp => exp && setExpenses(exp));
+              getCachedItems<any>('incomes').then(inc => inc && setIncomes(inc));
+            }}
           />
         )}
 

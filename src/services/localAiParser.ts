@@ -137,9 +137,8 @@ export async function parseAndExecuteLocalAiIntent(
 
     try {
       await SpendTrackApi.createIncome({
-        source: sourceName,
+        title: sourceName,
         amount,
-        date: new Date().toISOString(),
       });
 
       if (context.onRefreshData) {

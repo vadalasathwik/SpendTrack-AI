@@ -414,64 +414,7 @@ export const WalletPage: React.FC<WalletPageProps> = () => {
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* 3. SAVED UPI IDS & MANDATES SECTION                           */}
-      {/* ------------------------------------------------------------- */}
-      {(activeSegment === 'all' || activeSegment === 'upis') && (
-        <div className="space-y-3 px-1">
-          <h2 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
-            <Smartphone className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-            Saved UPI IDs & AutoPay Mandates
-          </h2>
-
-          <div className="space-y-2.5">
-            {savedUpiIds.map((upi) => (
-              <div
-                key={upi.id}
-                className="p-4 rounded-[24px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between shadow-sm hover:border-cyan-500/30 transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center font-bold text-xs shrink-0">
-                    <Smartphone className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-extrabold text-xs text-slate-900 dark:text-white">{upi.title}</h3>
-                      {upi.isDefault && (
-                        <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
-                          Primary
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-0.5">
-                      {upi.upiHandle} {upi.amount ? `(${upi.amount})` : ''}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => handleCopy(upi.upiHandle, upi.id)}
-                  className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-extrabold text-xs hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors flex items-center gap-1.5 cursor-pointer"
-                >
-                  {copiedId === upi.id ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-500" />
-                      <span className="text-emerald-500">Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ------------------------------------------------------------- */}
-      {/* 4. PAYMENT CARDS SECTION (Glass Credit & Debit Passes)        */}
+      {/* 3. PAYMENT CARDS SECTION (Glass Credit & Debit Passes)        */}
       {/* ------------------------------------------------------------- */}
       {(activeSegment === 'all' || activeSegment === 'cards') && (
         <div className="space-y-3 px-1">
@@ -515,6 +458,63 @@ export const WalletPage: React.FC<WalletPageProps> = () => {
                     <span className="text-xs font-mono font-bold text-slate-200">{card.expiry}</span>
                   </div>
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* 4. SAVED UPI IDS & MANDATES SECTION                           */}
+      {/* ------------------------------------------------------------- */}
+      {(activeSegment === 'all' || activeSegment === 'upis') && (
+        <div className="space-y-3 px-1">
+          <h2 className="text-sm font-black text-slate-900 dark:text-white flex items-center gap-2">
+            <Smartphone className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+            Saved UPI IDs & AutoPay Mandates
+          </h2>
+
+          <div className="space-y-2.5">
+            {savedUpiIds.map((upi) => (
+              <div
+                key={upi.id}
+                className="p-4 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between shadow-sm hover:border-cyan-500/30 transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center font-bold text-xs shrink-0">
+                    <Smartphone className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-extrabold text-xs text-slate-900 dark:text-white">{upi.title}</h3>
+                      {upi.isDefault && (
+                        <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                          Primary
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-0.5">
+                      {upi.upiHandle} {upi.amount ? `(${upi.amount})` : ''}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleCopy(upi.upiHandle, upi.id)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-extrabold text-xs hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  {copiedId === upi.id ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="text-emerald-500">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
               </div>
             ))}
           </div>
