@@ -20,7 +20,7 @@ export function generateAndPrintPdfReport(data: ReportData) {
     <!DOCTYPE html>
     <html>
       <head>
-        <title>${data.title} - TrackPay Executive Report</title>
+        <title>${data.title} - SpendTrack AI Executive Report</title>
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
           body {
@@ -180,7 +180,7 @@ export function generateAndPrintPdfReport(data: ReportData) {
         </div>
 
         <div class="footer">
-          <div>Verified TrackPay Financial Intelligence System • Confidential Document</div>
+          <div>Verified SpendTrack AI Financial Intelligence System • Confidential Document</div>
           <div>Page 1 of 1</div>
         </div>
 

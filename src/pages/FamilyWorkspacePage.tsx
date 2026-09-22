@@ -68,7 +68,7 @@ export const FamilyWorkspacePage: React.FC = () => {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold mb-2">
             <GitFork className="w-3.5 h-3.5 text-emerald-400" />
-            <span>TrackPay Family Wealth Tree & Legacy v4.7.0</span>
+            <span>SpendTrack AI Family Wealth Tree & Legacy v4.7.0</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
             <Users className="w-7 h-7 text-emerald-400" /> Family Wealth Tree & Legacy OS

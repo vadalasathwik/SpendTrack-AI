@@ -77,13 +77,38 @@ export function createExpressApp() {
     try {
       const { base64Data, type } = req.body || {};
       if (!base64Data) {
-        return sendApiError(res, req, 400, ApiErrorCodes.BAD_REQUEST, "Missing base64Data");
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: "INVALID_RECEIPT_IMAGE",
+            message: "Missing base64Data",
+          },
+        });
       }
       const data = await extractReceipt({ base64Data, mimeType: type });
       res.json(data);
-    } catch (err: unknown) {
-      console.error("Server /api/receipt/scan caught error:", err);
-      return handleRouteError(res, req, err, "Receipt scanner unavailable", 500);
+    } catch (err: any) {
+      const msg = err?.message || "";
+      let code = "RECEIPT_AI_UNAVAILABLE";
+      let status = 500;
+      let userMessage = "Receipt AI is temporarily unavailable.";
+
+      if (msg === "RECEIPT_AI_TIMEOUT") {
+        code = "RECEIPT_AI_TIMEOUT";
+        userMessage = "Receipt processing timed out. Please try again.";
+      } else if (msg === "INVALID_RECEIPT_IMAGE") {
+        code = "INVALID_RECEIPT_IMAGE";
+        status = 400;
+        userMessage = "Invalid or unreadable receipt image.";
+      }
+
+      return res.status(status).json({
+        success: false,
+        error: {
+          code,
+          message: userMessage,
+        },
+      });
     }
   });
 

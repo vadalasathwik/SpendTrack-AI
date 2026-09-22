@@ -13,13 +13,13 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: "autoUpdate",
-        includeAssets: ["favicon.svg", "apple-touch-icon.png", "pwa-192x192.png", "pwa-512x512.png"],
+        includeAssets: ["favicon.svg", "apple-touch-icon.png", "pwa-192x192.png", "pwa-512x512.png", "maskable-icon-512x512.png"],
         manifest: {
-          name: "TrackPay",
-          short_name: "TrackPay",
-          description: "TrackPay — Smart Personal Finance & Payment Companion",
-          theme_color: "#10B981",
-          background_color: "#FFFFFF",
+          name: "SpendTrack AI",
+          short_name: "SpendTrack",
+          description: "SpendTrack AI — Smart Personal Finance & Payment Companion",
+          theme_color: "#0F172A",
+          background_color: "#000000",
           display: "standalone",
           orientation: "portrait",
           start_url: "/",
@@ -32,8 +32,8 @@ export default defineConfig(({ mode }) => {
               purpose: "any"
             },
             {
-              src: "pwa-192x192.png",
-              sizes: "192x192",
+              src: "maskable-icon-512x512.png",
+              sizes: "512x512",
               type: "image/png",
               purpose: "maskable"
             },
@@ -42,16 +42,11 @@ export default defineConfig(({ mode }) => {
               sizes: "512x512",
               type: "image/png",
               purpose: "any"
-            },
-            {
-              src: "pwa-512x512.png",
-              sizes: "512x512",
-              type: "image/png",
-              purpose: "maskable"
             }
           ]
         },
         workbox: {
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           globPatterns: ["**/*.{js,css,html,ico,png,svg,json,woff,woff2}"],
           navigateFallback: "index.html",
           navigateFallbackDenylist: [/^\/api/],

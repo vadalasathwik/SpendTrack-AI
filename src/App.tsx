@@ -42,7 +42,7 @@ import {
 import { BRAND_NAME } from './constants/brand.js';
 
 // UI Components
-import { TrackPayLogo } from './components/TrackPayLogo.js';
+import { SpendTrackLogo } from './components/TrackPayLogo.js';
 import { SplashScreen } from './components/SplashScreen.js';
 import { SyncStatusBadge } from './components/SyncStatusBadge.js';
 import { DateRangePicker } from './components/DateRangePicker.js';
@@ -72,6 +72,8 @@ import { ConflictResolutionModal } from './components/ConflictResolutionModal.js
 import { offlineSyncManager } from './services/offlineSyncManager.js';
 import { getCachedItems, saveAllCachedItems, OfflineMutation } from './services/offlineStore.js';
 import { getStoredThemeMode, applyThemeMode } from './utils/theme.js';
+import { OfflineBanner, SyncSuccessToast } from './components/ui/ErrorUI.js';
+import { OfflineFallbackPage } from './pages/OfflineFallbackPage.js';
 
 
 // Pages
@@ -114,6 +116,8 @@ import { TaxDashboardPage } from './pages/TaxDashboardPage.js';
 import { AiExecutiveWorkspacePage } from './pages/AiExecutiveWorkspacePage.js';
 import { QRVaultPage } from './pages/QRVaultPage.js';
 import { WalletPage } from './pages/WalletPage.js';
+import { ReceiptVaultPage } from './pages/ReceiptVaultPage.js';
+import { ReceiptDetailPage } from './pages/ReceiptDetailPage.js';
 
 
 const DATE_RANGE_STORAGE_KEY = 'spendtrack_date_range';
@@ -147,9 +151,8 @@ const getInitialActiveTab = (): any => {
 
 export function App() {
   // Navigation State
-  const [activeTab, setActiveTab] = useState<
-    'dashboard' | 'budget' | 'expenses' | 'monthly-items' | 'items' | 'analytics' | 'recurring' | 'ai' | 'family' | 'settings' | 'categories' | 'receipt-scanner'
-  >(getInitialActiveTab);
+  const [activeTab, setActiveTab] = useState<string>(getInitialActiveTab());
+  const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
   const [isMoreDrawerOpen, setIsMoreDrawerOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isQuickAddSheetOpen, setIsQuickAddSheetOpen] = useState(false);
@@ -1406,17 +1409,12 @@ export function App() {
     <Routes>
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<Terms />} />
+      <Route path="/offline" element={<OfflineFallbackPage />} />
       <Route
         path="*"
         element={
           authLoading ? (
-            <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center font-sans text-slate-800">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-xl shadow-emerald-600/30 animate-bounce mb-4">
-                <TrendingUp className="w-6 h-6" />
-              </div>
-              <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mb-2" />
-              <p className="text-sm font-semibold text-slate-500">Initializing {BRAND_NAME} Workspace...</p>
-            </div>
+            <SplashScreen onFinish={() => {}} durationMs={1200} />
           ) : !user ? (
             <WelcomePage
               onSignIn={handleGoogleSignIn}
@@ -1425,7 +1423,8 @@ export function App() {
             />
           ) : (
             <div className="min-h-screen bg-[var(--bg)] flex flex-col font-sans text-[var(--text-primary)] transition-colors duration-200" id="spendtrack-root">
-              {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} durationMs={800} />}
+              {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} durationMs={1200} />}
+              <OfflineBanner isOffline={!isOnline} />
 
       {/* Top Application Header (Google Pay & Apple Wallet Style) */}
       <header className="sticky top-0 z-40 h-[68px] sm:h-[76px] bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/90 px-4 flex items-center justify-between shadow-xs transition-colors">
@@ -1453,10 +1452,10 @@ export function App() {
               className="w-9 h-9 rounded-full bg-emerald-600 text-white font-black text-xs border-2 border-emerald-400 flex items-center justify-center shrink-0 overflow-hidden shadow-sm cursor-pointer hover:scale-105 transition-transform"
               title="Account & Settings"
             >
-              {user?.photoUrl ? (
-                <img src={user.photoUrl} alt="Profile" className="w-full h-full object-cover" />
+              {(user?.photoUrl || user?.photoURL) ? (
+                <img src={user.photoUrl || user.photoURL} alt="Profile" className="w-full h-full object-cover" />
               ) : (
-                user?.name ? user.name.substring(0, 2).toUpperCase() : (user?.email ? user.email.substring(0, 2).toUpperCase() : 'ST')
+                user?.name ? user.name.substring(0, 2).toUpperCase() : (user?.displayName ? user.displayName.substring(0, 2).toUpperCase() : (user?.email ? user.email.substring(0, 2).toUpperCase() : 'ST'))
               )}
             </button>
           </div>
@@ -1490,6 +1489,20 @@ export function App() {
 
         {activeTab === 'wallet' && (
           <WalletPage expenses={expenses} userSettings={userSettings} />
+        )}
+
+        {activeTab === 'receipts' && !selectedReceiptId && (
+          <ReceiptVaultPage
+            onSelectReceipt={(id) => setSelectedReceiptId(id)}
+            onOpenScanner={() => setIsScanReceiptOpen(true)}
+          />
+        )}
+
+        {activeTab === 'receipts' && selectedReceiptId && (
+          <ReceiptDetailPage
+            receiptId={selectedReceiptId}
+            onBack={() => setSelectedReceiptId(null)}
+          />
         )}
 
         {activeTab === 'inbox' && (
@@ -1721,8 +1734,10 @@ export function App() {
             categories={categories}
             dateRange={dateRange}
             initialQuestion={aiInitialQuestion}
-            onClearInitialQuestion={() => setAiInitialQuestion(null)}
-            onRefreshData={fetchFinancialData}
+            onRefreshData={() => {
+              getCachedItems<Expense>('expenses').then(exp => exp && setExpenses(exp));
+              getCachedItems<any>('incomes').then(inc => inc && setIncomes(inc));
+            }}
           />
         )}
 
@@ -1835,7 +1850,7 @@ export function App() {
         isOpen={isQuickAddSheetOpen}
         onClose={() => setIsQuickAddSheetOpen(false)}
         title="Quick Add Action"
-        subtitle="Create a record across TrackPay Finance OS"
+        subtitle="Create a record across SpendTrack AI Finance OS"
       >
         <div className="grid grid-cols-2 gap-3">
           <button
@@ -1899,8 +1914,8 @@ export function App() {
         isOpen={isProfileSheetOpen}
         onClose={() => setIsProfileSheetOpen(false)}
         userEmail={user?.email}
-        userName={user?.displayName || undefined}
-        userPhotoUrl={user?.photoURL || undefined}
+        userName={user?.displayName || user?.name || undefined}
+        userPhotoUrl={user?.photoUrl || user?.photoURL || undefined}
         onNavigateToSettings={() => setActiveTab('settings')}
         onSyncNow={loadDataFromWorkspace}
         onSignOut={handleSignOut}
@@ -1930,6 +1945,7 @@ export function App() {
         isOpen={isScanReceiptOpen}
         onClose={() => setIsScanReceiptOpen(false)}
         categories={categories}
+        expenses={expenses}
         onSaveExpenses={handleSaveMultipleExpenses}
       />
 

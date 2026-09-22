@@ -82,7 +82,7 @@ export const InsuranceVaultPage: React.FC = () => {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-xs font-bold mb-2">
             <HeartPulse className="w-3.5 h-3.5 text-teal-400" />
-            <span>TrackPay Healthcare & Insurance Vault v4.7.0</span>
+            <span>SpendTrack AI Healthcare & Insurance Vault v4.7.0</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
             <ShieldCheck className="w-7 h-7 text-teal-400" /> Healthcare Finance & Policy Vault

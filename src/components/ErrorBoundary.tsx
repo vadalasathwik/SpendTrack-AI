@@ -22,7 +22,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('TrackPay Finance OS ErrorBoundary caught a runtime error:', error, errorInfo);
+    console.error('SpendTrack AI Finance OS ErrorBoundary caught a runtime error:', error, errorInfo);
   }
 
   handleReset = () => {
@@ -54,7 +54,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
                 Workspace Render Safeguard
               </h2>
               <p className="text-xs text-slate-400 mt-1">
-                TrackPay caught a transient render error and prevented a blank screen.
+                SpendTrack AI caught a transient render error and prevented a blank screen.
               </p>
             </div>
 

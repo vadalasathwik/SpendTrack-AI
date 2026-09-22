@@ -52,6 +52,22 @@ class OfflineSyncManagerClass {
     return this.onlineStatus;
   }
 
+  public async queueMutation(
+    entity: 'expenses' | 'incomes' | 'qr_vault' | 'notes' | 'planner',
+    action: 'CREATE' | 'UPDATE' | 'DELETE',
+    payload: any,
+    targetId?: string
+  ): Promise<OfflineMutation> {
+    const mutation = await enqueueMutation({
+      entity,
+      action,
+      payload,
+      targetId: targetId || payload.id || `temp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    });
+    this.notifyListeners();
+    return mutation;
+  }
+
   public subscribe(listener: SyncStateListener): () => void {
     this.listeners.add(listener);
     this.notifyListeners();

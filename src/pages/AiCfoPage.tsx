@@ -98,7 +98,7 @@ export const AiCfoPage: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `TrackPay_Closing_Report_${closingReport.monthName}_${closingReport.year}.csv`;
+    link.download = `SpendTrack_Closing_Report_${closingReport.monthName}_${closingReport.year}.csv`;
     link.click();
   };
 

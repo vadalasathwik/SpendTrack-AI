@@ -12,6 +12,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  Legend,
 } from 'recharts';
 import {
   TrendingUp,
@@ -22,10 +23,15 @@ import {
   RefreshCw,
   ShoppingBag,
   Layers,
+  AlertTriangle,
+  Target,
+  Flame,
 } from 'lucide-react';
 import { Expense, DateRange } from '../types.js';
 import { formatCurrency } from '../utils/calculations.js';
 import { SpendTrackApi } from '../services/api.js';
+import { AnalyticsSkeleton } from '../components/SkeletonLoader.js';
+import { EmptyState } from '../components/ui/EmptyState.js';
 
 interface AnalyticsPageProps {
   expenses?: Expense[];
@@ -84,17 +90,19 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
   const [categoryBreakdown, setCategoryBreakdown] = useState<CategoryBreakdownItem[]>([]);
   const [weeklySpending, setWeeklySpending] = useState<WeeklySpendingItem[]>([]);
   const [topMerchants, setTopMerchants] = useState<TopMerchantItem[]>([]);
+  const [budgetInsights, setBudgetInsights] = useState<any>(null);
 
   const fetchAnalyticsData = async () => {
     setIsLoading(true);
     try {
-      const [fetchedStats, fetchedMonthly, fetchedCategories, fetchedWeekly, fetchedMerchants] =
+      const [fetchedStats, fetchedMonthly, fetchedCategories, fetchedWeekly, fetchedMerchants, fetchedBudgets] =
         await Promise.all([
           SpendTrackApi.getAnalyticsStats().catch(() => null),
           SpendTrackApi.getMonthlyTrend().catch(() => []),
           SpendTrackApi.getCategoryBreakdown(selectedMonth, selectedYear).catch(() => []),
           SpendTrackApi.getWeeklySpending().catch(() => []),
           SpendTrackApi.getTopMerchants().catch(() => []),
+          SpendTrackApi.getBudgetInsights(selectedMonth, selectedYear).catch(() => null),
         ]);
 
       if (fetchedStats) {
@@ -116,6 +124,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
       setCategoryBreakdown(fetchedCategories || []);
       setWeeklySpending(fetchedWeekly || []);
       setTopMerchants(fetchedMerchants || []);
+      setBudgetInsights(fetchedBudgets || null);
     } catch (err) {
       console.warn("Analytics fetch notice:", err);
     } finally {
@@ -135,6 +144,10 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
   ];
 
   const maxMerchantSpend = topMerchants.length > 0 ? Math.max(...topMerchants.map((m) => m.totalAmount)) : 1;
+
+  if (isLoading && (!expenses || expenses.length === 0)) {
+    return <AnalyticsSkeleton />;
+  }
 
   return (
     <div className="space-y-6 pb-20 max-w-[1440px] mx-auto" id="analytics-page-container">
@@ -500,6 +513,169 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
           ) : (
             <div className="h-64 flex items-center justify-center text-slate-400 text-xs">
               No merchant transactions logged yet.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Budget Intelligence Grid: Budget vs Actual Bar Chart & Overspend Ranking */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Budget vs Actual Bar Chart */}
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-[20px] border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                <Target className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>Budget vs Actual Spend</span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Monthly category budget limit compared to actual expense logs
+              </p>
+            </div>
+            {budgetInsights && (
+              <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                {budgetInsights.categoryCount || 0} Categories
+              </span>
+            )}
+          </div>
+
+          {budgetInsights?.categories && budgetInsights.categories.length > 0 ? (
+            <div className="h-64 w-full pt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={budgetInsights.categories.map((c: any) => ({
+                    category: c.category,
+                    Limit: Number(c.monthlyLimit) || 0,
+                    Spent: Number(c.spent) || 0,
+                  }))}
+                  margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.3} />
+                  <XAxis
+                    dataKey="category"
+                    tick={{ fontSize: 10, fill: '#94A3B8' }}
+                    axisLine={{ stroke: '#475569' }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: '#94A3B8' }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(val) => `₹${val}`}
+                  />
+                  <Tooltip
+                    formatter={(val: any) => [`${formatCurrency(Number(val))}`]}
+                    contentStyle={{
+                      backgroundColor: '#0F172A',
+                      borderRadius: '12px',
+                      color: '#fff',
+                      fontSize: '12px',
+                      border: '1px solid #334155',
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                  <Bar dataKey="Limit" fill="#6366F1" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Spent" fill="#10B981" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-xs space-y-2">
+              <Target className="w-8 h-8 text-slate-300 dark:text-slate-700" />
+              <span>No active category budgets set for this month.</span>
+            </div>
+          )}
+        </div>
+
+        {/* Category Overspend Ranking */}
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-[20px] border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                <Flame className="w-4 h-4 text-rose-500" />
+                <span>Category Overspend Ranking</span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Categories ordered by percentage of monthly budget consumed
+              </p>
+            </div>
+            {budgetInsights && budgetInsights.overspendCount > 0 && (
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                {budgetInsights.overspendCount} Overbudget
+              </span>
+            )}
+          </div>
+
+          {budgetInsights?.categories && budgetInsights.categories.length > 0 ? (
+            <div className="space-y-3 pt-1 max-h-72 overflow-y-auto pr-1">
+              {[...budgetInsights.categories]
+                .sort((a: any, b: any) => b.percentageUsed - a.percentageUsed)
+                .map((cat: any, idx: number) => {
+                  const isOver = cat.percentageUsed > 100;
+                  const isWarning = cat.percentageUsed >= 80 && !isOver;
+                  return (
+                    <div
+                      key={cat.id || cat.category}
+                      className={`p-3 rounded-[14px] border ${
+                        isOver
+                          ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200/80 dark:border-rose-800/80'
+                          : isWarning
+                          ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/80 dark:border-amber-800/80'
+                          : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs mb-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className={`w-5 h-5 rounded-full flex items-center justify-center font-black text-[10px] shrink-0 ${
+                              isOver
+                                ? 'bg-rose-200 dark:bg-rose-900 text-rose-800 dark:text-rose-200'
+                                : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                            }`}
+                          >
+                            #{idx + 1}
+                          </span>
+                          <span className="font-bold text-slate-900 dark:text-white truncate">
+                            {cat.category}
+                          </span>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="font-extrabold text-slate-900 dark:text-white">
+                            {formatCurrency(cat.spent)}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block">
+                            of {formatCurrency(cat.monthlyLimit)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            isOver ? 'bg-rose-500' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'
+                          }`}
+                          style={{ width: `${Math.min(cat.percentageUsed, 100)}%` }}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between text-[10px] mt-1 font-semibold text-slate-500 dark:text-slate-400">
+                        <span>{cat.percentageUsed}% used</span>
+                        <span className={isOver ? 'text-rose-600 dark:text-rose-400 font-bold' : ''}>
+                          {isOver
+                            ? `Exceeded by ${formatCurrency(cat.spent - cat.monthlyLimit)}`
+                            : `${formatCurrency(cat.remaining)} remaining`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          ) : (
+            <div className="h-64 flex flex-col items-center justify-center text-slate-400 text-xs space-y-2">
+              <Flame className="w-8 h-8 text-slate-300 dark:text-slate-700" />
+              <span>No category overspend ranking data available.</span>
             </div>
           )}
         </div>

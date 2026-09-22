@@ -1,9 +1,9 @@
 {
-  "name": "TrackPay",
-  "short_name": "TrackPay",
-  "description": "TrackPay — Smart Personal Finance & Payment Companion",
-  "theme_color": "#10B981",
-  "background_color": "#FFFFFF",
+  "name": "SpendTrack AI",
+  "short_name": "SpendTrack",
+  "description": "SpendTrack AI — Smart Personal Finance & Payment Companion",
+  "theme_color": "#0F172A",
+  "background_color": "#000000",
   "display": "standalone",
   "orientation": "portrait",
   "start_url": "/",
@@ -16,8 +16,8 @@
       "purpose": "any"
     },
     {
-      "src": "pwa-192x192.png",
-      "sizes": "192x192",
+      "src": "maskable-icon-512x512.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     },
@@ -26,12 +26,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
-    },
-    {
-      "src": "pwa-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
     }
   ]
 }

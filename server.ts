@@ -42,7 +42,7 @@ async function start() {
   });
 
   app.listen(PORT, () => {
-    console.log(`TrackPay running at http://localhost:${PORT}`);
+    console.log(`SpendTrack AI running at http://localhost:${PORT}`);
   });
 }
 

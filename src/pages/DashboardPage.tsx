@@ -33,6 +33,8 @@ import {
 import { formatDisplayDate } from '../utils/dateRanges.js';
 import { CATEGORY_COLORS } from '../data/defaults.js';
 import { getCalendarUrl } from '../utils/calendar.js';
+import { EmptyState } from '../components/ui/EmptyState.js';
+import { DashboardSkeleton } from '../components/SkeletonLoader.js';
 
 interface DashboardPageProps {
   expenses: Expense[];
@@ -59,6 +61,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   dateRange,
   recurringExpenses = [],
   userSettings,
+  onOpenAddExpense,
+  onOpenScanReceipt,
   onViewExpenseHistory,
   onViewRecurringBills,
   onSelectItemAnalytics,
@@ -634,7 +638,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                       {exp.receiptDriveFileId && (
                         <span
                           className="text-[10px] text-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full font-bold"
-                          title="Receipt saved in TrackPay"
+                          title="Receipt saved in SpendTrack AI"
                         >
                           Receipt ✓
                         </span>
@@ -657,9 +661,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             ))}
           </div>
         ) : (
-          <div className="py-8 text-center text-slate-400 text-xs">
-            No transactions logged yet.
-          </div>
+          <EmptyState
+            icon={TrendingUp}
+            title="No transactions yet"
+            description="Scan your first receipt or tap + to log an expense."
+            actionLabel="Scan First Receipt"
+            onAction={onOpenScanReceipt || onOpenAddExpense}
+          />
         )}
       </section>
     </div>

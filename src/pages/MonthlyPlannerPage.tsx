@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -24,12 +24,15 @@ import { BottomSheet } from '../components/ui/BottomSheet.js';
 import { WealthTimeline, TimelineEventItem } from '../components/ui/WealthTimeline.js';
 import { GlassCard } from '../components/ui/GlassCard.js';
 
+import { SpendTrackApi } from '../services/api.js';
+
 interface MonthlyPlannerPageProps {
   emis?: EmiItem[];
   investments?: InvestmentItem[];
   savings?: SavingItem[];
   recurringExpenses?: RecurringExpense[];
   expenses?: Expense[];
+  onOpenBudgets?: () => void;
 }
 
 export interface PlannerEvent {
@@ -48,10 +51,16 @@ export const MonthlyPlannerPage: React.FC<MonthlyPlannerPageProps> = ({
   savings = [],
   recurringExpenses = [],
   expenses = [],
+  onOpenBudgets,
 }) => {
   const [activeView, setActiveView] = useState<'calendar' | 'timeline'>('calendar');
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDayEvents, setSelectedDayEvents] = useState<{ day: number; events: PlannerEvent[] } | null>(null);
+  const [budgetData, setBudgetData] = useState<any>(null);
+
+  useEffect(() => {
+    SpendTrackApi.getBudgetInsights().then(setBudgetData).catch(() => {});
+  }, []);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -63,6 +72,12 @@ export const MonthlyPlannerPage: React.FC<MonthlyPlannerPageProps> = ({
   const today = new Date();
   const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
   const todayDateNum = today.getDate();
+
+  const totalBudget = Number(budgetData?.totalBudget) || 0;
+  const totalSpent = Number(budgetData?.totalSpent) || 0;
+  const remainingBudget = Number(budgetData?.remaining) || 0;
+  const remainingDays = Math.max(1, daysInMonth - todayDateNum + 1);
+  const dailySafeSpend = remainingBudget > 0 ? Math.round(remainingBudget / remainingDays) : 0;
 
   // Synthesize events for Financial Calendar 2.0
   const events: PlannerEvent[] = [];
@@ -312,6 +327,38 @@ export const MonthlyPlannerPage: React.FC<MonthlyPlannerPageProps> = ({
               </button>
             </div>
           </div>
+        </div>
+      </GlassCard>
+
+      {/* Daily Safe Spend & Budget vs Actual Banner */}
+      <GlassCard padding="p-5" className="relative overflow-hidden border border-emerald-500/20 bg-gradient-to-r from-slate-900 via-slate-900/90 to-emerald-950/40">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold uppercase tracking-wider">
+                Safe Spend Allowance
+              </span>
+              <span className="text-[11px] text-slate-400 font-medium">
+                {remainingDays} days remaining
+              </span>
+            </div>
+            <h2 className="text-xl font-black text-white">
+              Safe to spend today: <span className="text-emerald-400 font-mono">₹{dailySafeSpend.toLocaleString('en-IN')}</span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Budget: ₹{totalBudget.toLocaleString('en-IN')} • Spent: ₹{totalSpent.toLocaleString('en-IN')} • Left: ₹{remainingBudget.toLocaleString('en-IN')}
+            </p>
+          </div>
+
+          {onOpenBudgets && (
+            <button
+              onClick={onOpenBudgets}
+              className="px-4 py-2.5 rounded-2xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4 text-emerald-400" />
+              Manage Budgets
+            </button>
+          )}
         </div>
       </GlassCard>
 

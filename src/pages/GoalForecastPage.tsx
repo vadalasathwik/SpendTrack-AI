@@ -129,7 +129,7 @@ export const GoalForecastPage: React.FC = () => {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold mb-2">
             <GraduationCap className="w-3.5 h-3.5" />
-            <span>TrackPay Education & Goal Intelligence v4.7.0</span>
+            <span>SpendTrack AI Education & Goal Intelligence v4.7.0</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Goal Forecast Engine</h1>
           <p className="text-xs sm:text-sm text-slate-300 mt-1">

@@ -137,9 +137,8 @@ export async function parseAndExecuteLocalAiIntent(
 
     try {
       await SpendTrackApi.createIncome({
-        source: sourceName,
+        title: sourceName,
         amount,
-        date: new Date().toISOString(),
       });
 
       if (context.onRefreshData) {
@@ -319,7 +318,7 @@ export async function parseAndExecuteLocalAiIntent(
 
   // General helpful AI reply
   return {
-    message: `🤖 **TrackPay AI CFO Assistant**\n\nI can help you manage your finances directly in PostgreSQL! Try asking:\n\n` +
+    message: `🤖 **SpendTrack AI CFO Assistant**\n\nI can help you manage your finances directly in PostgreSQL! Try asking:\n\n` +
       `• *"I spent ₹240 at Swiggy"*\n` +
       `• *"Add ₹5000 salary"*\n` +
       `• *"Show this month's spending"*\n` +

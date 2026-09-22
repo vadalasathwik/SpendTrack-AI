@@ -3,6 +3,12 @@ export interface Expense {
   itemName: string;
   category: string;
   subcategory?: string;
+  merchant?: string;
+  taxAmount?: number;
+  currency?: string;
+  invoiceNumber?: string;
+  paymentMethod?: string;
+  account?: string;
   quantity?: number;
   unit?: string;
   totalPrice: number;
@@ -22,6 +28,29 @@ export interface Expense {
   recurringId?: string;
   createdAt: string; // ISO
   updatedAt: string; // ISO
+}
+
+export interface ExtractedReceiptResult {
+  title: string;
+  merchant: string;
+  amount: number;
+  taxAmount?: number;
+  currency?: string;
+  invoiceNumber?: string;
+  paymentMethod?: string;
+  purchaseDate: string;
+  category: string;
+  confidences?: Record<string, 'High' | 'Medium' | 'Low'>;
+  items?: Array<{
+    name: string;
+    price: number;
+    quantity?: number;
+    unit?: string;
+    category?: string;
+  }>;
+  receiptDriveFileId?: string;
+  receiptFileName?: string;
+  receiptViewLink?: string;
 }
 
 export interface CategoryItem {

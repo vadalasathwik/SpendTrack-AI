@@ -92,7 +92,7 @@ export const PrivacyPolicy: React.FC<PrivacyPolicyProps> = ({ onBack }) => {
               If you have any questions, privacy concerns, or data deletion requests regarding {BRAND_NAME}, please contact our developer support team:
             </p>
             <p className="mt-2 font-bold text-emerald-800">
-              Email: support@trackpay.app
+              Email: support@spendtrack.ai
             </p>
           </section>
         </div>

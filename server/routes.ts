@@ -27,6 +27,11 @@ import {
   getCurrentBudget,
   setBudget,
   getBudgetSummary,
+  getUserCategoryBudgets,
+  upsertCategoryBudget,
+  updateCategoryBudget,
+  deleteCategoryBudget,
+  getBudgetInsights,
 } from "./services/budget.service.js";
 import {
   getDashboardStats,
@@ -104,12 +109,143 @@ import { importBankStatement } from "./services/statementImport.service.js";
 import { getMarketIntelligence } from "./services/market.service.js";
 import { getWatchlist, addToWatchlist } from "./services/watchlist.service.js";
 import { getAutomationTriggers } from "./services/automation.service.js";
+import {
+  saveReceiptVaultRecord,
+  getUserReceipts,
+  getReceiptById,
+  getMerchantIntelligence,
+  deleteReceipt,
+} from "./services/receiptVault.service.js";
 
 const router = Router();
 
 const getUserId = (req: any): string => {
   return req.user?.id || req.user?.userId || req.user?.uid || "";
 };
+
+// Receipt Vault APIs
+router.get("/api/receipts", async (req: any, res: any) => {
+  try {
+    const userId = getUserId(req);
+    const search = req.query.search ? String(req.query.search) : undefined;
+    const receipts = await getUserReceipts(userId, search);
+    res.json(receipts);
+  } catch (err: any) {
+    console.error("GET /api/receipts error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch receipts" });
+  }
+});
+
+router.get("/api/receipts/merchant/:merchantName", async (req: any, res: any) => {
+  try {
+    const userId = getUserId(req);
+    const merchantName = req.params.merchantName;
+    const stats = await getMerchantIntelligence(userId, merchantName);
+    res.json(stats);
+  } catch (err: any) {
+    console.error("GET /api/receipts/merchant error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch merchant intelligence" });
+  }
+});
+
+router.get("/api/receipts/:id", async (req: any, res: any) => {
+  try {
+    const userId = getUserId(req);
+    const receipt = await getReceiptById(userId, req.params.id);
+    if (!receipt) {
+      return res.status(404).json({ error: "Receipt not found" });
+    }
+    res.json(receipt);
+  } catch (err: any) {
+    console.error("GET /api/receipts/:id error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch receipt" });
+  }
+});
+
+router.post("/api/receipts/save", async (req: any, res: any) => {
+  try {
+    const userId = getUserId(req);
+    const result = await saveReceiptVaultRecord({
+      userId,
+      ...req.body,
+    });
+    res.json(result);
+  } catch (err: any) {
+    console.error("POST /api/receipts/save error:", err);
+    res.status(400).json({ error: err.message || "Failed to save receipt" });
+  }
+});
+
+router.delete("/api/receipts/:id", async (req: any, res: any) => {
+  try {
+    const userId = getUserId(req);
+    const result = await deleteReceipt(userId, req.params.id);
+    res.json(result);
+  } catch (err: any) {
+    console.error("DELETE /api/receipts/:id error:", err);
+    res.status(400).json({ error: err.message || "Failed to delete receipt" });
+  }
+});
+
+// Category Budget APIs
+router.get("/api/budgets", async (req: any, res: any) => {
+  try {
+    const userId = getUserId(req);
+    const month = req.query.month ? Number(req.query.month) : undefined;
+    const year = req.query.year ? Number(req.query.year) : undefined;
+    const budgets = await getUserCategoryBudgets(userId, month, year);
+    res.json(budgets);
+  } catch (err: any) {
+    console.error("GET /api/budgets error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch budgets" });
+  }
+});
+
+router.get("/api/budgets/insights", async (req: any, res: any) => {
+  try {
+    const userId = getUserId(req);
+    const month = req.query.month ? Number(req.query.month) : undefined;
+    const year = req.query.year ? Number(req.query.year) : undefined;
+    const insights = await getBudgetInsights(userId, month, year);
+    res.json(insights);
+  } catch (err: any) {
+    console.error("GET /api/budgets/insights error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch budget insights" });
+  }
+});
+
+router.post("/api/budgets", async (req: any, res: any) => {
+  try {
+    const userId = getUserId(req);
+    const result = await upsertCategoryBudget(userId, req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error("POST /api/budgets error:", err);
+    res.status(400).json({ error: err.message || "Failed to save budget" });
+  }
+});
+
+router.patch("/api/budgets/:id", async (req: any, res: any) => {
+  try {
+    const userId = getUserId(req);
+    const result = await updateCategoryBudget(userId, req.params.id, req.body);
+    res.json(result);
+  } catch (err: any) {
+    console.error("PATCH /api/budgets/:id error:", err);
+    res.status(400).json({ error: err.message || "Failed to update budget" });
+  }
+});
+
+router.delete("/api/budgets/:id", async (req: any, res: any) => {
+  try {
+    const userId = getUserId(req);
+    const result = await deleteCategoryBudget(userId, req.params.id);
+    res.json(result);
+  } catch (err: any) {
+    console.error("DELETE /api/budgets/:id error:", err);
+    res.status(400).json({ error: err.message || "Failed to delete budget" });
+  }
+});
 
 router.get("/api/expenses", async (req: any, res: any) => {
   try {

@@ -1,13 +1,13 @@
 import React from 'react';
 import { Wallet, Check } from 'lucide-react';
 
-interface TrackPayLogoProps {
+export interface SpendTrackLogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   showText?: boolean;
   className?: string;
 }
 
-export const TrackPayLogo: React.FC<TrackPayLogoProps> = ({
+export const SpendTrackLogo: React.FC<SpendTrackLogoProps> = ({
   size = 'md',
   showText = false,
   className = '',
@@ -43,7 +43,7 @@ export const TrackPayLogo: React.FC<TrackPayLogoProps> = ({
   return (
     <div className={`inline-flex items-center gap-2.5 ${className}`}>
       <div
-        className={`${sizeClasses[size]} bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-md shadow-emerald-600/20 flex items-center justify-center relative shrink-0 ring-1 ring-emerald-400/30`}
+        className={`${sizeClasses[size]} bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-500/20 flex items-center justify-center relative shrink-0 ring-1 ring-emerald-400/40`}
       >
         <div className="relative flex items-center justify-center">
           <Wallet className={`${walletIconSizes[size]} stroke-[2.2]`} />
@@ -56,10 +56,13 @@ export const TrackPayLogo: React.FC<TrackPayLogoProps> = ({
       </div>
 
       {showText && (
-        <span className={`${textSizes[size]} tracking-tight text-slate-900 dark:text-white`}>
-          Track<span className="text-emerald-600 dark:text-emerald-400">Pay</span>
+        <span className={`${textSizes[size]} tracking-tight text-slate-900 dark:text-white flex items-center gap-1`}>
+          SpendTrack<span className="text-emerald-500">AI</span>
         </span>
       )}
     </div>
   );
 };
+
+export const TrackPayLogo = SpendTrackLogo;
+export type TrackPayLogoProps = SpendTrackLogoProps;

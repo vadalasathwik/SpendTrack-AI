@@ -55,7 +55,7 @@ export const AppLockModal: React.FC<AppLockModalProps> = ({
         </div>
 
         <div>
-          <h3 className="text-lg font-black text-white">TrackPay App Lock</h3>
+          <h3 className="text-lg font-black text-white">SpendTrack AI App Lock</h3>
           <p className="text-xs text-slate-400 mt-0.5">Enter 4-digit security PIN to access personal ledger</p>
         </div>
 

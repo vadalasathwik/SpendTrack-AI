@@ -90,7 +90,7 @@ export const DocumentVaultPage: React.FC = () => {
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold mb-2">
             <Scan className="w-3.5 h-3.5 text-indigo-400" />
-            <span>TrackPay Smart OCR Document Center v4.8.0</span>
+            <span>SpendTrack AI Smart OCR Document Center v4.8.0</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
             <FileText className="w-7 h-7 text-indigo-400" /> Smart OCR Document Intelligence

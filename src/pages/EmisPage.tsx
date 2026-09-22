@@ -74,7 +74,7 @@ export const EmisPage: React.FC<EmisPageProps> = ({ onAddEmi, onDeleteEmi }) => 
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold mb-2">
             <Gauge className="w-3.5 h-3.5 text-purple-400" />
-            <span>TrackPay Credit Intelligence & Prepayment Optimizer Pro v4.7.0</span>
+            <span>SpendTrack AI Credit Intelligence & Prepayment Optimizer Pro v4.7.0</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
             <CreditCard className="w-7 h-7 text-purple-400" /> Credit Score & Loan Prepayment Optimizer

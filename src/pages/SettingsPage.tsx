@@ -24,6 +24,12 @@ import {
 import { CategoryItem, UserSettings } from '../types.js';
 import { GlassCard } from '../components/ui/GlassCard.js';
 import { getActiveSessions, revokeSession, logoutAllDevices, UserSession } from '../services/authService.js';
+import {
+  exportReceiptsJSON,
+  exportQRVaultJSON,
+  exportExpensesCSV,
+  importBackupJSON,
+} from '../utils/mobileStorage.js';
 
 interface SettingsPageProps {
   categories: CategoryItem[];
@@ -427,17 +433,74 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={onExportCsv}
-                className="w-full p-4 rounded-2xl bg-slate-900/80 border border-white/10 hover:border-emerald-500/30 text-left cursor-pointer transition-all space-y-1"
-              >
-                <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
-                  <Download className="w-4 h-4" />
-                  <span>Export Financial CSV Data</span>
+              {/* Mobile Device Storage Export & Import Section */}
+              <div className="space-y-3 pt-4 border-t border-white/10">
+                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                  Mobile Storage & Backup
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => exportExpensesCSV()}
+                    className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 text-left cursor-pointer transition-all space-y-1"
+                  >
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs">
+                      <Download className="w-4 h-4" />
+                      <span>Export Expenses (CSV)</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">Download expenses spreadsheet</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => exportReceiptsJSON()}
+                    className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 text-left cursor-pointer transition-all space-y-1"
+                  >
+                    <div className="flex items-center gap-2 text-teal-400 font-bold text-xs">
+                      <Download className="w-4 h-4" />
+                      <span>Export Receipts (JSON)</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">Download OCR receipt vault JSON</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => exportQRVaultJSON()}
+                    className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 text-left cursor-pointer transition-all space-y-1"
+                  >
+                    <div className="flex items-center gap-2 text-cyan-400 font-bold text-xs">
+                      <Download className="w-4 h-4" />
+                      <span>Export QR Vault (JSON)</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">Backup encrypted QR codes</p>
+                  </button>
+
+                  <label className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 text-left cursor-pointer transition-all space-y-1 block">
+                    <div className="flex items-center gap-2 text-emerald-300 font-bold text-xs">
+                      <Upload className="w-4 h-4" />
+                      <span>Import Backup JSON</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400">Restore previous JSON backup</p>
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const result = await importBackupJSON(file);
+                          alert(`Successfully restored ${result.itemCount} items! Reloading...`);
+                          window.location.reload();
+                        } catch (err: any) {
+                          alert('Failed to import backup: ' + (err.message || 'Invalid format'));
+                        }
+                      }}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
-                <p className="text-[11px] text-slate-400">Download complete PostgreSQL dataset export</p>
-              </button>
+              </div>
             </div>
           </GlassCard>
         )}
@@ -448,7 +511,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             disabled={isSaving}
             className="px-8 py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-xl shadow-emerald-500/25 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
           >
-            {isSaving ? 'Saving...' : 'Save TrackPay v4.0 Preferences'}
+            {isSaving ? 'Saving...' : 'Save SpendTrack AI Preferences'}
           </button>
         </div>
       </form>

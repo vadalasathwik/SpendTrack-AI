@@ -14,6 +14,7 @@ import {
   QrCode,
   Brain,
   Zap,
+  PieChart,
 } from 'lucide-react';
 import {
   CashFlowCurrent,
@@ -56,11 +57,16 @@ export const FinanceHomePage: React.FC<FinanceHomePageProps> = ({
   onOpenScanReceipt,
 }) => {
   const [dailyBrief, setDailyBrief] = useState<any>(null);
+  const [budgetInsights, setBudgetInsights] = useState<any>(null);
 
   useEffect(() => {
     SpendTrackApi.getDailyBrief()
       .then(setDailyBrief)
       .catch((err) => console.warn('Daily brief fetch notice:', err));
+
+    SpendTrackApi.getBudgetInsights()
+      .then(setBudgetInsights)
+      .catch((err) => console.warn('Budget insights fetch notice:', err));
   }, [expenses, incomes]);
 
   const displayName = user?.name || (user?.email ? user.email.split('@')[0] : 'Member');
@@ -222,6 +228,47 @@ export const FinanceHomePage: React.FC<FinanceHomePageProps> = ({
             <span>{dailyBrief.recommendation}</span>
           </div>
         )}
+      </motion.div>
+
+      {/* 6. BUDGET HEALTH WIDGET */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.3 }}
+        onClick={() => onNavigateToTab('planner')}
+        className="p-4 rounded-[28px] bg-slate-900 border border-slate-800 text-white shadow-xl cursor-pointer hover:border-emerald-500/40 transition-all group"
+      >
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+              <PieChart className="w-4 h-4" />
+            </div>
+            <h3 className="text-xs font-black text-white uppercase tracking-wider">Budget Health</h3>
+          </div>
+          <span className="text-xs font-bold text-emerald-400 font-mono">
+            {budgetInsights?.percentageUsed || 0}% used
+          </span>
+        </div>
+
+        <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden mb-2 border border-slate-800">
+          <div
+            className={`h-full bg-gradient-to-r ${
+              (budgetInsights?.percentageUsed || 0) >= 100
+                ? 'from-red-500 to-rose-600'
+                : (budgetInsights?.percentageUsed || 0) >= 80
+                ? 'from-amber-500 to-orange-500'
+                : 'from-emerald-400 to-teal-500'
+            } transition-all duration-500 rounded-full`}
+            style={{ width: `${Math.min(100, budgetInsights?.percentageUsed || 0)}%` }}
+          />
+        </div>
+
+        <div className="flex items-center justify-between text-[11px] text-slate-400">
+          <span>Remaining {formatCurrency(budgetInsights?.remaining || 0)}</span>
+          <span className="group-hover:text-emerald-400 transition-colors font-semibold flex items-center gap-0.5">
+            View Details &rarr;
+          </span>
+        </div>
       </motion.div>
 
       {/* Quick Action Buttons Grid */}

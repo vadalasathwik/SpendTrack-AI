@@ -763,7 +763,7 @@ export const FinanceOnboardingWizard: React.FC<FinanceOnboardingWizardProps> = (
             <div>
               <h3 className="text-base font-black text-slate-900 dark:text-white">Setup Complete & Experience Preference</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Review your configured modules before entering TrackPay Personal CFO OS.
+                Review your configured modules before entering SpendTrack AI Personal CFO OS.
               </p>
             </div>
 

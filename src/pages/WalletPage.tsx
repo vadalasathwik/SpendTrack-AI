@@ -25,6 +25,8 @@ import { AppleWalletQRCard } from '../components/qrVault/AppleWalletQRCard.js';
 import { FullScreenQRModal } from '../components/qrVault/FullScreenQRModal.js';
 import { AddQRModal } from '../components/qrVault/AddQRModal.js';
 import { formatCurrency } from '../utils/calculations.js';
+import { WalletSkeleton } from '../components/SkeletonLoader.js';
+import { EmptyState } from '../components/ui/EmptyState.js';
 
 interface WalletPageProps {
   expenses?: any[];
@@ -34,6 +36,7 @@ interface WalletPageProps {
 export const WalletPage: React.FC<WalletPageProps> = () => {
   const [activeSegment, setActiveSegment] = useState<'all' | 'accounts' | 'qrs' | 'upis' | 'cards'>('all');
   const [qrItems, setQrItems] = useState<QRVaultItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAddQRModalOpen, setIsAddQRModalOpen] = useState(false);
   const [selectedQRItem, setSelectedQRItem] = useState<QRVaultItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,6 +64,8 @@ export const WalletPage: React.FC<WalletPageProps> = () => {
       setQrItems(items);
     } catch (err) {
       console.warn('Failed to load QR Vault items:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -182,6 +187,10 @@ export const WalletPage: React.FC<WalletPageProps> = () => {
       accentColor: 'text-teal-400',
     },
   ];
+
+  if (isLoading) {
+    return <WalletSkeleton />;
+  }
 
   return (
     <div className="space-y-5 animate-in fade-in duration-200">
@@ -385,30 +394,13 @@ export const WalletPage: React.FC<WalletPageProps> = () => {
               ))}
             </div>
           ) : (
-            <div className="p-6 rounded-[28px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-center space-y-3 shadow-sm">
-              <div className="w-12 h-12 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center mx-auto">
-                <QrCode className="w-6 h-6 stroke-[2]" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  {searchQuery ? 'No Passes Match Your Search' : 'No QR Passes in Offline Vault'}
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xs mx-auto">
-                  {searchQuery
-                    ? 'Try searching with another keyword or category.'
-                    : 'Add UPI payment QR codes or upload images to access them offline anytime.'}
-                </p>
-              </div>
-              {!searchQuery && (
-                <button
-                  onClick={() => setIsAddQRModalOpen(true)}
-                  className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-black text-xs shadow-md shadow-teal-600/20 transition-all inline-flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4 stroke-[3]" />
-                  <span>Add First QR Pass</span>
-                </button>
-              )}
-            </div>
+            <EmptyState
+              icon={QrCode}
+              title={searchQuery ? 'No Passes Match Your Search' : 'Add your first payment method'}
+              description={searchQuery ? 'Try searching with another keyword or category.' : 'Add UPI payment QR codes or upload payment cards to access them offline anytime.'}
+              actionLabel={!searchQuery ? 'Add First QR Pass' : undefined}
+              onAction={!searchQuery ? () => setIsAddQRModalOpen(true) : undefined}
+            />
           )}
         </div>
       )}

@@ -74,7 +74,7 @@ export const Terms: React.FC<TermsProps> = ({ onBack }) => {
               For any questions regarding these Terms of Service, please contact our support team at:
             </p>
             <p className="mt-2 font-bold text-emerald-800 text-sm">
-              Email: support@trackpay.app
+              Email: support@spendtrack.ai
             </p>
           </section>
         </div>

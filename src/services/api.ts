@@ -302,7 +302,7 @@ export const SpendTrackApi = {
     return { success: true };
   },
 
-  // AI Receipt Scanner
+  // AI Receipt Scanner & Vault
   async scanReceipt(payload: {
     name: string;
     type: string;
@@ -314,7 +314,69 @@ export const SpendTrackApi = {
     });
   },
 
+  async getReceipts(search?: string) {
+    const query = search ? `?search=${encodeURIComponent(search)}` : "";
+    return apiFetch<any[]>(`/api/receipts${query}`);
+  },
+
+  async getReceiptById(id: string) {
+    return apiFetch<any>(`/api/receipts/${id}`);
+  },
+
+  async saveReceiptVault(receiptData: any) {
+    return apiFetch<any>("/api/receipts/save", {
+      method: "POST",
+      body: JSON.stringify(receiptData),
+    });
+  },
+
+  async getMerchantIntelligence(merchantName: string) {
+    return apiFetch<any>(`/api/receipts/merchant/${encodeURIComponent(merchantName)}`);
+  },
+
+  async deleteReceipt(id: string) {
+    return apiFetch<{ success: boolean }>(`/api/receipts/${id}`, {
+      method: "DELETE",
+    });
+  },
+
   // Budget Management (Prisma API)
+  async getCategoryBudgets(month?: number, year?: number) {
+    const params = new URLSearchParams();
+    if (month !== undefined) params.append("month", String(month));
+    if (year !== undefined) params.append("year", String(year));
+    const query = params.toString() ? `?${params.toString()}` : "";
+    return apiFetch<any[]>(`/api/budgets${query}`);
+  },
+
+  async getBudgetInsights(month?: number, year?: number) {
+    const params = new URLSearchParams();
+    if (month !== undefined) params.append("month", String(month));
+    if (year !== undefined) params.append("year", String(year));
+    const query = params.toString() ? `?${params.toString()}` : "";
+    return apiFetch<any>(`/api/budgets/insights${query}`);
+  },
+
+  async saveCategoryBudget(data: { category: string; monthlyLimit: number; month?: number; year?: number }) {
+    return apiFetch<any>("/api/budgets", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateCategoryBudget(id: string, data: { monthlyLimit?: number; category?: string }) {
+    return apiFetch<any>(`/api/budgets/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteCategoryBudget(id: string) {
+    return apiFetch<{ success: boolean }>(`/api/budgets/${id}`, {
+      method: "DELETE",
+    });
+  },
+
   async getBudgetSummary(month?: number, year?: number) {
     const params = new URLSearchParams();
     if (month !== undefined) params.append("month", String(month));
