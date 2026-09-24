@@ -109,7 +109,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       ? insights[0]
       : {
           title: 'Smart Spending Insight',
-          description: 'Groceries & Utilities account for the bulk of your recent variable spending. Consider automated limits.',
+          description: 'Start by adding your first transaction.',
         };
   }, [expenses]);
 
@@ -196,9 +196,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   };
 
   // Savings goal metrics (20% surplus target)
-  const savingsTarget = (userSettings?.monthlyBudget || 50000) * 0.2;
+  const savingsTarget = (userSettings?.monthlyBudget || 0) * 0.2;
   const currentSavings = Math.max(0, budgetMetrics.remainingBudget);
-  const savingsProgress = Math.min(100, Math.round((currentSavings / (savingsTarget || 1)) * 100));
+  const savingsProgress = savingsTarget > 0 ? Math.min(100, Math.round((currentSavings / savingsTarget) * 100)) : 0;
 
   return (
     <div className="space-y-6 pb-12" id="dashboard-container">

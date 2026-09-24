@@ -45,7 +45,7 @@ export const DocumentVaultPage: React.FC = () => {
       const res = await SpendTrackApi.processDocumentOcr({
         title,
         category,
-        fileUrl: fileUrl || 'https://spendtrack.app/vault/sample-doc.pdf',
+        fileUrl: fileUrl || '',
         rawContentText: rawText,
       });
 

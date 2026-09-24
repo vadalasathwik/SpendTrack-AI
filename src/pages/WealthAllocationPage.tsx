@@ -27,13 +27,13 @@ export const WealthAllocationPage: React.FC<WealthAllocationPageProps> = ({
   const [allocationData, setAllocationData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const baseIncome = plannerSummary.income || 198708;
+  const baseIncome = plannerSummary?.income || 0;
 
   // Manual Sliders State
-  const [emiPct, setEmiPct] = useState(plannerSummary.income > 0 ? Math.round((plannerSummary.emi / plannerSummary.income) * 100) : 40);
-  const [invPct, setInvPct] = useState(plannerSummary.income > 0 ? Math.round((plannerSummary.investments / plannerSummary.income) * 100) : 15);
-  const [savPct, setSavPct] = useState(plannerSummary.income > 0 ? Math.round((plannerSummary.savings / plannerSummary.income) * 100) : 10);
-  const [livingPct, setLivingPct] = useState(plannerSummary.income > 0 ? Math.round((plannerSummary.living / plannerSummary.income) * 100) : 25);
+  const [emiPct, setEmiPct] = useState(plannerSummary?.income > 0 ? Math.round((plannerSummary.emi / plannerSummary.income) * 100) : 0);
+  const [invPct, setInvPct] = useState(plannerSummary?.income > 0 ? Math.round((plannerSummary.investments / plannerSummary.income) * 100) : 0);
+  const [savPct, setSavPct] = useState(plannerSummary?.income > 0 ? Math.round((plannerSummary.savings / plannerSummary.income) * 100) : 0);
+  const [livingPct, setLivingPct] = useState(plannerSummary?.income > 0 ? Math.round((plannerSummary.living / plannerSummary.income) * 100) : 0);
 
   const allocatedTotalPct = emiPct + invPct + savPct + livingPct;
   const bufferPct = Math.max(0, 100 - allocatedTotalPct);

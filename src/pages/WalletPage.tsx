@@ -25,6 +25,7 @@ import { AppleWalletQRCard } from '../components/qrVault/AppleWalletQRCard.js';
 import { FullScreenQRModal } from '../components/qrVault/FullScreenQRModal.js';
 import { AddQRModal } from '../components/qrVault/AddQRModal.js';
 import { formatCurrency } from '../utils/calculations.js';
+import { SpendTrackApi } from '../services/api.js';
 import { WalletSkeleton } from '../components/SkeletonLoader.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
 
@@ -99,94 +100,23 @@ export const WalletPage: React.FC<WalletPageProps> = () => {
     return matchesSearch && matchesCat;
   });
 
-  const totalBalance = 227700;
+  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  const [savedUpiIds, setSavedUpiIds] = useState<any[]>([]);
+  const [paymentCards, setPaymentCards] = useState<any[]>([]);
 
-  // 1. Bank Accounts (Apple Wallet Styled Passes)
-  const bankAccounts = [
-    {
-      id: 'acc-1',
-      bankName: 'HDFC Bank',
-      accountType: 'Savings Salary',
-      accountNumber: '•••• 4821',
-      balance: 142500,
-      gradient: 'from-blue-700 via-indigo-800 to-slate-950',
-      isPrimary: true,
-      logoText: 'HDFC',
-    },
-    {
-      id: 'acc-2',
-      bankName: 'ICICI Bank',
-      accountType: 'Wealth Savings',
-      accountNumber: '•••• 9104',
-      balance: 85200,
-      gradient: 'from-amber-600 via-orange-700 to-slate-950',
-      isPrimary: false,
-      logoText: 'ICICI',
-    },
-  ];
+  useEffect(() => {
+    SpendTrackApi.getAccounts()
+      .then((data: any) => {
+        if (Array.isArray(data)) {
+          setBankAccounts(data);
+        } else if (data && Array.isArray(data.accounts)) {
+          setBankAccounts(data.accounts);
+        }
+      })
+      .catch(() => setBankAccounts([]));
+  }, []);
 
-  // 3. Saved UPI Handles & Mandates
-  const savedUpiIds = [
-    {
-      id: 'upi-1',
-      title: 'Primary Google Pay UPI',
-      upiHandle: 'user@okhdfcbank',
-      app: 'Google Pay',
-      isDefault: true,
-    },
-    {
-      id: 'upi-2',
-      title: 'PhonePe Secondary UPI',
-      upiHandle: 'user@ybl',
-      app: 'PhonePe',
-      isDefault: false,
-    },
-    {
-      id: 'upi-3',
-      title: 'SIP AutoPay Mandate',
-      upiHandle: 'autopay.sip@icici',
-      app: 'Auto-Debit',
-      isDefault: false,
-      amount: '₹15,000 / mo',
-    },
-  ];
-
-  // 4. Glass Payment Cards (Apple Wallet Metallic Cards)
-  const paymentCards = [
-    {
-      id: 'card-1',
-      bank: 'HDFC Bank',
-      cardName: 'Regalia Gold',
-      network: 'VISA SIGNATURE',
-      cardNumber: '4532 •••• •••• 8821',
-      cardHolder: 'AUTHENTICATED USER',
-      expiry: '09/28',
-      gradient: 'from-slate-900 via-purple-950 to-black',
-      accentColor: 'text-purple-400',
-    },
-    {
-      id: 'card-2',
-      bank: 'ICICI Bank',
-      cardName: 'Sapphiro World',
-      network: 'MASTERCARD',
-      cardNumber: '5412 •••• •••• 3910',
-      cardHolder: 'AUTHENTICATED USER',
-      expiry: '11/27',
-      gradient: 'from-amber-950 via-stone-900 to-black',
-      accentColor: 'text-amber-400',
-    },
-    {
-      id: 'card-3',
-      bank: 'SBI Card',
-      cardName: 'RuPay Select',
-      network: 'RUPAY',
-      cardNumber: '6521 •••• •••• 1042',
-      cardHolder: 'AUTHENTICATED USER',
-      expiry: '04/29',
-      gradient: 'from-teal-950 via-slate-900 to-black',
-      accentColor: 'text-teal-400',
-    },
-  ];
+  const totalBalance = bankAccounts.reduce((sum, acc) => sum + (Number(acc.balance) || Number(acc.currentBalance) || 0), 0);
 
   if (isLoading) {
     return <WalletSkeleton />;
@@ -290,50 +220,56 @@ export const WalletPage: React.FC<WalletPageProps> = () => {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 gap-3.5">
-            {bankAccounts.map((acc) => (
-              <div
-                key={acc.id}
-                className={`relative overflow-hidden rounded-[28px] bg-gradient-to-br ${acc.gradient} p-5 text-white shadow-xl border border-white/15 backdrop-blur-xl hover:scale-[1.01] transition-all duration-300 group`}
-              >
-                <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-                <div className="absolute bottom-2 right-4 text-white/5 font-mono text-5xl font-black pointer-events-none select-none">
-                  {acc.logoText}
-                </div>
+          {bankAccounts.length > 0 ? (
+            <div className="grid grid-cols-1 gap-3.5">
+              {bankAccounts.map((acc) => (
+                <div
+                  key={acc.id}
+                  className={`relative overflow-hidden rounded-[28px] bg-gradient-to-br ${acc.gradient || 'from-blue-700 via-indigo-800 to-slate-950'} p-5 text-white shadow-xl border border-white/15 backdrop-blur-xl hover:scale-[1.01] transition-all duration-300 group`}
+                >
+                  <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+                  <div className="absolute bottom-2 right-4 text-white/5 font-mono text-5xl font-black pointer-events-none select-none">
+                    {acc.logoText || acc.bankName}
+                  </div>
 
-                <div className="flex items-center justify-between mb-4 relative z-10">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center font-black text-xs text-white border border-white/20 shadow-inner">
-                      {acc.logoText}
+                  <div className="flex items-center justify-between mb-4 relative z-10">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center font-black text-xs text-white border border-white/20 shadow-inner">
+                        {acc.logoText || acc.bankName?.charAt(0)}
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-sm text-white tracking-tight">{acc.bankName || acc.name}</h3>
+                        <p className="text-[11px] text-slate-300 font-medium">{acc.accountType || acc.type}</p>
+                      </div>
                     </div>
+
+                    {acc.isPrimary ? (
+                      <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400/30 backdrop-blur-md">
+                        Primary Salary
+                      </span>
+                    ) : (
+                      <Wifi className="w-4 h-4 text-white/60 rotate-90" />
+                    )}
+                  </div>
+
+                  <div className="flex items-end justify-between relative z-10 pt-2 border-t border-white/10">
                     <div>
-                      <h3 className="font-extrabold text-sm text-white tracking-tight">{acc.bankName}</h3>
-                      <p className="text-[11px] text-slate-300 font-medium">{acc.accountType}</p>
+                      <span className="text-[10px] text-slate-300 uppercase tracking-widest font-black block">Available Balance</span>
+                      <span className="text-2xl font-black text-white tracking-tight">{formatCurrency(acc.balance || acc.currentBalance || 0)}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-300 uppercase tracking-widest font-black block">Account No.</span>
+                      <span className="text-xs font-mono font-bold tracking-widest text-slate-200">{acc.accountNumber || '•••• ----'}</span>
                     </div>
                   </div>
-
-                  {acc.isPrimary ? (
-                    <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400/30 backdrop-blur-md">
-                      Primary Salary
-                    </span>
-                  ) : (
-                    <Wifi className="w-4 h-4 text-white/60 rotate-90" />
-                  )}
                 </div>
-
-                <div className="flex items-end justify-between relative z-10 pt-2 border-t border-white/10">
-                  <div>
-                    <span className="text-[10px] text-slate-300 uppercase tracking-widest font-black block">Available Balance</span>
-                    <span className="text-2xl font-black text-white tracking-tight">{formatCurrency(acc.balance)}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-slate-300 uppercase tracking-widest font-black block">Account No.</span>
-                    <span className="text-xs font-mono font-bold tracking-widest text-slate-200">{acc.accountNumber}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-4 rounded-[24px] bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-center text-xs text-slate-500">
+              No connected bank accounts found.
+            </div>
+          )}
         </div>
       )}
 
@@ -396,7 +332,7 @@ export const WalletPage: React.FC<WalletPageProps> = () => {
           ) : (
             <EmptyState
               icon={QrCode}
-              title={searchQuery ? 'No Passes Match Your Search' : 'Add your first payment method'}
+              title={searchQuery ? 'No Passes Match Your Search' : 'No transactions yet'}
               description={searchQuery ? 'Try searching with another keyword or category.' : 'Add UPI payment QR codes or upload payment cards to access them offline anytime.'}
               actionLabel={!searchQuery ? 'Add First QR Pass' : undefined}
               onAction={!searchQuery ? () => setIsAddQRModalOpen(true) : undefined}
@@ -415,50 +351,56 @@ export const WalletPage: React.FC<WalletPageProps> = () => {
             Saved UPI IDs & AutoPay Mandates
           </h2>
 
-          <div className="space-y-2.5">
-            {savedUpiIds.map((upi) => (
-              <div
-                key={upi.id}
-                className="p-4 rounded-[24px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between shadow-sm hover:border-cyan-500/30 transition-all"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center font-bold text-xs shrink-0">
-                    <Smartphone className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-extrabold text-xs text-slate-900 dark:text-white">{upi.title}</h3>
-                      {upi.isDefault && (
-                        <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
-                          Primary
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-0.5">
-                      {upi.upiHandle} {upi.amount ? `(${upi.amount})` : ''}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => handleCopy(upi.upiHandle, upi.id)}
-                  className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-extrabold text-xs hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors flex items-center gap-1.5 cursor-pointer"
+          {savedUpiIds.length > 0 ? (
+            <div className="space-y-2.5">
+              {savedUpiIds.map((upi) => (
+                <div
+                  key={upi.id}
+                  className="p-4 rounded-[24px] bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between shadow-sm hover:border-cyan-500/30 transition-all"
                 >
-                  {copiedId === upi.id ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-500" />
-                      <span className="text-emerald-500">Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            ))}
-          </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center font-bold text-xs shrink-0">
+                      <Smartphone className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-extrabold text-xs text-slate-900 dark:text-white">{upi.title}</h3>
+                        {upi.isDefault && (
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                            Primary
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-0.5">
+                        {upi.upiHandle} {upi.amount ? `(${upi.amount})` : ''}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleCopy(upi.upiHandle, upi.id)}
+                    className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-extrabold text-xs hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {copiedId === upi.id ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-500" />
+                        <span className="text-emerald-500">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-4 rounded-[24px] bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-center text-xs text-slate-500">
+              No saved UPI handles or mandates found.
+            </div>
+          )}
         </div>
       )}
 
@@ -472,44 +414,50 @@ export const WalletPage: React.FC<WalletPageProps> = () => {
             Payment Credit & Debit Cards
           </h2>
 
-          <div className="grid grid-cols-1 gap-3.5">
-            {paymentCards.map((card) => (
-              <div
-                key={card.id}
-                className={`relative overflow-hidden rounded-[28px] bg-gradient-to-br ${card.gradient} p-5 text-white shadow-xl border border-white/15 backdrop-blur-xl hover:scale-[1.01] transition-transform duration-300 min-h-[190px] flex flex-col justify-between`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-7 rounded-lg bg-gradient-to-tr from-amber-200 via-amber-400 to-yellow-100 border border-amber-300/60 shadow-inner flex items-center justify-center">
-                      <Cpu className="w-5 h-5 text-amber-900/60" />
+          {paymentCards.length > 0 ? (
+            <div className="grid grid-cols-1 gap-3.5">
+              {paymentCards.map((card) => (
+                <div
+                  key={card.id}
+                  className={`relative overflow-hidden rounded-[28px] bg-gradient-to-br ${card.gradient} p-5 text-white shadow-xl border border-white/15 backdrop-blur-xl hover:scale-[1.01] transition-transform duration-300 min-h-[190px] flex flex-col justify-between`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-7 rounded-lg bg-gradient-to-tr from-amber-200 via-amber-400 to-yellow-100 border border-amber-300/60 shadow-inner flex items-center justify-center">
+                        <Cpu className="w-5 h-5 text-amber-900/60" />
+                      </div>
+                      <Wifi className="w-5 h-5 text-white/70 rotate-90" />
                     </div>
-                    <Wifi className="w-5 h-5 text-white/70 rotate-90" />
-                  </div>
-                  <span className={`text-xs font-black tracking-widest ${card.accentColor}`}>
-                    {card.network}
-                  </span>
-                </div>
-
-                <div className="my-3">
-                  <span className="text-lg sm:text-xl font-mono tracking-[0.25em] text-slate-100 font-bold drop-shadow-md">
-                    {card.cardNumber}
-                  </span>
-                </div>
-
-                <div className="flex items-end justify-between border-t border-white/10 pt-3">
-                  <div>
-                    <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest block">Cardholder</span>
-                    <span className="text-xs font-bold tracking-wider text-slate-200">{card.cardHolder}</span>
+                    <span className={`text-xs font-black tracking-widest ${card.accentColor}`}>
+                      {card.network}
+                    </span>
                   </div>
 
-                  <div>
-                    <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest block">Expires</span>
-                    <span className="text-xs font-mono font-bold text-slate-200">{card.expiry}</span>
+                  <div className="my-3">
+                    <span className="text-lg sm:text-xl font-mono tracking-[0.25em] text-slate-100 font-bold drop-shadow-md">
+                      {card.cardNumber}
+                    </span>
+                  </div>
+
+                  <div className="flex items-end justify-between border-t border-white/10 pt-3">
+                    <div>
+                      <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest block">Cardholder</span>
+                      <span className="text-xs font-bold tracking-wider text-slate-200">{card.cardHolder}</span>
+                    </div>
+
+                    <div>
+                      <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest block">Expires</span>
+                      <span className="text-xs font-mono font-bold text-slate-200">{card.expiry}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-4 rounded-[24px] bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-center text-xs text-slate-500">
+              No payment cards stored.
+            </div>
+          )}
         </div>
       )}
 

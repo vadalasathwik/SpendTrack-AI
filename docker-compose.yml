@@ -1,40 +1,63 @@
-version: '3.8'
-
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: trackpay_postgres
-    restart: always
-    environment:
-      POSTGRES_USER: trackpay_user
-      POSTGRES_PASSWORD: trackpay_password
-      POSTGRES_DB: trackpay_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U trackpay_user -d trackpay_db"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  trackpay_app:
+  spendtrack:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: trackpay_app
+    container_name: spendtrack
     restart: always
     ports:
       - "3000:3000"
+    env_file:
+      - .env.local
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: "postgresql://trackpay_user:trackpay_password@postgres:5432/trackpay_db?schema=public"
-      JWT_SECRET: "super-secret-trackpay-jwt-key-2026-production"
+      DATABASE_URL: "postgresql://postgres:trackpay123@postgres:5432/spendtrack?schema=public"
+      JWT_SECRET: "super-secret-spendtrack-jwt-key-2026-production"
+      APP_URL: "http://localhost:3000"
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - spendtrack-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: spendtrack_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: trackpay123
+      POSTGRES_DB: spendtrack
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d spendtrack"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - spendtrack-network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: spendtrack_pgadmin
+    restart: always
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "admin@spendtrack.ai"
+      PGADMIN_DEFAULT_PASSWORD: "admin123"
+    depends_on:
+      - postgres
+    networks:
+      - spendtrack-network
 
 volumes:
   postgres_data:
+
+networks:
+  spendtrack-network:
+    driver: bridge

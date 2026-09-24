@@ -86,14 +86,7 @@ export const AiExecutiveWorkspacePage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [messages, setMessages] = useState<
     { persona: PersonaType; query: string; reply: string; time: string }[]
-  >([
-    {
-      persona: 'CFO',
-      query: 'Hello! What is my primary financial focus for this month?',
-      reply: 'Welcome to your AI Executive Hub. Based on your live PostgreSQL metrics, your monthly cash flow is active. Ask any specialized question to get context-aware financial coaching.',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-  ]);
+  >([]);
 
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [showAuditLogs, setShowAuditLogs] = useState(false);

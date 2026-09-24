@@ -1,11 +1,15 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import helmet from "helmet";
+import compression from "compression";
+import rateLimit from "express-rate-limit";
 import authRoutes from "./auth/routes.js";
 import apiRoutes from "./routes.js";
 import { authenticateJWT, assertJwtSecretConfigured } from "./auth/jwt.js";
 import { geminiAssistantService } from "./services/geminiService.js";
 import { extractReceipt } from "./services/receipt.service.js";
+import { prisma } from "./db/prisma.js";
 import {
   ApiErrorCodes,
   apiErrorHandler,
@@ -21,17 +25,35 @@ const ALLOWED_ORIGINS = [
   "http://localhost:3000",
   "http://localhost:5173",
   "https://spend-track-rho.vercel.app",
-] as const;
+  ...(process.env.APP_URL ? [process.env.APP_URL.trim()] : []),
+];
+
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: {
+      code: "RATE_LIMIT_EXCEEDED",
+      message: "Too many authentication requests. Please try again later.",
+    },
+  },
+});
 
 export function createExpressApp() {
   assertJwtSecretConfigured();
 
   const app = express();
 
+  app.use(helmet({ contentSecurityPolicy: false }));
+  app.use(compression());
+
   app.use(
     cors({
       origin(origin, callback) {
-        if (!origin || (ALLOWED_ORIGINS as readonly string[]).includes(origin)) {
+        if (!origin || (ALLOWED_ORIGINS as string[]).includes(origin)) {
           callback(null, true);
           return;
         }
@@ -50,13 +72,25 @@ export function createExpressApp() {
     return express.json({ limit })(req, res, next);
   });
 
-  // Health check
-  app.get("/api/health", (_, res) => {
-    res.json({ success: true, database: "postgresql" });
+  // Production Health check with Prisma ping
+  app.get("/api/health", async (_, res) => {
+    let dbStatus = "connected";
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+    } catch (err) {
+      dbStatus = "disconnected";
+    }
+
+    res.json({
+      status: dbStatus === "connected" ? "healthy" : "unhealthy",
+      database: dbStatus,
+      version: "7.2.0",
+      uptime: process.uptime(),
+    });
   });
 
-  // Google authentication (rate limit applied inside auth router)
-  app.use("/api/auth", authRoutes);
+  // Google authentication with rate limiting
+  app.use("/api/auth", authRateLimiter, authRoutes);
 
   // Authenticate JWT for all subsequent /api routes
   app.use(authenticateJWT);

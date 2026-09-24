@@ -179,7 +179,7 @@ export const ReceiptVaultPage: React.FC<ReceiptVaultPageProps> = ({
       ) : Object.keys(groupedReceipts).length === 0 ? (
         <EmptyState
           icon={ReceiptIcon}
-          title="Your digital receipts will appear here"
+          title="Scan your first receipt"
           description="Scan your store receipts to automatically capture items, total spend, and warranty records."
           actionLabel="Scan Receipt Now"
           onAction={onOpenScanner}

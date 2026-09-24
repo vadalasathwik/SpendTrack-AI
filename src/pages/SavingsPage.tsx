@@ -36,11 +36,11 @@ export const SavingsPage: React.FC<any> = () => {
     loadData();
   }, []);
 
-  const emergencyMonths = healthData?.emergencyFundMonths ?? 3.5;
-  const currentFund = savingsData.reduce((sum, s) => sum + (s.currentAmount || 0), 0) || 120000;
-  const monthlyContribution = savingsData.reduce((sum, s) => sum + (s.monthlyContribution || 0), 0) || 10000;
-  const targetFund = currentFund * (6 / Math.max(0.5, emergencyMonths));
-  const progressPct = Math.min(100, Math.round((currentFund / targetFund) * 100));
+  const emergencyMonths = healthData?.emergencyFundMonths ?? 0;
+  const currentFund = savingsData.reduce((sum, s) => sum + (s.currentAmount || 0), 0);
+  const monthlyContribution = savingsData.reduce((sum, s) => sum + (s.monthlyContribution || 0), 0);
+  const targetFund = currentFund > 0 && emergencyMonths > 0 ? currentFund * (6 / Math.max(0.5, emergencyMonths)) : 0;
+  const progressPct = targetFund > 0 ? Math.min(100, Math.round((currentFund / targetFund) * 100)) : 0;
 
   let statusBadge = { label: 'Healthy', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
   if (emergencyMonths < 1) statusBadge = { label: 'Critical', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20' };

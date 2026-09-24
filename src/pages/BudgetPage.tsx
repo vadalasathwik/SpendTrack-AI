@@ -275,7 +275,7 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({ onBack }) => {
             {!insights?.categoryBreakdown || insights.categoryBreakdown.length === 0 ? (
               <EmptyState
                 icon={PieChartIcon}
-                title="No category budgets created yet"
+                title="Create your first monthly budget"
                 description="Set target spending limits for dining, shopping, groceries, and entertainment to avoid overspending."
                 actionLabel="Set First Limit"
                 onAction={() => setIsModalOpen(true)}

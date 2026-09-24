@@ -1,35 +1,47 @@
-# TrackPay v5.2.0 Production Dockerfile
-FROM node:20-alpine AS builder
+# SpendTrack AI v7.2 — Multi-Stage Production Dockerfile (Node 22)
 
+# Stage 1: Dependencies
+FROM node:22-alpine AS deps
 WORKDIR /app
 
-# Copy dependency manifests
-COPY package*.json prisma ./
+COPY package*.json ./
+COPY prisma ./prisma/
 
-# Install dependencies
 RUN npm ci
 
-# Copy application source code
+# Stage 2: Builder
+FROM node:22-alpine AS builder
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma Client & Build Vite static assets + server.js
 RUN npx prisma generate
 RUN npm run build
 
-# Production Stage
-FROM node:20-alpine AS runner
-
+# Stage 3: Production Runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Copy built assets and dependencies from builder
-COPY --from=builder /app/package*.json ./
+# Install wget for healthcheck if needed
+RUN apk add --no-cache wget
+
+# Copy package manifests and production build artifacts
+COPY package*.json ./
+COPY prisma ./prisma/
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules ./node_modules
 
+# Enforce non-root security policy
+USER node
+
 EXPOSE 3000
+
+# Container Healthcheck targeting Express GET /api/health
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
 CMD ["node", "dist/server.js"]
