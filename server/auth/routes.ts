@@ -36,8 +36,7 @@ router.get("/google", (req, res) => {
   try {
     const appUrl = (process.env.APP_URL || "http://localhost:5173").trim();
     const clientId = (process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || "").trim();
-    const apiUrl = (process.env.API_URL || "http://localhost:3000").trim();
-    const redirectUri = `${apiUrl}/api/auth/google/callback`;
+    const redirectUri = new URL("/api/auth/google/callback", appUrl).toString();
 
     console.log("OAuth Redirect Debug:", {
       APP_URL: appUrl,
@@ -56,8 +55,7 @@ router.get("/google", (req, res) => {
 router.get("/debug", (req, res) => {
   const appUrl = (process.env.APP_URL || "http://localhost:5173").trim();
   const clientId = (process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || "").trim();
-  const apiUrl = (process.env.API_URL || "http://localhost:3000").trim();
-  const redirectUri = `${apiUrl}/api/auth/google/callback`;
+  const redirectUri = new URL("/api/auth/google/callback", appUrl).toString();
 
   res.json({
     appUrl,

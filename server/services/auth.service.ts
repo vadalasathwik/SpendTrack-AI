@@ -20,13 +20,14 @@ const getAppUrl = () => {
   return (process.env.APP_URL || "http://localhost:5173").trim();
 };
 
-const getApiUrl = () => {
-  return (process.env.API_URL || "http://localhost:3000").trim();
+export const getRedirectUri = () => {
+  const appUrl = getAppUrl();
+  return new URL("/api/auth/google/callback", appUrl).toString();
 };
 
 export const generateGoogleAuthUrl = () => {
   const clientId = getGoogleClientId();
-  const redirectUri = `${getApiUrl()}/api/auth/google/callback`;
+  const redirectUri = getRedirectUri();
 
   if (!clientId) {
     throw new Error("GOOGLE_CLIENT_ID is not configured in environment variables");
@@ -49,7 +50,7 @@ export const hashToken = (token: string): string => {
 
 export const handleGoogleCallback = async (code: string, reqInfo: { userAgent?: string; ip?: string }) => {
   const clientId = getGoogleClientId();
-  const redirectUri = `${getApiUrl()}/api/auth/google/callback`;
+  const redirectUri = getRedirectUri();
   const oauth2Client = new OAuth2Client(clientId, getGoogleClientSecret(), redirectUri);
 
   const { tokens } = await oauth2Client.getToken(code);
