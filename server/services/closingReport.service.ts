@@ -1,6 +1,6 @@
 import { prisma } from '../db/prisma.js';
 import { getCfoCashflow } from './cfoCashflow.service.js';
-import { getMonthlyFinancialHealth } from './aiCfo.service.ts';
+import { getMonthlyFinancialHealth } from './aiCfo.service.js';
 
 export interface MonthlyClosingReport {
   monthName: string;
