@@ -134,8 +134,8 @@ export function verifyJWT(token: string): JWTPayload {
  * Populates req.user.id for every protected API.
  */
 export function authenticateJWT(req: Request, res: Response, next: NextFunction) {
-  // Public routes (health check & initial login/refresh endpoints) bypass JWT check
-  const reqPath = req.path || req.originalUrl || '';
+  // Public routes (health check & initial login/refresh/debug endpoints) bypass JWT check
+  const rawPath = (req.originalUrl || req.url || req.path || '').split('?')[0];
   const publicPaths = [
     '/api/auth/google',
     '/api/auth/google/callback',
@@ -144,7 +144,7 @@ export function authenticateJWT(req: Request, res: Response, next: NextFunction)
     '/api/health',
   ];
 
-  if (!reqPath.startsWith('/api/') || publicPaths.some(p => reqPath === p || reqPath.startsWith(`${p}?`))) {
+  if (!rawPath.startsWith('/api/') || publicPaths.includes(rawPath)) {
     return next();
   }
 
