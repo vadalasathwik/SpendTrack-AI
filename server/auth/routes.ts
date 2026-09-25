@@ -34,11 +34,37 @@ const parseRefreshToken = (req: any): string | null => {
 // 1. GET /api/auth/google - OAuth Redirect
 router.get("/google", (req, res) => {
   try {
+    const appUrl = (process.env.APP_URL || "http://localhost:5173").trim();
+    const clientId = (process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || "").trim();
+    const apiUrl = (process.env.API_URL || "http://localhost:3000").trim();
+    const redirectUri = `${apiUrl}/api/auth/google/callback`;
+
+    console.log("OAuth Redirect Debug:", {
+      APP_URL: appUrl,
+      GOOGLE_CLIENT_ID: clientId,
+      redirectUri,
+    });
+
     const authUrl = generateGoogleAuthUrl();
     res.redirect(authUrl);
   } catch (err: any) {
     sendApiError(res, req, 500, ApiErrorCodes.SERVER_MISCONFIGURED, err.message || "Failed to generate Google Auth URL");
   }
+});
+
+// GET /api/auth/debug - Debug endpoint for OAuth config
+router.get("/debug", (req, res) => {
+  const appUrl = (process.env.APP_URL || "http://localhost:5173").trim();
+  const clientId = (process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID || "").trim();
+  const apiUrl = (process.env.API_URL || "http://localhost:3000").trim();
+  const redirectUri = `${apiUrl}/api/auth/google/callback`;
+
+  res.json({
+    appUrl,
+    redirectUri,
+    clientId,
+    callbackPath: "/api/auth/google/callback",
+  });
 });
 
 // 2. GET /api/auth/google/callback - OAuth Callback

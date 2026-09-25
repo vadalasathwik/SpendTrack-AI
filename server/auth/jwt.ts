@@ -140,6 +140,7 @@ export function authenticateJWT(req: Request, res: Response, next: NextFunction)
     '/api/auth/google',
     '/api/auth/google/callback',
     '/api/auth/refresh',
+    '/api/auth/debug',
     '/api/health',
   ];
 
