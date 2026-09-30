@@ -36,18 +36,18 @@ export const BudgetDashboardPage: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());
 
   const [summary, setSummary] = useState<BudgetSummary>({
-    budget: 90000,
-    spent: 58750,
-    remaining: 31250,
-    percentage: 65,
+    budget: 0,
+    spent: 0,
+    remaining: 0,
+    percentage: 0,
   });
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   // Intelligent Budget Engine Income inputs
-  const [salaryIncome, setSalaryIncome] = useState('120000');
+  const [salaryIncome, setSalaryIncome] = useState('0');
   const [bonusIncome, setBonusIncome] = useState('0');
-  const [rentalIncome, setRentalIncome] = useState('20000');
+  const [rentalIncome, setRentalIncome] = useState('0');
   const [sideIncome, setSideIncome] = useState('0');
 
   // AI Recommended Allocation Overrides
@@ -75,7 +75,7 @@ export const BudgetDashboardPage: React.FC = () => {
     setError(null);
     try {
       const data = await SpendTrackApi.getBudgetSummary(selectedMonth, selectedYear);
-      if (data && data.budget > 0) {
+      if (data) {
         setSummary(data);
       }
       const env = await SpendTrackApi.getEnvelopes(selectedMonth, selectedYear);

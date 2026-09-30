@@ -115,7 +115,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
             placeholder="Search expenses, notes, EMIs, investments, goals... (Cmd+K)"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="flex-1 bg-transparent text-sm sm:text-base font-bold text-white placeholder-slate-500 focus:outline-none"
+            className="flex-1 bg-transparent text-sm sm:text-base font-bold text-white placeholder:text-slate-400 caret-emerald-400 focus:outline-none"
           />
           {query && (
             <button

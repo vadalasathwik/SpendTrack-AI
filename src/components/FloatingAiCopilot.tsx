@@ -72,21 +72,23 @@ export const FloatingAiCopilot: React.FC<FloatingAiCopilotProps> = ({ onRefreshD
   };
 
   return (
-    <div className="fixed bottom-5 right-5 z-50">
+    <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] sm:bottom-24 right-3 sm:right-6 z-50">
       {/* Floating Copilot Button */}
       {!isOpen && (
         <button
+          type="button"
           onClick={() => setIsOpen(true)}
-          className="px-4 py-3 rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 text-white font-extrabold text-xs flex items-center gap-2 shadow-2xl hover:scale-105 transition-all cursor-pointer border border-violet-400/40"
+          aria-label="Open AI CFO Copilot"
+          className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-full bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 text-white font-extrabold text-xs flex items-center gap-1.5 sm:gap-2 shadow-xl hover:scale-105 active:scale-95 focus:outline-none focus:ring-2 focus:ring-violet-400/50 transition-all cursor-pointer border border-violet-400/40 shrink-0"
         >
-          <Sparkles className="w-4 h-4 animate-pulse" />
-          <span>AI CFO Copilot</span>
+          <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-pulse shrink-0" />
+          <span className="text-[11px] sm:text-xs tracking-tight">AI CFO</span>
         </button>
       )}
 
       {/* Expanded Copilot Drawer */}
       {isOpen && (
-        <div className="bg-slate-900 border border-violet-500/30 w-[calc(100vw-40px)] sm:w-[380px] h-[520px] rounded-[28px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="bg-slate-900 border border-violet-500/30 w-[calc(100vw-24px)] sm:w-[380px] h-[480px] sm:h-[520px] max-h-[calc(100vh-100px)] rounded-[24px] sm:rounded-[28px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
           {/* Header */}
           <div className="p-4 bg-gradient-to-r from-violet-950 via-slate-900 to-indigo-950 border-b border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2">

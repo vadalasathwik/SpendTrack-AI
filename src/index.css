@@ -80,6 +80,15 @@
     @apply antialiased min-h-screen selection:bg-emerald-500/20 selection:text-emerald-500;
     overflow-x: hidden;
   }
+
+  /* WebKit autofill dark mode text color fix */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-text-fill-color: #f8fafc !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
 }
 
 /* Strict Radius Specs */

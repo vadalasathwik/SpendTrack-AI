@@ -345,7 +345,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                   priceInputRef.current?.focus();
                 }
               }}
-              className="w-full px-3.5 py-2.5 text-sm sm:text-base border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-[12px] focus:ring-2 focus:ring-emerald-500 focus:outline-none font-bold min-h-[44px]"
+              className="w-full px-3.5 py-2.5 text-sm sm:text-base border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 caret-emerald-400 rounded-[12px] focus:ring-2 focus:ring-emerald-500 focus:outline-none font-bold min-h-[44px] transition-all"
             />
           </div>
 
@@ -355,8 +355,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                 Amount (₹) <span className="text-rose-500">*</span>
               </label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold text-sm">₹</span>
+              <div className="relative flex items-center">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm pointer-events-none select-none">₹</span>
                 <input
                   ref={priceInputRef}
                   type="number"
@@ -367,7 +367,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                   placeholder="250"
                   value={totalPrice}
                   onChange={(e) => setTotalPrice(e.target.value)}
-                  className="w-full pl-8 pr-3 py-2.5 text-sm sm:text-base border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-[12px] focus:ring-2 focus:ring-emerald-500 focus:outline-none font-black min-h-[44px]"
+                  className="w-full pl-8 pr-3 py-2.5 text-sm sm:text-base border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 caret-emerald-400 text-right tabular-nums rounded-[12px] focus:ring-2 focus:ring-emerald-500 focus:outline-none font-black min-h-[44px] transition-all"
                 />
               </div>
             </div>
@@ -382,7 +382,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
                 required
                 value={purchaseDate}
                 onChange={(e) => setPurchaseDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-[12px] focus:ring-2 focus:ring-emerald-500 focus:outline-none font-semibold min-h-[44px]"
+                className="w-full px-3 py-2.5 text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white caret-emerald-400 rounded-[12px] focus:ring-2 focus:ring-emerald-500 focus:outline-none font-semibold min-h-[44px] transition-all"
               />
             </div>
           </div>

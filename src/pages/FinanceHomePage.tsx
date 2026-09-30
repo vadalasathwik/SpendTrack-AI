@@ -41,6 +41,7 @@ interface FinanceHomePageProps {
   onNavigateToTab: (tab: string) => void;
   onOpenScanReceipt?: () => void;
   onOpenWizard?: () => void;
+  onOpenOnboarding?: () => void;
 }
 
 export const FinanceHomePage: React.FC<FinanceHomePageProps> = ({
@@ -55,6 +56,7 @@ export const FinanceHomePage: React.FC<FinanceHomePageProps> = ({
   onOpenAddExpense,
   onNavigateToTab,
   onOpenScanReceipt,
+  onOpenOnboarding,
 }) => {
   const [dailyBrief, setDailyBrief] = useState<any>(null);
   const [budgetInsights, setBudgetInsights] = useState<any>(null);
@@ -113,6 +115,33 @@ export const FinanceHomePage: React.FC<FinanceHomePageProps> = ({
           <span className="hidden sm:inline">Scan Receipt</span>
         </button>
       </motion.div>
+
+      {/* Setup Budget Banner when no budget exists */}
+      {(!userSettings?.monthlyBudget || userSettings.monthlyBudget <= 0) && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 rounded-[20px] bg-slate-900 border border-emerald-500/30 text-white flex items-center justify-between gap-3 shadow-lg"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+              <Wallet className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-white">Monthly Household Budget Not Set</h4>
+              <p className="text-[11px] text-slate-400 mt-0.5">Set up your budget to track burn rate & predictions.</p>
+            </div>
+          </div>
+          {onOpenOnboarding && (
+            <button
+              onClick={onOpenOnboarding}
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0 shadow-md shadow-emerald-600/20"
+            >
+              Set Up Budget
+            </button>
+          )}
+        </motion.div>
+      )}
 
       {/* 4 CORE KPI CARDS */}
       <div className="grid grid-cols-2 gap-3.5">

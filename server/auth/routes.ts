@@ -315,7 +315,7 @@ router.post("/logout", async (req, res) => {
 // 6. POST /api/auth/logout-all - Logout All Devices
 router.post("/logout-all", async (req: any, res: any) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.userId || req.user?.id || req.user?.uid;
     if (!userId) {
       return sendApiError(res, req, 401, ApiErrorCodes.UNAUTHORIZED, "Unauthorized");
     }
@@ -330,7 +330,7 @@ router.post("/logout-all", async (req: any, res: any) => {
 // 7. GET /api/auth/me - Current User Profile
 router.get("/me", async (req: any, res: any) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.userId || req.user?.id || req.user?.uid;
     if (!userId) {
       return sendApiError(res, req, 401, ApiErrorCodes.UNAUTHORIZED, "Unauthorized");
     }
@@ -361,7 +361,7 @@ router.get("/me", async (req: any, res: any) => {
 // 8. GET /api/auth/sessions - Active User Sessions
 router.get("/sessions", async (req: any, res: any) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.userId || req.user?.id || req.user?.uid;
     if (!userId) {
       return sendApiError(res, req, 401, ApiErrorCodes.UNAUTHORIZED, "Unauthorized");
     }
@@ -376,7 +376,7 @@ router.get("/sessions", async (req: any, res: any) => {
 // 9. DELETE /api/auth/sessions/:sessionId - Revoke Specific Session
 router.delete("/sessions/:sessionId", async (req: any, res: any) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.userId || req.user?.id || req.user?.uid;
     if (!userId) {
       return sendApiError(res, req, 401, ApiErrorCodes.UNAUTHORIZED, "Unauthorized");
     }

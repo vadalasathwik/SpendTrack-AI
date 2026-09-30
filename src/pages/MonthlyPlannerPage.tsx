@@ -12,6 +12,7 @@ import {
   Sparkles,
   List,
   Target,
+  Plus,
 } from 'lucide-react';
 import {
   EmiItem,
@@ -27,12 +28,15 @@ import { GlassCard } from '../components/ui/GlassCard.js';
 import { SpendTrackApi } from '../services/api.js';
 
 interface MonthlyPlannerPageProps {
+  incomes?: any[];
   emis?: EmiItem[];
   investments?: InvestmentItem[];
   savings?: SavingItem[];
   recurringExpenses?: RecurringExpense[];
   expenses?: Expense[];
   onOpenBudgets?: () => void;
+  onNavigateToTab?: (tab: string) => void;
+  onOpenAddExpense?: () => void;
 }
 
 export interface PlannerEvent {
@@ -46,12 +50,15 @@ export interface PlannerEvent {
 }
 
 export const MonthlyPlannerPage: React.FC<MonthlyPlannerPageProps> = ({
+  incomes = [],
   emis = [],
   investments = [],
   savings = [],
   recurringExpenses = [],
   expenses = [],
   onOpenBudgets,
+  onNavigateToTab,
+  onOpenAddExpense,
 }) => {
   const [activeView, setActiveView] = useState<'calendar' | 'timeline'>('calendar');
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -79,40 +86,48 @@ export const MonthlyPlannerPage: React.FC<MonthlyPlannerPageProps> = ({
   const remainingDays = Math.max(1, daysInMonth - todayDateNum + 1);
   const dailySafeSpend = remainingBudget > 0 ? Math.round(remainingBudget / remainingDays) : 0;
 
-  // Synthesize events for Financial Calendar 2.0
+  // Synthesize events strictly from authenticated user real records
   const events: PlannerEvent[] = [];
   const timelineItems: TimelineEventItem[] = [];
 
-  // 1. Salary (1st of month)
-  events.push({
-    id: 'evt-salary',
-    day: 1,
-    title: 'Primary Salary Credit',
-    amount: 120000,
-    type: 'Salary',
-    status: isCurrentMonth && todayDateNum >= 1 ? 'Paid' : 'Upcoming',
-    categoryLabel: 'Verified Income Credit',
-  });
-  timelineItems.push({
-    id: 'tl-salary',
-    dateStr: `${monthName.substring(0, 3)} 01`,
-    title: 'Primary Salary Credit',
-    amount: 120000,
-    type: 'Salary',
-    categoryLabel: 'Monthly Inflow',
+  // 1. User Income Credits
+  incomes.forEach((inc) => {
+    const payDay = Math.min(Math.max(1, Number(inc.payDay) || Number(String(inc.date || '').split('-')?.[2]) || 1), daysInMonth);
+    const amt = Number(inc.amount) || 0;
+    const title = inc.source || inc.title || 'Income Credit';
+    events.push({
+      id: `inc-${inc.id || Math.random()}`,
+      day: payDay,
+      title,
+      amount: amt,
+      type: 'Salary',
+      status: isCurrentMonth && todayDateNum >= payDay ? 'Paid' : 'Upcoming',
+      categoryLabel: 'Verified Income Credit',
+    });
+    timelineItems.push({
+      id: `tl-inc-${inc.id || Math.random()}`,
+      dateStr: `${monthName.substring(0, 3)} ${payDay < 10 ? '0' + payDay : payDay}`,
+      title,
+      amount: amt,
+      type: 'Salary',
+      categoryLabel: 'Monthly Inflow',
+    });
   });
 
-  // 2. EMIs
+  // 2. User EMIs
   emis.forEach((emi) => {
-    const due = Math.min(emi.dueDay || 1, daysInMonth);
+    const due = Math.min(Math.max(1, Number(emi.dueDay) || 1), daysInMonth);
     let status: 'Upcoming' | 'Paid' | 'Overdue' = 'Upcoming';
     if (isCurrentMonth && todayDateNum > due) status = 'Paid';
+
+    const title = `${emi.title}${emi.bank ? ` (${emi.bank})` : ''}`;
+    const amt = Number(emi.amount) || 0;
 
     events.push({
       id: `emi-${emi.id}`,
       day: due,
-      title: `${emi.title} (${emi.bank})`,
-      amount: emi.amount,
+      title,
+      amount: amt,
       type: 'EMI',
       status,
       categoryLabel: 'Loan EMI Payment',
@@ -121,26 +136,29 @@ export const MonthlyPlannerPage: React.FC<MonthlyPlannerPageProps> = ({
     timelineItems.push({
       id: `tl-emi-${emi.id}`,
       dateStr: `${monthName.substring(0, 3)} ${due < 10 ? '0' + due : due}`,
-      title: `${emi.title} (${emi.bank})`,
-      amount: emi.amount,
+      title,
+      amount: amt,
       type: 'EMI',
       categoryLabel: 'Loan EMI Payment',
     });
   });
 
-  // 3. Investments - SIP
+  // 3. User Investments - SIP
   investments.forEach((inv) => {
     if (inv.isActive === false) return;
-    const dateObj = new Date(inv.nextDate);
-    const day = Math.min(!isNaN(dateObj.getDate()) ? dateObj.getDate() : 10, daysInMonth);
+    const dateObj = inv.nextDate ? new Date(inv.nextDate) : new Date();
+    const day = Math.min(Math.max(1, !isNaN(dateObj.getDate()) ? dateObj.getDate() : 1), daysInMonth);
     let status: 'Upcoming' | 'Paid' | 'Overdue' = 'Upcoming';
     if (isCurrentMonth && todayDateNum > day) status = 'Paid';
+
+    const title = `${inv.title}${inv.provider ? ` (${inv.provider})` : ''}`;
+    const amt = Number(inv.amount) || 0;
 
     events.push({
       id: `inv-${inv.id}`,
       day,
-      title: `${inv.title} (${inv.provider})`,
-      amount: inv.amount,
+      title,
+      amount: amt,
       type: 'SIP',
       status,
       categoryLabel: 'SIP Deposit',
@@ -149,89 +167,75 @@ export const MonthlyPlannerPage: React.FC<MonthlyPlannerPageProps> = ({
     timelineItems.push({
       id: `tl-inv-${inv.id}`,
       dateStr: `${monthName.substring(0, 3)} ${day < 10 ? '0' + day : day}`,
-      title: `${inv.title} (${inv.provider})`,
-      amount: inv.amount,
+      title,
+      amount: amt,
       type: 'SIP',
       categoryLabel: 'Wealth SIP',
     });
   });
 
-  // 4. Savings - RD & FD
+  // 4. User Savings - RD & FD
   savings.forEach((sav) => {
     const isFD = sav.type === 'FD';
+    const day = Math.min(Math.max(1, Number((sav as any).depositDay) || 5), daysInMonth);
+    const amount = Number(sav.monthlyContribution) || Number((sav as any).targetAmount) || 0;
+
     events.push({
       id: `sav-${sav.id}`,
-      day: 5,
+      day,
       title: `${sav.title} (${sav.type})`,
-      amount: sav.monthlyContribution,
+      amount,
       type: isFD ? 'FD' : 'RD',
-      status: isCurrentMonth && todayDateNum > 5 ? 'Paid' : 'Upcoming',
+      status: isCurrentMonth && todayDateNum > day ? 'Paid' : 'Upcoming',
       categoryLabel: isFD ? 'Fixed Deposit' : 'Recurring Deposit',
     });
 
     timelineItems.push({
       id: `tl-sav-${sav.id}`,
-      dateStr: `${monthName.substring(0, 3)} 05`,
+      dateStr: `${monthName.substring(0, 3)} ${day < 10 ? '0' + day : day}`,
       title: `${sav.title} (${sav.type})`,
-      amount: sav.monthlyContribution,
+      amount,
       type: isFD ? 'FD' : 'RD',
       categoryLabel: isFD ? 'FD Deposit' : 'RD Deposit',
     });
   });
 
-  // 5. Insurance Renewal (Cyan/Teal) - 15th of Month
-  events.push({
-    id: 'evt-ins-health',
-    day: 15,
-    title: 'Health Insurance Annual Premium',
-    amount: 28500,
-    type: 'Insurance',
-    status: isCurrentMonth && todayDateNum > 15 ? 'Paid' : 'Upcoming',
-    categoryLabel: 'Star Health Optima Secure',
-  });
+  // 5. User Recurring Expenses & Bills
+  recurringExpenses.forEach((bill) => {
+    let day = 1;
+    if (bill.dueDate) {
+      const d = new Date(bill.dueDate);
+      if (!isNaN(d.getDate())) day = d.getDate();
+    } else if ((bill as any).billingCycle) {
+      const match = String((bill as any).billingCycle).match(/\d+/);
+      if (match) day = parseInt(match[0], 10);
+    }
+    day = Math.min(Math.max(1, day), daysInMonth);
 
-  // 6. GST / Tax Filing Due Date (Indigo) - 20th of Month
-  events.push({
-    id: 'evt-gst-quarterly',
-    day: 20,
-    title: 'GSTR-3B Tax Filing Deadline',
-    amount: 14200,
-    type: 'GST',
-    status: isCurrentMonth && todayDateNum > 20 ? 'Paid' : 'Upcoming',
-    categoryLabel: 'GST Tax Compliance',
-  });
+    let status: 'Upcoming' | 'Paid' | 'Overdue' = 'Upcoming';
+    if (isCurrentMonth && todayDateNum > day) status = 'Paid';
 
-  // 7. Property Tax / Maintenance (Amber) - 25th of Month
-  events.push({
-    id: 'evt-prop-maint',
-    day: 25,
-    title: 'Society Maintenance & Property Tax Fund',
-    amount: 8500,
-    type: 'Property Tax',
-    status: isCurrentMonth && todayDateNum > 25 ? 'Paid' : 'Upcoming',
-    categoryLabel: 'Prestige Heights Owner Corp',
-  });
+    const title = bill.title || (bill as any).name || 'Recurring Bill';
+    const amount = Number(bill.amount) || 0;
 
-  // 8. Vehicle Service & Insurance (Pink) - 28th of Month
-  events.push({
-    id: 'evt-veh-service',
-    day: 28,
-    title: 'EV Periodic Inspection & Tyre Maintenance',
-    amount: 4500,
-    type: 'Vehicle Service',
-    status: isCurrentMonth && todayDateNum > 28 ? 'Paid' : 'Upcoming',
-    categoryLabel: 'Tata Nexon EV Max Care',
-  });
+    events.push({
+      id: `rec-${bill.id}`,
+      day,
+      title,
+      amount,
+      type: 'Reminder',
+      status,
+      categoryLabel: (bill as any).category || 'Recurring Payment',
+    });
 
-  // 9. Family Birthday / Anniversary (Yellow/Gold) - 18th of Month
-  events.push({
-    id: 'evt-bday-fam',
-    day: 18,
-    title: 'Spouse Birthday & Mutual Wealth Gift Fund',
-    amount: 15000,
-    type: 'Birthday',
-    status: isCurrentMonth && todayDateNum > 18 ? 'Paid' : 'Upcoming',
-    categoryLabel: 'Family Milestone Event',
+    timelineItems.push({
+      id: `tl-rec-${bill.id}`,
+      dateStr: `${monthName.substring(0, 3)} ${day < 10 ? '0' + day : day}`,
+      title,
+      amount,
+      type: 'Reminder',
+      categoryLabel: (bill as any).category || 'Recurring Payment',
+    });
   });
 
   // Helper function for event colors
@@ -374,6 +378,57 @@ export const MonthlyPlannerPage: React.FC<MonthlyPlannerPageProps> = ({
         <span className="px-2.5 py-1 rounded-full bg-pink-500/20 text-pink-400 border border-pink-500/30 shrink-0">● Vehicle Care</span>
         <span className="px-2.5 py-1 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 shrink-0">● Birthday/Milestone</span>
       </GlassCard>
+
+      {/* Empty State Banner when user has no planner records */}
+      {events.length === 0 && (
+        <GlassCard padding="p-6 sm:p-8" className="text-center space-y-4 border border-emerald-500/20 bg-slate-900/60">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/10">
+            <CalendarIcon className="w-7 h-7" />
+          </div>
+          <div className="max-w-md mx-auto space-y-1">
+            <h3 className="text-base font-black text-white">Your Planner is empty</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Add bills, subscriptions, goals, or reminders to organize your upcoming financial activity.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+            {onOpenAddExpense && (
+              <button
+                onClick={onOpenAddExpense}
+                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Expense / Bill</span>
+              </button>
+            )}
+            {onNavigateToTab && (
+              <>
+                <button
+                  onClick={() => onNavigateToTab('recurring')}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Clock className="w-4 h-4 text-cyan-400" />
+                  <span>Add Recurring Bill</span>
+                </button>
+                <button
+                  onClick={() => onNavigateToTab('emis')}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <CreditCard className="w-4 h-4 text-rose-400" />
+                  <span>Add EMI / Income</span>
+                </button>
+                <button
+                  onClick={() => onNavigateToTab('investments')}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <TrendingUp className="w-4 h-4 text-purple-400" />
+                  <span>Add Investment / SIP</span>
+                </button>
+              </>
+            )}
+          </div>
+        </GlassCard>
+      )}
 
       {/* VIEW 1: CALENDAR GRID */}
       {activeView === 'calendar' && (

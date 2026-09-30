@@ -591,7 +591,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
               {/* Merchant & Confidence */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase">Merchant</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase">Merchant</label>
                   {renderConfidenceBadge('merchant')}
                 </div>
                 <input
@@ -599,10 +599,10 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                   value={merchant}
                   onChange={(e) => setMerchant(e.target.value)}
                   placeholder="Merchant / Store Name"
-                  className={`w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border text-xs font-extrabold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 ${
+                  className={`w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border text-xs font-bold text-white caret-emerald-400 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all ${
                     confidences.merchant === 'Low'
-                      ? 'border-amber-500/50 bg-amber-500/5'
-                      : 'border-slate-200 dark:border-slate-800'
+                      ? 'border-amber-500/50 bg-amber-950/20'
+                      : 'border-slate-700'
                   }`}
                 />
               </div>
@@ -611,26 +611,26 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase">Date</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase">Date</label>
                   </div>
                   <input
                     type="date"
                     value={purchaseDate}
                     onChange={(e) => setPurchaseDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-900 dark:text-white focus:outline-none"
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-white caret-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
                   />
                 </div>
 
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase">Invoice #</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase">Invoice #</label>
                   </div>
                   <input
                     type="text"
                     value={invoiceNumber}
                     onChange={(e) => setInvoiceNumber(e.target.value)}
                     placeholder="Invoice #"
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-900 dark:text-white focus:outline-none"
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-white caret-emerald-400 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
                   />
                 </div>
               </div>
@@ -638,14 +638,14 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
               {/* Category & Payment Method */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase">Category</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase">Category</label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-900 dark:text-white focus:outline-none"
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-white caret-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
                   >
                     {categories.map((cat) => (
-                      <option key={cat.name} value={cat.name}>
+                      <option key={cat.name} value={cat.name} className="bg-slate-900 text-white">
                         {cat.name}
                       </option>
                     ))}
@@ -653,17 +653,17 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase">Payment Method</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase">Payment Method</label>
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-900 dark:text-white focus:outline-none"
+                    className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-white caret-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
                   >
-                    <option value="UPI">UPI / Google Pay</option>
-                    <option value="Credit Card">Credit Card</option>
-                    <option value="Debit Card">Debit Card</option>
-                    <option value="NetBanking">NetBanking</option>
-                    <option value="Cash">Cash</option>
+                    <option value="UPI" className="bg-slate-900 text-white">UPI / Google Pay</option>
+                    <option value="Credit Card" className="bg-slate-900 text-white">Credit Card</option>
+                    <option value="Debit Card" className="bg-slate-900 text-white">Debit Card</option>
+                    <option value="NetBanking" className="bg-slate-900 text-white">NetBanking</option>
+                    <option value="Cash" className="bg-slate-900 text-white">Cash</option>
                   </select>
                 </div>
               </div>
@@ -671,22 +671,23 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
               {/* Tax / GST */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase">Tax / GST Amount</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase">Tax / GST Amount</label>
                   {renderConfidenceBadge('taxAmount')}
                 </div>
                 <input
                   type="number"
+                  inputMode="decimal"
                   value={taxAmount || ''}
                   onChange={(e) => setTaxAmount(Number(e.target.value) || 0)}
                   placeholder="0.00"
-                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-900 dark:text-white focus:outline-none font-mono"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-white caret-emerald-400 placeholder:text-slate-400 text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
                 />
               </div>
 
               {/* Extracted Line Items */}
               <div className="space-y-2 pt-1">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                  <h4 className="text-xs font-black text-white uppercase tracking-wider">
                     Line Items ({items.length})
                   </h4>
                   <button
@@ -703,7 +704,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                         },
                       ])
                     }
-                    className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                    className="text-[10px] font-black text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     <Plus className="w-3 h-3" /> Add Item
                   </button>
@@ -711,7 +712,7 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
 
                 <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                   {items.map((it) => (
-                    <div key={it.id} className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800">
+                    <div key={it.id} className="flex items-center gap-2 p-2 rounded-xl bg-slate-800/80 border border-slate-700">
                       <input
                         type="text"
                         value={it.name}
@@ -720,17 +721,18 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
                             prev.map((x) => (x.id === it.id ? { ...x, name: e.target.value } : x))
                           )
                         }
-                        className="flex-1 bg-transparent text-xs font-extrabold text-slate-900 dark:text-white focus:outline-none"
+                        className="flex-1 bg-transparent text-xs font-extrabold text-white caret-emerald-400 focus:outline-none"
                       />
                       <input
                         type="number"
+                        inputMode="decimal"
                         value={it.price || ''}
                         onChange={(e) =>
                           setItems((prev) =>
                             prev.map((x) => (x.id === it.id ? { ...x, price: Number(e.target.value) || 0 } : x))
                           )
                         }
-                        className="w-20 bg-transparent text-right text-xs font-black font-mono text-slate-900 dark:text-white focus:outline-none"
+                        className="w-20 bg-transparent text-right text-xs font-black tabular-nums text-white caret-emerald-400 focus:outline-none"
                       />
                       <button
                         onClick={() => setItems((prev) => prev.filter((x) => x.id !== it.id))}

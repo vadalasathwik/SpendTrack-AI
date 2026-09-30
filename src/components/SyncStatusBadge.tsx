@@ -73,15 +73,20 @@ export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({
     );
   }
 
-  // 4. Synced & Secured State
+  // 4. Synced & Secured State (Compact Icon-Only Indicator)
+  const timeTooltip = syncInfo.lastSyncedAt
+    ? `Synced and encrypted • Last synced at ${syncInfo.lastSyncedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : 'Synced and encrypted';
+
   return (
     <div
       id="sync-status-synced"
-      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
-      title={syncInfo.lastSyncedAt ? `Last synced: ${syncInfo.lastSyncedAt.toLocaleTimeString()}` : 'Encrypted & Synced'}
+      className="w-8 h-8 rounded-full flex items-center justify-center bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/25 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-all cursor-default shrink-0"
+      title={timeTooltip}
+      aria-label="Synced and encrypted"
+      tabIndex={0}
     >
-      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
-      <span>{compact ? 'Synced' : 'Synced & Encrypted'}</span>
+      <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
     </div>
   );
 };

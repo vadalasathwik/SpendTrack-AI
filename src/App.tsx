@@ -240,7 +240,7 @@ export function App() {
     emi: 0,
     investments: 0,
     savings: 0,
-    living: 55000,
+    living: 0,
     buffer: 0,
   });
   const [cashFlow, setCashFlow] = useState<any>({
@@ -512,7 +512,7 @@ export function App() {
         SpendTrackApi.getSavings().catch(() => []),
         SpendTrackApi.getNotes().catch(() => []),
         SpendTrackApi.getReminders().catch(() => []),
-        SpendTrackApi.getPlannerSummary().catch(() => ({ income: 0, emi: 0, investments: 0, savings: 0, living: 55000, buffer: 0 })),
+        SpendTrackApi.getPlannerSummary().catch(() => ({ income: 0, emi: 0, investments: 0, savings: 0, living: 0, buffer: 0 })),
         SpendTrackApi.getCashFlowCurrent().catch(() => ({ income: 0, expenses: 0, emi: 0, investments: 0, savings: 0, freeCash: 0, savingRate: 0, emiRatio: 0 })),
         SpendTrackApi.getUpcomingReminders().catch(() => []),
       ]);
@@ -531,7 +531,7 @@ export function App() {
       setSavings(loadedSavings || []);
       setNotes(loadedNotes || []);
       setReminders(loadedReminders || []);
-      setPlannerSummary(loadedPlanner || { income: 0, emi: 0, investments: 0, savings: 0, living: 55000, buffer: 0 });
+      setPlannerSummary(loadedPlanner || { income: 0, emi: 0, investments: 0, savings: 0, living: 0, buffer: 0 });
       setCashFlow(loadedCashFlow || { income: 0, expenses: 0, emi: 0, investments: 0, savings: 0, freeCash: 0, savingRate: 0, emiRatio: 0 });
       setUpcomingTimeline(loadedUpcoming || []);
 
@@ -986,7 +986,7 @@ export function App() {
         () => SpendTrackApi.createIncome(data)
       );
       setIncomes((prev) => [...prev, result]);
-      const summary = await SpendTrackApi.getPlannerSummary().catch(() => ({ income: 0, emi: 0, investments: 0, savings: 0, living: 55000, buffer: 0 }));
+      const summary = await SpendTrackApi.getPlannerSummary().catch(() => ({ income: 0, emi: 0, investments: 0, savings: 0, living: 0, buffer: 0 }));
       setPlannerSummary(summary);
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
@@ -1006,7 +1006,7 @@ export function App() {
         () => SpendTrackApi.deleteIncome(id)
       );
       setIncomes((prev) => prev.filter((item) => item.id !== id));
-      const summary = await SpendTrackApi.getPlannerSummary().catch(() => ({ income: 0, emi: 0, investments: 0, savings: 0, living: 55000, buffer: 0 }));
+      const summary = await SpendTrackApi.getPlannerSummary().catch(() => ({ income: 0, emi: 0, investments: 0, savings: 0, living: 0, buffer: 0 }));
       setPlannerSummary(summary);
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
@@ -1427,15 +1427,15 @@ export function App() {
               <OfflineBanner isOffline={!isOnline} />
 
       {/* Top Application Header (Google Pay & Apple Wallet Style) */}
-      <header className="sticky top-0 z-40 h-[68px] sm:h-[76px] bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/90 px-4 flex items-center justify-between shadow-xs transition-colors">
-        <div className="max-w-[430px] w-full mx-auto flex items-center justify-between gap-2">
+      <header className="sticky top-0 z-40 h-[68px] sm:h-[76px] bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/90 px-3 sm:px-4 flex items-center justify-between shadow-xs transition-colors">
+        <div className="max-w-[430px] sm:max-w-xl md:max-w-4xl w-full mx-auto flex items-center justify-between gap-1.5 sm:gap-2 min-w-0">
           {/* Left: Logo */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <HeaderLogo onClick={() => handleSelectTab('dashboard')} />
           </div>
 
           {/* Center: Month Selector Pill */}
-          <div className="flex-1 justify-center flex">
+          <div className="flex-1 justify-center flex min-w-0 px-1">
             <MonthSelectorPill
               dateRange={dateRange}
               onChangeDateRange={handleDateRangeChange}
@@ -1443,14 +1443,16 @@ export function App() {
           </div>
 
           {/* Right: Sync Badge, Search, and Google Profile Avatar */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <SyncStatusBadge onOpenConflictModal={() => setIsConflictModalOpen(true)} />
             <SearchTrigger onOpenSearch={() => setIsSearchOpen(true)} />
             <button
+              type="button"
               id="google-profile-header-avatar"
               onClick={() => setIsProfileSheetOpen(true)}
-              className="w-9 h-9 rounded-full bg-emerald-600 text-white font-black text-xs border-2 border-emerald-400 flex items-center justify-center shrink-0 overflow-hidden shadow-sm cursor-pointer hover:scale-105 transition-transform"
-              title="Account & Settings"
+              className="w-9 h-9 rounded-full bg-emerald-600 text-white font-black text-xs border-2 border-emerald-400 flex items-center justify-center shrink-0 overflow-hidden shadow-sm cursor-pointer hover:scale-105 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-transform"
+              title="Open profile"
+              aria-label="Open profile"
             >
               {(user?.photoUrl || user?.photoURL) ? (
                 <img src={user.photoUrl || user.photoURL} alt="Profile" className="w-full h-full object-cover" />
@@ -1463,7 +1465,7 @@ export function App() {
       </header>
 
       {/* Main Content Area (Max Width 430px Desktop Shell) */}
-      <main className="flex-1 max-w-[430px] w-full mx-auto px-4 pt-4 pb-24">
+      <main className="flex-1 max-w-[430px] w-full mx-auto px-4 pt-4 pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]">
         {activeTab === 'dashboard' && (
           <FinanceHomePage
             user={user}
@@ -1484,6 +1486,7 @@ export function App() {
             onNavigateToTab={(tab) => setActiveTab(tab as any)}
             onOpenScanReceipt={() => setIsScanReceiptOpen(true)}
             onOpenWizard={() => setIsWizardOpen(true)}
+            onOpenOnboarding={() => setIsOnboardingOpen(true)}
           />
         )}
 
@@ -1633,11 +1636,19 @@ export function App() {
 
         {activeTab === 'planner' && (
           <MonthlyPlannerPage
+            incomes={incomes}
             emis={emis}
             investments={investments}
             savings={savings}
             recurringExpenses={recurringExpenses}
             expenses={expenses}
+            onOpenBudgets={() => setActiveTab('budget')}
+            onNavigateToTab={(tab) => setActiveTab(tab as any)}
+            onOpenAddExpense={() => {
+              setEditingExpense(null);
+              setInitialMonthlyItem(null);
+              setIsAddExpenseOpen(true);
+            }}
           />
         )}
 
@@ -1982,6 +1993,7 @@ export function App() {
       {/* Monthly Budget Onboarding Modal */}
       <BudgetOnboardingModal
         isOpen={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
         onSave={handleSaveUserSettings}
       />
 

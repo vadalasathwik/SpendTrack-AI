@@ -925,7 +925,7 @@ export function calculateDynamicHealthScore(params: {
   }
 
   // 4. Emergency Fund weight (15 points max)
-  const monthlyNeed = (totalExpenses || monthlyBudget || 30000);
+  const monthlyNeed = (totalExpenses || monthlyBudget || 0);
   const emergencyCoverageMonths = monthlyNeed > 0 ? savingsTotal / monthlyNeed : 0;
   const emergencyScore = Math.min(15, Math.max(0, Math.round((emergencyCoverageMonths / 3) * 15)));
 

@@ -12,10 +12,15 @@ import { getStoredJWT, refreshAccessToken, clearAuthSession } from "./authServic
 /* -------------------------------------------------------
    Universal authenticated fetch
 -------------------------------------------------------- */
+interface ApiFetchOptions extends RequestInit {
+  skip401Redirect?: boolean;
+}
+
 async function apiFetch<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: ApiFetchOptions = {}
 ): Promise<T> {
+  const { skip401Redirect = false, ...fetchOptions } = options;
   let token = getStoredJWT();
 
   if (!token) {
@@ -23,7 +28,7 @@ async function apiFetch<T>(
   }
 
   if (!token) {
-    if (typeof window !== "undefined") {
+    if (!skip401Redirect && typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("spendtrack_401_unauthorized"));
     }
     throw new Error(
@@ -32,11 +37,11 @@ async function apiFetch<T>(
   }
 
   let res = await fetch(endpoint, {
-    ...options,
+    ...fetchOptions,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
+      ...(fetchOptions.headers || {}),
     },
   });
 
@@ -45,11 +50,11 @@ async function apiFetch<T>(
     token = await refreshAccessToken();
     if (token) {
       res = await fetch(endpoint, {
-        ...options,
+        ...fetchOptions,
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
-          ...(options.headers || {}),
+          ...(fetchOptions.headers || {}),
         },
       });
     }
@@ -57,9 +62,11 @@ async function apiFetch<T>(
 
   if (!res.ok) {
     if (res.status === 401) {
-      clearAuthSession();
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("spendtrack_401_unauthorized"));
+      if (!skip401Redirect) {
+        clearAuthSession();
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("spendtrack_401_unauthorized"));
+        }
       }
       throw new Error(
         "Session expired or unauthorized. Please sign in with Google again."
@@ -82,7 +89,7 @@ async function apiFetch<T>(
 export const SpendTrackApi = {
   // Auth Sessions
   async getSessions() {
-    return apiFetch<any[]>("/api/auth/sessions").catch(() => []);
+    return apiFetch<any[]>("/api/auth/sessions", { skip401Redirect: true }).catch(() => []);
   },
 
   // Workspace Status

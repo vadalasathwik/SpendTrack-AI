@@ -63,8 +63,8 @@ export const FinanceOnboardingWizard: React.FC<FinanceOnboardingWizardProps> = (
   // Step 2: Budget Controlled States
   const [currency, setCurrency] = useState<string>('INR');
   const [currencySymbol, setCurrencySymbol] = useState<string>('₹');
-  const [monthlyBudgetInput, setMonthlyBudgetInput] = useState<string>('105000');
-  const [monthlyBudget, setMonthlyBudget] = useState<number>(105000);
+  const [monthlyBudgetInput, setMonthlyBudgetInput] = useState<string>('');
+  const [monthlyBudget, setMonthlyBudget] = useState<number>(0);
   const [budgetStartDayInput, setBudgetStartDayInput] = useState<string>('1');
   const [budgetStartDay, setBudgetStartDay] = useState<number>(1);
 
@@ -293,11 +293,11 @@ export const FinanceOnboardingWizard: React.FC<FinanceOnboardingWizardProps> = (
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="sm:col-span-2">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Monthly Household Budget <span className="text-rose-500">*</span>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                  Monthly Household Budget <span className="text-rose-400">*</span>
                 </label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-2.5 text-base font-bold text-slate-500 dark:text-slate-400 pointer-events-none select-none">
+                <div className="relative flex items-center">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-base font-bold text-slate-400 pointer-events-none select-none">
                     {currencySymbol}
                   </span>
                   <input
@@ -306,32 +306,32 @@ export const FinanceOnboardingWizard: React.FC<FinanceOnboardingWizardProps> = (
                     placeholder="50,000"
                     value={monthlyBudgetInput}
                     onChange={handleMonthlyBudgetInputChange}
-                    className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-black text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none transition-all"
+                    className="w-full rounded-xl bg-slate-900 border border-slate-700 text-white placeholder:text-slate-400 caret-emerald-400 text-right tabular-nums pl-9 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all font-bold text-base"
                   />
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                <p className="text-[11px] text-slate-400 mt-1">
                   Total household spending budget for one month.
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Currency</label>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5">Currency</label>
                 <select
                   value={currency}
                   onChange={(e) => handleCurrencyChange(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  className="w-full rounded-xl bg-slate-900 border border-slate-700 text-white placeholder:text-slate-400 caret-emerald-400 px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all font-bold text-sm"
                 >
-                  <option value="INR">INR (₹)</option>
-                  <option value="USD">USD ($)</option>
-                  <option value="EUR">EUR (€)</option>
-                  <option value="GBP">GBP (£)</option>
+                  <option value="INR" className="bg-slate-900 text-white">INR (₹)</option>
+                  <option value="USD" className="bg-slate-900 text-white">USD ($)</option>
+                  <option value="EUR" className="bg-slate-900 text-white">EUR (€)</option>
+                  <option value="GBP" className="bg-slate-900 text-white">GBP (£)</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Budget Start Day <span className="text-rose-500">*</span>
+              <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                Budget Start Day <span className="text-rose-400">*</span>
               </label>
               <input
                 type="text"
@@ -339,9 +339,9 @@ export const FinanceOnboardingWizard: React.FC<FinanceOnboardingWizardProps> = (
                 placeholder="1"
                 value={budgetStartDayInput}
                 onChange={handleBudgetStartDayInputChange}
-                className="w-full sm:w-1/2 px-3.5 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl text-sm font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                className="w-full sm:w-1/2 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder:text-slate-400 caret-emerald-400 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all font-bold text-sm"
               />
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Day of month (1 - 31)</p>
+              <p className="text-[11px] text-slate-400 mt-1">Day of month (1 - 31)</p>
             </div>
           </div>
         )}

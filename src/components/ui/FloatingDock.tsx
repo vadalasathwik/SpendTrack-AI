@@ -26,8 +26,8 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
   ];
 
   return (
-    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-[94%] max-w-[420px] pointer-events-auto">
-      <div className="bg-slate-900/95 backdrop-blur-xl border border-slate-800 rounded-[28px] px-2 py-2 flex items-center justify-around shadow-2xl shadow-slate-950/80">
+    <div className="fixed bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-24px)] max-w-[430px] pointer-events-auto pb-[env(safe-area-inset-bottom,0px)]">
+      <div className="bg-slate-900/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-800/90 rounded-[24px] sm:rounded-[28px] px-1 sm:px-2 py-1.5 sm:py-2 flex items-center justify-between shadow-2xl shadow-slate-950/80">
         {items.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -35,20 +35,22 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
           return (
             <button
               key={item.id}
+              type="button"
               onClick={() => onSelectTab(item.id)}
-              className={`flex flex-col items-center justify-center px-3 py-1.5 rounded-2xl transition-all duration-200 cursor-pointer ${
+              aria-label={item.label}
+              className={`flex-1 min-w-0 min-h-[44px] flex flex-col items-center justify-center px-1 sm:px-2 py-1 rounded-xl sm:rounded-2xl transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/40 ${
                 isActive
-                  ? 'text-emerald-400 font-extrabold bg-emerald-500/15 ring-1 ring-emerald-500/30 scale-105'
+                  ? 'text-emerald-400 font-extrabold bg-emerald-500/15 ring-1 ring-emerald-500/30'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               <Icon
-                className={`w-5 h-5 transition-transform duration-200 ${
+                className={`w-4 h-4 sm:w-5 sm:h-5 shrink-0 transition-transform duration-200 ${
                   isActive ? 'scale-110 text-emerald-400' : ''
                 }`}
                 strokeWidth={2}
               />
-              <span className="text-[10px] font-bold mt-0.5 tracking-tight">
+              <span className="text-[10px] sm:text-[11px] font-bold mt-0.5 tracking-tight truncate w-full text-center">
                 {item.label}
               </span>
             </button>

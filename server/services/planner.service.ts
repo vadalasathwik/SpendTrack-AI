@@ -14,7 +14,7 @@ export async function getPlannerSummary(userId: string) {
   const totalInvestments = investments.reduce((sum, item) => sum + item.amount, 0);
   const totalSavings = savings.reduce((sum, item) => sum + item.monthlyContribution, 0);
   
-  const monthlyBudget = budgets.length > 0 ? budgets[0].budget : 55000;
+  const monthlyBudget = budgets.length > 0 ? budgets[0].budget : 0;
   const living = monthlyBudget;
 
   const totalObligations = totalEmi + totalInvestments + totalSavings + living;

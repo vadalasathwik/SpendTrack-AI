@@ -203,15 +203,15 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
         {activeTab === 'ALL' && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
             {/* Search Box */}
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3.5 top-2.5 text-slate-400" />
+            <div className="relative flex items-center">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 id="expense-search-input"
                 placeholder="Search expenses..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-[12px] focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 caret-emerald-400 rounded-[12px] focus:ring-2 focus:ring-emerald-500 focus:outline-none transition-all"
               />
             </div>
 
@@ -221,11 +221,11 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
                 id="filter-category-select"
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-[12px] focus:ring-2 focus:ring-emerald-500 focus:outline-none font-medium"
+                className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white caret-emerald-400 rounded-[12px] focus:ring-2 focus:ring-emerald-500 focus:outline-none font-medium transition-all"
               >
-                <option value="ALL">All Categories</option>
+                <option value="ALL" className="bg-slate-900 text-white">All Categories</option>
                 {categories.map((c) => (
-                  <option key={c.name} value={c.name}>
+                  <option key={c.name} value={c.name} className="bg-slate-900 text-white">
                     {c.name}
                   </option>
                 ))}
@@ -237,11 +237,11 @@ export const ExpensesPage: React.FC<ExpensesPageProps> = ({
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="flex-1 px-3 py-2 text-xs sm:text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-[12px] focus:ring-2 focus:ring-emerald-500 focus:outline-none font-medium"
+                className="flex-1 px-3 py-2 text-xs sm:text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white caret-emerald-400 rounded-[12px] focus:ring-2 focus:ring-emerald-500 focus:outline-none font-medium transition-all"
               >
-                <option value="date">Sort by Date</option>
-                <option value="price">Sort by Price</option>
-                <option value="name">Sort by Name</option>
+                <option value="date" className="bg-slate-900 text-white">Sort by Date</option>
+                <option value="price" className="bg-slate-900 text-white">Sort by Price</option>
+                <option value="name" className="bg-slate-900 text-white">Sort by Name</option>
               </select>
               <button
                 onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
