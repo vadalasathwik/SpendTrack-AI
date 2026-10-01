@@ -56,8 +56,8 @@ export const FinanceOnboardingWizard: React.FC<FinanceOnboardingWizardProps> = (
   });
 
   // Step 1: Income
-  const [salary, setSalary] = useState<string>('120000');
-  const [rental, setRental] = useState<string>('20000');
+  const [salary, setSalary] = useState<string>('');
+  const [rental, setRental] = useState<string>('');
   const [otherIncome, setOtherIncome] = useState<string>('0');
 
   // Step 2: Budget Controlled States
@@ -68,27 +68,27 @@ export const FinanceOnboardingWizard: React.FC<FinanceOnboardingWizardProps> = (
   const [budgetStartDayInput, setBudgetStartDayInput] = useState<string>('1');
   const [budgetStartDay, setBudgetStartDay] = useState<number>(1);
 
-  const [livingBudget, setLivingBudget] = useState<string>('45000');
-  const [emiBudget, setEmiBudget] = useState<string>('25000');
-  const [investmentBudget, setInvestmentBudget] = useState<string>('20000');
-  const [savingsBudget, setSavingsBudget] = useState<string>('15000');
+  const [livingBudget, setLivingBudget] = useState<string>('');
+  const [emiBudget, setEmiBudget] = useState<string>('');
+  const [investmentBudget, setInvestmentBudget] = useState<string>('');
+  const [savingsBudget, setSavingsBudget] = useState<string>('');
 
   // Step 3: EMI (Optional)
   const [emiBank, setEmiBank] = useState<string>('HDFC Bank');
   const [emiTitle, setEmiTitle] = useState<string>('Home Loan EMI');
-  const [emiAmount, setEmiAmount] = useState<string>('25000');
+  const [emiAmount, setEmiAmount] = useState<string>('');
   const [emiDueDay, setEmiDueDay] = useState<string>('10');
 
   // Step 4: Investments (Optional)
   const [invTitle, setInvTitle] = useState<string>('Nifty 50 Index SIP');
   const [invProvider, setInvProvider] = useState<string>('Zerodha');
-  const [invAmount, setInvAmount] = useState<string>('15000');
+  const [invAmount, setInvAmount] = useState<string>('');
 
   // Step 5: Savings (Optional)
   const [savTitle, setSavTitle] = useState<string>('Emergency Cushion Fund');
-  const [savTarget, setSavTarget] = useState<string>('300000');
-  const [savCurrent, setSavCurrent] = useState<string>('75000');
-  const [savMonthly, setSavMonthly] = useState<string>('10000');
+  const [savTarget, setSavTarget] = useState<string>('');
+  const [savCurrent, setSavCurrent] = useState<string>('');
+  const [savMonthly, setSavMonthly] = useState<string>('');
 
   // Step 6 & 7: Experience & Summary
   const [selectedHomeMode, setSelectedHomeMode] = useState<string>('default');
@@ -177,8 +177,8 @@ export const FinanceOnboardingWizard: React.FC<FinanceOnboardingWizardProps> = (
         await SpendTrackApi.createSaving({
           title: savTitle,
           type: 'EMERGENCY_FUND',
-          targetAmount: Number(savTarget || 300000),
-          currentAmount: Number(savCurrent || 75000),
+          targetAmount: Number(savTarget || 0),
+          currentAmount: Number(savCurrent || 0),
           monthlyContribution: Number(savMonthly),
         });
         savingsSaved = true;

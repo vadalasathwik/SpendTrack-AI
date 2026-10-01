@@ -14,7 +14,8 @@ export const getPassiveIncomeTracker = async (userId: string) => {
   const annualInterest = Math.round(fdSavingsTotal * 0.07); // ~7.0% interest yield
   const monthlyInterest = Math.round(annualInterest / 12);
 
-  const monthlyRental = 20000; // rental income
+  const properties = await prisma.propertyAsset.findMany({ where: { userId } });
+  const monthlyRental = properties.reduce((acc, prop) => acc + (prop.rentalIncome || 0), 0);
   const annualRental = monthlyRental * 12;
 
   const totalMonthlyPassiveIncome = monthlyDividend + monthlyInterest + monthlyRental;

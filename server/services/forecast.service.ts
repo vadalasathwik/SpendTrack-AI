@@ -3,7 +3,7 @@ import { getCashFlowCurrent } from "./cashflow.service.js";
 
 export const get90DayCashflowForecast = async (userId: string) => {
   const cashflow = await getCashFlowCurrent(userId);
-  const currentLiquidCash = Math.max(10000, cashflow.income - cashflow.expenses - cashflow.emi);
+  const currentLiquidCash = Math.max(0, cashflow.income - cashflow.expenses - cashflow.emi);
 
   const forecastDays = [];
   let runningBalance = currentLiquidCash;

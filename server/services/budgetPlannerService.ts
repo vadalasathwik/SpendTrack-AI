@@ -89,9 +89,9 @@ export class BudgetPlannerService {
 
     const currentSpent = currentMonthExpenses.reduce((s, e) => s + (Number(e.totalPrice) || 0), 0);
 
-    // Estimate monthly budget limit from recurring + average past spend
+    // Estimate monthly budget limit from recurring + run rate
     const totalRecurringMonthly = recurringExpenses.reduce((s, r) => s + (Number(r.amount) || 0), 0);
-    const estimatedBudgetLimit = Math.max(25000, Math.round((currentSpent / daysElapsed) * totalDaysInMonth + totalRecurringMonthly * 0.5));
+    const estimatedBudgetLimit = Math.round((currentSpent / daysElapsed) * totalDaysInMonth + totalRecurringMonthly * 0.5);
     const remaining = Math.max(0, estimatedBudgetLimit - currentSpent);
     const dailyAllowance = Number((remaining / daysRemaining).toFixed(2));
 
@@ -118,14 +118,6 @@ export class BudgetPlannerService {
         changePercentage,
       };
     });
-
-    if (categoryForecasts.length === 0) {
-      categoryForecasts.push(
-        { category: 'Groceries', current: 6500, predicted: 6900, changePercentage: 6.1 },
-        { category: 'Utilities', current: 3200, predicted: 3400, changePercentage: 6.25 },
-        { category: 'Dining', current: 2800, predicted: 2950, changePercentage: 5.3 }
-      );
-    }
 
     // Inflation Tracker for Key Items (Milk, Rice, Vegetables, Cooking Oil)
     const targetItems = ['Milk', 'Rice', 'Vegetables', 'Cooking Oil'];

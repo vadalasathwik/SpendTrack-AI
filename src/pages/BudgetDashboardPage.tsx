@@ -80,6 +80,18 @@ export const BudgetDashboardPage: React.FC = () => {
       }
       const env = await SpendTrackApi.getEnvelopes(selectedMonth, selectedYear);
       setEnvelopeData(env);
+
+      const incomes = await SpendTrackApi.getIncomes().catch(() => []);
+      if (Array.isArray(incomes) && incomes.length > 0) {
+        const sal = incomes.find((i: any) => i.title.toLowerCase().includes('salary'));
+        const ren = incomes.find((i: any) => i.title.toLowerCase().includes('rental'));
+        const bon = incomes.find((i: any) => i.title.toLowerCase().includes('bonus'));
+        const sid = incomes.find((i: any) => i.title.toLowerCase().includes('side') || i.title.toLowerCase().includes('passive'));
+        if (sal) setSalaryIncome(String(sal.amount));
+        if (ren) setRentalIncome(String(ren.amount));
+        if (bon) setBonusIncome(String(bon.amount));
+        if (sid) setSideIncome(String(sid.amount));
+      }
     } catch (err: any) {
       console.error('Failed to fetch budget summary:', err);
     } finally {
@@ -110,12 +122,70 @@ export const BudgetDashboardPage: React.FC = () => {
 
   const formattedMonthYear = `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`;
 
-  // Calculated allocations based on total income
-  const plannedLiving = Math.round((totalIncome * livingPercent) / 100);
-  const plannedEmi = Math.round((totalIncome * emiPercent) / 100);
-  const plannedInv = Math.round((totalIncome * invPercent) / 100);
-  const plannedSavings = Math.round((totalIncome * savingsPercent) / 100);
-  const plannedLifestyle = Math.round((totalIncome * lifestylePercent) / 100);
+  // Base monthly budget for targets
+  const targetMonthlyBudget = summary.budget > 0 ? summary.budget : 0;
+
+  const plannedLiving = Math.round((targetMonthlyBudget * livingPercent) / 100);
+  const plannedEmi = Math.round((targetMonthlyBudget * emiPercent) / 100);
+  const plannedInv = Math.round((targetMonthlyBudget * invPercent) / 100);
+  const plannedSavings = Math.round((targetMonthlyBudget * savingsPercent) / 100);
+  const plannedLifestyle = Math.round((targetMonthlyBudget * lifestylePercent) / 100);
+
+  // Real Actual Spent per category derived from database envelope records
+  const envelopes: any[] = envelopeData?.envelopes || [];
+  const getEnvSpent = (names: string[]) => {
+    return envelopes
+      .filter((e: any) => names.includes(e.name))
+      .reduce((sum: number, e: any) => sum + (Number(e.spent) || 0), 0);
+  };
+
+  const livingActualSpent = getEnvSpent(['Groceries & Food', 'Fuel & Transport', 'Utility Bills & Internet']);
+  const emiActualSpent = getEnvSpent(['EMI & Loan Obligations']);
+  const invActualSpent = getEnvSpent(['Gold & Metal Accumulation']);
+  const savingsActualSpent = getEnvSpent(['Emergency Liquidity Buffer']);
+  const lifestyleActualSpent = getEnvSpent(['Shopping & Lifestyle', 'Entertainment & Dining Out']);
+
+  // Dynamic AI Budget Optimizer recommendations
+  const overspentEnv = envelopes.find((e: any) => e.allocated > 0 && e.spent > e.allocated);
+  const surplusEnv =
+    envelopes.find((e: any) => e.allocated - e.spent > 0 && e.name.includes('Emergency')) ||
+    envelopes.find((e: any) => e.allocated - e.spent > 0 && e.name !== overspentEnv?.name);
+
+  let shiftText = "All envelopes are within allocated limits this month.";
+  if (overspentEnv) {
+    const overspendAmt = Math.round(overspentEnv.spent - overspentEnv.allocated);
+    const fromName = surplusEnv ? surplusEnv.name : "Emergency Liquidity Buffer";
+    shiftText = `Move ₹${overspendAmt.toLocaleString('en-IN')} from ${fromName} to ${overspentEnv.name} this month.`;
+  } else if (summary.budget === 0) {
+    shiftText = `No budget target set for ${formattedMonthYear}. Set a target to enable envelope shift optimization.`;
+  }
+
+  let safeDiscretionaryText = "";
+  if (summary.budget > 0) {
+    if (summary.remaining > 0) {
+      safeDiscretionaryText = `You have ₹${summary.remaining.toLocaleString('en-IN')} unallocated cash buffer remaining for non-essential purchases.`;
+    } else {
+      safeDiscretionaryText = "No discretionary spend buffer remaining for this month.";
+    }
+  } else {
+    safeDiscretionaryText = "Not enough transaction or budget history yet.";
+  }
+
+  const goldEnv = envelopes.find((e: any) => e.name === 'Gold & Metal Accumulation');
+  const goldCap = goldEnv
+    ? Math.max(0, goldEnv.allocated - goldEnv.spent)
+    : 0;
+
+  let goldCapacityText = "";
+  if (summary.budget > 0) {
+    if (goldCap > 0) {
+      goldCapacityText = `You have ₹${goldCap.toLocaleString('en-IN')} of available Gold allocation remaining this month.`;
+    } else {
+      goldCapacityText = "No Gold allocation is currently available this month.";
+    }
+  } else {
+    goldCapacityText = "No monthly budget is configured for this month.";
+  }
 
   return (
     <div className="space-y-6 pb-28 max-w-[1440px] mx-auto animate-in fade-in duration-300">
@@ -331,13 +401,13 @@ export const BudgetDashboardPage: React.FC = () => {
           </div>
           <div className="space-y-2 text-xs text-slate-300">
             <p className="p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20">
-              💡 <span className="font-bold text-white">Suggested Envelope Shift:</span> Move ₹3,000 from Entertainment envelope to Emergency Buffer this month.
+              💡 <span className="font-bold text-white">Suggested Envelope Shift:</span> {shiftText}
             </p>
             <p className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-              ⚡ <span className="font-bold text-white">Safe Discretionary Spend:</span> You have ₹14,500 unallocated cash buffer remaining for non-essential purchases.
+              ⚡ <span className="font-bold text-white">Safe Discretionary Spend:</span> {safeDiscretionaryText}
             </p>
             <p className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
-              🏆 <span className="font-bold text-white">Gold Capacity:</span> You can safely allocate ₹5,000 to MMTC PAMP gold accumulation this week.
+              🏆 <span className="font-bold text-white">Gold Capacity:</span> {goldCapacityText}
             </p>
           </div>
         </GlassCard>
@@ -378,8 +448,14 @@ export const BudgetDashboardPage: React.FC = () => {
                   /> %
                 </td>
                 <td className="py-3 px-3 font-mono">₹{plannedLiving.toLocaleString('en-IN')}</td>
-                <td className="py-3 px-3 font-mono text-rose-400">₹32,500</td>
-                <td className="py-3 px-3 font-mono text-emerald-400">+₹{Math.max(0, plannedLiving - 32500).toLocaleString('en-IN')}</td>
+                <td className="py-3 px-3 font-mono text-rose-400">₹{livingActualSpent.toLocaleString('en-IN')}</td>
+                <td className="py-3 px-3 font-mono">
+                  {plannedLiving - livingActualSpent >= 0 ? (
+                    <span className="text-emerald-400">+₹{(plannedLiving - livingActualSpent).toLocaleString('en-IN')}</span>
+                  ) : (
+                    <span className="text-rose-400">-₹{Math.abs(plannedLiving - livingActualSpent).toLocaleString('en-IN')}</span>
+                  )}
+                </td>
               </tr>
 
               <tr>
@@ -393,8 +469,14 @@ export const BudgetDashboardPage: React.FC = () => {
                   /> %
                 </td>
                 <td className="py-3 px-3 font-mono">₹{plannedEmi.toLocaleString('en-IN')}</td>
-                <td className="py-3 px-3 font-mono text-purple-400">₹25,000</td>
-                <td className="py-3 px-3 font-mono text-emerald-400">+₹{Math.max(0, plannedEmi - 25000).toLocaleString('en-IN')}</td>
+                <td className="py-3 px-3 font-mono text-purple-400">₹{emiActualSpent.toLocaleString('en-IN')}</td>
+                <td className="py-3 px-3 font-mono">
+                  {plannedEmi - emiActualSpent >= 0 ? (
+                    <span className="text-emerald-400">+₹{(plannedEmi - emiActualSpent).toLocaleString('en-IN')}</span>
+                  ) : (
+                    <span className="text-rose-400">-₹{Math.abs(plannedEmi - emiActualSpent).toLocaleString('en-IN')}</span>
+                  )}
+                </td>
               </tr>
 
               <tr>
@@ -408,8 +490,14 @@ export const BudgetDashboardPage: React.FC = () => {
                   /> %
                 </td>
                 <td className="py-3 px-3 font-mono">₹{plannedInv.toLocaleString('en-IN')}</td>
-                <td className="py-3 px-3 font-mono text-blue-400">₹20,000</td>
-                <td className="py-3 px-3 font-mono text-slate-400">₹0</td>
+                <td className="py-3 px-3 font-mono text-blue-400">₹{invActualSpent.toLocaleString('en-IN')}</td>
+                <td className="py-3 px-3 font-mono">
+                  {plannedInv - invActualSpent >= 0 ? (
+                    <span className="text-emerald-400">+₹{(plannedInv - invActualSpent).toLocaleString('en-IN')}</span>
+                  ) : (
+                    <span className="text-rose-400">-₹{Math.abs(plannedInv - invActualSpent).toLocaleString('en-IN')}</span>
+                  )}
+                </td>
               </tr>
 
               <tr>
@@ -423,8 +511,14 @@ export const BudgetDashboardPage: React.FC = () => {
                   /> %
                 </td>
                 <td className="py-3 px-3 font-mono">₹{plannedSavings.toLocaleString('en-IN')}</td>
-                <td className="py-3 px-3 font-mono text-amber-400">₹15,000</td>
-                <td className="py-3 px-3 font-mono text-slate-400">₹0</td>
+                <td className="py-3 px-3 font-mono text-amber-400">₹{savingsActualSpent.toLocaleString('en-IN')}</td>
+                <td className="py-3 px-3 font-mono">
+                  {plannedSavings - savingsActualSpent >= 0 ? (
+                    <span className="text-emerald-400">+₹{(plannedSavings - savingsActualSpent).toLocaleString('en-IN')}</span>
+                  ) : (
+                    <span className="text-rose-400">-₹{Math.abs(plannedSavings - savingsActualSpent).toLocaleString('en-IN')}</span>
+                  )}
+                </td>
               </tr>
 
               <tr>
@@ -438,8 +532,14 @@ export const BudgetDashboardPage: React.FC = () => {
                   /> %
                 </td>
                 <td className="py-3 px-3 font-mono">₹{plannedLifestyle.toLocaleString('en-IN')}</td>
-                <td className="py-3 px-3 font-mono text-rose-400">₹6,250</td>
-                <td className="py-3 px-3 font-mono text-emerald-400">+₹{Math.max(0, plannedLifestyle - 6250).toLocaleString('en-IN')}</td>
+                <td className="py-3 px-3 font-mono text-rose-400">₹{lifestyleActualSpent.toLocaleString('en-IN')}</td>
+                <td className="py-3 px-3 font-mono">
+                  {plannedLifestyle - lifestyleActualSpent >= 0 ? (
+                    <span className="text-emerald-400">+₹{(plannedLifestyle - lifestyleActualSpent).toLocaleString('en-IN')}</span>
+                  ) : (
+                    <span className="text-rose-400">-₹{Math.abs(plannedLifestyle - lifestyleActualSpent).toLocaleString('en-IN')}</span>
+                  )}
+                </td>
               </tr>
             </tbody>
           </table>

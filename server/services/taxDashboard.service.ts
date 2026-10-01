@@ -14,22 +14,25 @@ export async function getTaxDashboard(userId: string, targetFy: string = 'FY 202
     prisma.insurancePolicy.findMany({ where: { userId } }),
   ]);
 
+  const incomes = await prisma.income.findMany({ where: { userId } });
+  const totalAnnualIncomes = incomes.reduce((sum, i) => sum + i.amount * 12, 0);
+
   const latestSalary = salaries[0] || null;
-  const annualGrossIncome = latestSalary ? latestSalary.grossSalary * 12 : 1200000;
+  const annualGrossIncome = latestSalary ? latestSalary.grossSalary * 12 : totalAnnualIncomes;
 
   // 80C Deductions (Max ₹1.5L: PF, ELSS, PPF, Life Insurance, EPF)
-  const annualPf = latestSalary ? latestSalary.pfDeduction * 12 : 24000;
+  const annualPf = latestSalary ? latestSalary.pfDeduction * 12 : 0;
   const elssInvestments = investments.filter((i) => i.type.toUpperCase().includes('ELSS')).reduce((sum, i) => sum + i.amount * 12, 0);
-  const total80CDeduction = Math.min(150000, annualPf + elssInvestments + 30000);
+  const total80CDeduction = Math.min(150000, annualPf + elssInvestments);
 
   // 80D Health Insurance (Max ₹25,000 for self + family)
   const healthInsurance = insurance.filter((p) => p.type === 'HEALTH').reduce((sum, p) => sum + p.premiumAmount, 0);
-  const total80DDeduction = Math.min(25000, healthInsurance > 0 ? healthInsurance : 15000);
+  const total80DDeduction = Math.min(25000, healthInsurance);
 
   // Section 24 Home Loan Interest (Max ₹2,00,000 for self-occupied property)
   const homeLoanEmis = emis.filter((e) => e.title.toLowerCase().includes('home loan') || e.bank.toLowerCase().includes('home'));
   const annualHomeLoanInterest = homeLoanEmis.reduce((sum, e) => sum + (e.amount * 12 * 0.65), 0); // ~65% interest component
-  const totalSec24Deduction = Math.min(200000, annualHomeLoanInterest > 0 ? Math.round(annualHomeLoanInterest) : 120000);
+  const totalSec24Deduction = Math.min(200000, Math.round(annualHomeLoanInterest));
 
   const standardDeductionOld = 50000;
   const standardDeductionNew = 75000;

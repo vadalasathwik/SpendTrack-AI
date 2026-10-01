@@ -27,7 +27,7 @@ export interface SmartAlert {
   category?: string;
 }
 
-async function getDbUserId(userId: string): Promise<string> {
+export async function getDbUserId(userId: string): Promise<string> {
   if (!userId) throw new Error('User ID required');
   const user = await prisma.user.findFirst({
     where: {
@@ -225,17 +225,41 @@ export async function getBudgetInsights(
   const targetMonth = month !== undefined && !isNaN(Number(month)) ? Number(month) : now.getMonth() + 1;
   const targetYear = year !== undefined && !isNaN(Number(year)) ? Number(year) : now.getFullYear();
 
-  const budgets = await getUserCategoryBudgets(dbUserId, targetMonth, targetYear);
+  const mb = await prisma.monthlyBudget.findUnique({
+    where: {
+      month_year_userId: {
+        month: targetMonth,
+        year: targetYear,
+        userId: dbUserId,
+      },
+    },
+  });
 
-  const totalBudget = budgets.reduce((sum, b) => sum + b.monthlyLimit, 0);
-  const totalSpent = budgets.reduce((sum, b) => sum + b.spent, 0);
+  const totalBudget = mb ? mb.budget : 0;
+  const categoryBudgets = await getUserCategoryBudgets(dbUserId, targetMonth, targetYear);
+
+  const startDate = new Date(targetYear, targetMonth - 1, 1, 0, 0, 0, 0);
+  const endDate = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999);
+
+  const expenses = await prisma.expense.findMany({
+    where: {
+      userId: dbUserId,
+      type: ExpenseType.EXPENSE,
+      spentAt: {
+        gte: startDate,
+        lte: endDate,
+      },
+    },
+  });
+
+  const totalSpent = Math.round(expenses.reduce((sum, e) => sum + e.amount, 0) * 100) / 100;
   const remaining = Math.round((totalBudget - totalSpent) * 100) / 100;
   const percentageUsed = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
 
   // Smart Alerts generation
   const alerts: SmartAlert[] = [];
 
-  for (const b of budgets) {
+  for (const b of categoryBudgets) {
     if (b.percentage >= 100) {
       const overspend = Math.round((b.spent - b.monthlyLimit) * 100) / 100;
       alerts.push({
@@ -256,7 +280,7 @@ export async function getBudgetInsights(
     }
   }
 
-  if (remaining > 0) {
+  if (totalBudget > 0 && remaining > 0) {
     alerts.push({
       id: `alert_safe_${targetMonth}_${targetYear}`,
       type: 'SUCCESS',
@@ -266,12 +290,12 @@ export async function getBudgetInsights(
   }
 
   // Month over month insight comparison for top category
-  if (budgets.length > 0) {
+  if (categoryBudgets.length > 0) {
     const prevMonth = targetMonth === 1 ? 12 : targetMonth - 1;
     const prevYear = targetMonth === 1 ? targetYear - 1 : targetYear;
 
     const prevBudgets = await getUserCategoryBudgets(dbUserId, prevMonth, prevYear);
-    const topCurrent = [...budgets].sort((a, b) => b.spent - a.spent)[0];
+    const topCurrent = [...categoryBudgets].sort((a, b) => b.spent - a.spent)[0];
 
     if (topCurrent) {
       const prevMatch = prevBudgets.find((p) => p.category.toLowerCase() === topCurrent.category.toLowerCase());
@@ -296,30 +320,67 @@ export async function getBudgetInsights(
     totalSpent,
     remaining,
     percentageUsed,
-    categoryBreakdown: budgets,
+    categoryBreakdown: categoryBudgets,
     smartAlerts: alerts,
   };
 }
 
 /**
- * Legacy support for current monthly budget summary.
+ * Monthly budget operations using MonthlyBudget Prisma model.
  */
 export async function getCurrentBudget(userId: string, month?: number, year?: number) {
-  const insights = await getBudgetInsights(userId, month, year);
+  const dbUserId = await getDbUserId(userId);
+  const now = new Date();
+  const targetMonth = month !== undefined && !isNaN(Number(month)) && Number(month) >= 1 && Number(month) <= 12
+    ? Number(month)
+    : now.getMonth() + 1;
+  const targetYear = year !== undefined && !isNaN(Number(year)) && Number(year) > 2000
+    ? Number(year)
+    : now.getFullYear();
+
+  const mb = await prisma.monthlyBudget.findUnique({
+    where: {
+      month_year_userId: {
+        month: targetMonth,
+        year: targetYear,
+        userId: dbUserId,
+      },
+    },
+  });
+
   return {
-    month: month || new Date().getMonth() + 1,
-    year: year || new Date().getFullYear(),
-    budget: insights.totalBudget,
-    record: null,
+    month: targetMonth,
+    year: targetYear,
+    budget: mb ? mb.budget : 0,
+    record: mb,
   };
 }
 
 export async function setBudget(userId: string, month: number, year: number, amount: number) {
-  return upsertCategoryBudget(userId, {
-    category: 'Overall',
-    monthlyLimit: amount,
-    month,
-    year,
+  const dbUserId = await getDbUserId(userId);
+  const budgetAmount = Number(amount);
+
+  if (!Number.isFinite(budgetAmount) || budgetAmount <= 0) {
+    throw new Error("Monthly budget must be greater than zero");
+  }
+
+  return prisma.monthlyBudget.upsert({
+    where: {
+      month_year_userId: {
+        month,
+        year,
+        userId: dbUserId,
+      },
+    },
+    update: {
+      budget: budgetAmount,
+    },
+    create: {
+      month,
+      year,
+      budget: budgetAmount,
+      userId: dbUserId,
+    },
   });
 }
 
@@ -328,11 +389,49 @@ export async function getBudgetSummary(
   month?: number,
   year?: number
 ): Promise<BudgetSummaryResponse> {
-  const insights = await getBudgetInsights(userId, month, year);
+  const dbUserId = await getDbUserId(userId);
+  const now = new Date();
+  const targetMonth = month !== undefined && !isNaN(Number(month)) && Number(month) >= 1 && Number(month) <= 12
+    ? Number(month)
+    : now.getMonth() + 1;
+  const targetYear = year !== undefined && !isNaN(Number(year)) && Number(year) > 2000
+    ? Number(year)
+    : now.getFullYear();
+
+  const mb = await prisma.monthlyBudget.findUnique({
+    where: {
+      month_year_userId: {
+        month: targetMonth,
+        year: targetYear,
+        userId: dbUserId,
+      },
+    },
+  });
+
+  const totalBudget = mb ? mb.budget : 0;
+
+  const startDate = new Date(targetYear, targetMonth - 1, 1, 0, 0, 0, 0);
+  const endDate = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999);
+
+  const expenses = await prisma.expense.findMany({
+    where: {
+      userId: dbUserId,
+      type: ExpenseType.EXPENSE,
+      spentAt: {
+        gte: startDate,
+        lte: endDate,
+      },
+    },
+  });
+
+  const spent = Math.round(expenses.reduce((sum, e) => sum + e.amount, 0) * 100) / 100;
+  const remaining = Math.round((totalBudget - spent) * 100) / 100;
+  const percentage = totalBudget > 0 ? Math.round((spent / totalBudget) * 100) : 0;
+
   return {
-    budget: insights.totalBudget,
-    spent: insights.totalSpent,
-    remaining: insights.remaining,
-    percentage: insights.percentageUsed,
+    budget: totalBudget,
+    spent,
+    remaining,
+    percentage,
   };
 }

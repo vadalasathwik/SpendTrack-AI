@@ -6,6 +6,44 @@ export const getBoardroomReports = async (userId: string, period: "weekly" | "mo
   const baseReport = await getExecutiveReport(userId, period);
   const cashflow = await getCashFlowCurrent(userId);
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayTime = today.getTime();
+  const endOfWeek = new Date(today);
+  endOfWeek.setDate(today.getDate() + 7);
+  endOfWeek.setHours(23, 59, 59, 999);
+  const endOfWeekTime = endOfWeek.getTime();
+
+  const userEmis = await prisma.emiItem.findMany({ where: { userId } });
+  const upcomingDuesThisWeek: Array<{ title: string; amount: number; dueDate: string }> = [];
+
+  for (const e of userEmis) {
+    if (!e.dueDay) continue;
+    let dueDate = new Date(today.getFullYear(), today.getMonth(), e.dueDay, 0, 0, 0, 0);
+    if (dueDate.getTime() < todayTime) {
+      dueDate = new Date(today.getFullYear(), today.getMonth() + 1, e.dueDay, 0, 0, 0, 0);
+    }
+
+    if (dueDate.getTime() >= todayTime && dueDate.getTime() <= endOfWeekTime) {
+      const diffMs = dueDate.getTime() - todayTime;
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+      let dueDateStr = "";
+      if (diffDays === 0) {
+        dueDateStr = "Due today";
+      } else if (diffDays === 1) {
+        dueDateStr = "Due tomorrow";
+      } else {
+        dueDateStr = `Due in ${diffDays} days`;
+      }
+
+      upcomingDuesThisWeek.push({
+        title: e.title,
+        amount: e.amount,
+        dueDate: dueDateStr,
+      });
+    }
+  }
+
   if (period === "weekly") {
     return {
       period: "Weekly CFO Briefing",
@@ -13,10 +51,7 @@ export const getBoardroomReports = async (userId: string, period: "weekly" | "mo
       spendingSummary: {
         weeklyOutflow: Math.round(cashflow.expenses / 4),
         weeklyBurnTarget: Math.round(cashflow.income / 4),
-        upcomingDuesThisWeek: [
-          { title: "Internet Bill", amount: 1499, dueDate: "In 2 days" },
-          { title: "HDFC Home Loan EMI", amount: 35000, dueDate: "In 5 days" },
-        ],
+        upcomingDuesThisWeek,
       },
       highlights: [
         `Weekly discretionary outflow controlled at ₹${Math.round(cashflow.expenses / 4).toLocaleString("en-IN")}.`,
