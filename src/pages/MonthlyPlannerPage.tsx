@@ -200,6 +200,22 @@ export const MonthlyPlannerPage: React.FC<MonthlyPlannerPageProps> = ({
     });
   });
 
+  const getRecurringCategoryLabel = (bill: RecurringExpense): string => {
+    const category = bill.category;
+
+    if (typeof category === 'string' && category.trim()) {
+      return category;
+    }
+
+    if (category && typeof category === 'object' && 'name' in category) {
+      return typeof category.name === 'string' && category.name.trim()
+        ? category.name
+        : 'Recurring Payment';
+    }
+
+    return 'Recurring Payment';
+  };
+
   // 5. User Recurring Expenses & Bills
   recurringExpenses.forEach((bill) => {
     let day = 1;
@@ -217,6 +233,7 @@ export const MonthlyPlannerPage: React.FC<MonthlyPlannerPageProps> = ({
 
     const title = bill.title || (bill as any).name || 'Recurring Bill';
     const amount = Number(bill.amount) || 0;
+    const categoryLabel = getRecurringCategoryLabel(bill);
 
     events.push({
       id: `rec-${bill.id}`,
@@ -225,7 +242,7 @@ export const MonthlyPlannerPage: React.FC<MonthlyPlannerPageProps> = ({
       amount,
       type: 'Reminder',
       status,
-      categoryLabel: (bill as any).category || 'Recurring Payment',
+      categoryLabel,
     });
 
     timelineItems.push({
@@ -234,7 +251,7 @@ export const MonthlyPlannerPage: React.FC<MonthlyPlannerPageProps> = ({
       title,
       amount,
       type: 'Reminder',
-      categoryLabel: (bill as any).category || 'Recurring Payment',
+      categoryLabel,
     });
   });
 

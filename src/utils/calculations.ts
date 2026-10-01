@@ -817,11 +817,18 @@ export function findMatchingRecurringBill(
     if (idMatch) return idMatch;
   }
 
+  const getCatStr = (cat: unknown): string =>
+    typeof cat === 'string'
+      ? cat
+      : cat && typeof cat === 'object' && 'name' in cat && typeof (cat as { name?: unknown }).name === 'string'
+      ? (cat as { name: string }).name
+      : '';
+
   // 3. Match of Name + Category + Due Day + Amount
   const exact4Way = candidates.find((c) => {
     const cName = (c.name || c.title || '').trim().toLowerCase();
     const sameName = cName === targetName;
-    const sameCategory = (c.category || '').toLowerCase() === (target.category || '').toLowerCase();
+    const sameCategory = getCatStr(c.category).toLowerCase() === getCatStr(target.category).toLowerCase();
     const sameDueDay = Number(c.dueDay) === Number(target.dueDay);
     const sameAmount = Math.abs(Number(c.amount) - Number(target.amount)) < 0.01;
     return sameName && sameCategory && sameDueDay && sameAmount;
@@ -832,7 +839,7 @@ export function findMatchingRecurringBill(
   const nameCatAmount = candidates.find((c) => {
     const cName = (c.name || c.title || '').trim().toLowerCase();
     const sameName = cName === targetName;
-    const sameCategory = (c.category || '').toLowerCase() === (target.category || '').toLowerCase();
+    const sameCategory = getCatStr(c.category).toLowerCase() === getCatStr(target.category).toLowerCase();
     const sameAmount = Math.abs(Number(c.amount) - Number(target.amount)) < 0.01;
     return sameName && sameCategory && sameAmount;
   });
@@ -842,7 +849,7 @@ export function findMatchingRecurringBill(
   const nameCat = candidates.find((c) => {
     const cName = (c.name || c.title || '').trim().toLowerCase();
     const sameName = cName === targetName;
-    const sameCategory = (c.category || '').toLowerCase() === (target.category || '').toLowerCase();
+    const sameCategory = getCatStr(c.category).toLowerCase() === getCatStr(target.category).toLowerCase();
     return sameName && sameCategory;
   });
   if (nameCat) return nameCat;

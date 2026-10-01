@@ -1249,11 +1249,16 @@ export function App() {
     const prevExpenses = [...expenses];
     const prevRecurring = [...recurringExpenses];
 
+    const billCategoryStr =
+      typeof activeBill.category === 'string'
+        ? activeBill.category
+        : activeBill.category?.name || 'Recurring Payment';
+
     const tempExpenseId = `exp-rec-${Date.now()}`;
     const optimisticExpense: Expense = {
       id: tempExpenseId,
       itemName: activeBill.name || activeBill.title || 'Recurring Bill',
-      category: activeBill.category,
+      category: billCategoryStr,
       subcategory: activeBill.subcategory,
       totalPrice: activeBill.amount,
       purchaseDate: today,
@@ -1284,7 +1289,7 @@ export function App() {
     try {
       const expensePayload = {
         itemName: activeBill.name || activeBill.title || 'Recurring Bill',
-        category: activeBill.category,
+        category: billCategoryStr,
         subcategory: activeBill.subcategory,
         totalPrice: activeBill.amount,
         purchaseDate: today,

@@ -89,7 +89,7 @@ export interface RecurringExpense {
   rowIndex?: number;
   name?: string;
   title?: string;
-  category?: string | any;
+  category?: string | CategoryItem | { id?: string; name: string; color?: string; icon?: string };
   categoryId?: string;
   subcategory?: string;
   amount: number;
