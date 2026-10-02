@@ -282,7 +282,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
-                { id: 'COMMAND', name: 'Command Center', desc: 'Executive overview & KPI cards grid' },
+                { id: 'COMMAND', name: 'Home Dashboard', desc: 'Personal finance overview & KPI cards grid' },
                 { id: 'CALENDAR', name: 'Calendar First', desc: 'Bills, SIP timeline & reminders first' },
                 { id: 'NOTEBOOK', name: 'Notebook Workspace', desc: 'Financial journal & goal notes focus' },
                 { id: 'AICFO', name: 'AI CFO Workspace', desc: 'Conversational assistant as homepage' },

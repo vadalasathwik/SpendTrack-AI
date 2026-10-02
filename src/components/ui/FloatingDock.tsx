@@ -26,7 +26,7 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
   ];
 
   return (
-    <div className="fixed bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-24px)] max-w-[430px] pointer-events-auto pb-[env(safe-area-inset-bottom,0px)]">
+    <div className="lg:hidden fixed bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-24px)] max-w-[430px] pointer-events-auto pb-[env(safe-area-inset-bottom,0px)]">
       <div className="bg-slate-900/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-800/90 rounded-[24px] sm:rounded-[28px] px-1 sm:px-2 py-1.5 sm:py-2 flex items-center justify-between shadow-2xl shadow-slate-950/80">
         {items.map((item) => {
           const Icon = item.icon;

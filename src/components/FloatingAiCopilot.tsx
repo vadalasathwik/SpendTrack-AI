@@ -10,10 +10,12 @@ interface Message {
 }
 
 interface FloatingAiCopilotProps {
+  activeTab?: string;
   onRefreshData?: () => void;
 }
 
-export const FloatingAiCopilot: React.FC<FloatingAiCopilotProps> = ({ onRefreshData }) => {
+export const FloatingAiCopilot: React.FC<FloatingAiCopilotProps> = ({ activeTab, onRefreshData }) => {
+  if (activeTab === 'ai') return null;
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);

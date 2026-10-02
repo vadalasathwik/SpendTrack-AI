@@ -238,10 +238,10 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
                   <Icon className="w-4 h-4 stroke-[2.5]" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 block truncate">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 block whitespace-normal text-left break-words leading-tight">
                     {prompt.text}
                   </span>
-                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block mt-1">
                     {prompt.badge}
                   </span>
                 </div>
@@ -256,7 +256,7 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
       {/* ------------------------------------------------------------- */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Chat Area (8 Cols) */}
-        <div className="lg:col-span-8 bg-white dark:bg-slate-900 rounded-[28px] border border-slate-200/80 dark:border-slate-800 shadow-xs p-4 sm:p-6 flex flex-col justify-between min-h-[480px] h-[calc(100vh-360px)]">
+        <div className="lg:col-span-8 bg-white dark:bg-slate-900 rounded-[28px] border border-slate-200/80 dark:border-slate-800 shadow-xs p-4 sm:p-6 flex flex-col justify-between min-h-[500px] lg:min-h-[540px] h-[calc(100vh-280px)] lg:h-[calc(100vh-240px)]">
           {/* Messages list */}
           <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
             {messages.map((msg) => {
@@ -270,13 +270,13 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
                   )}
 
                   <div
-                    className={`max-w-[88%] sm:max-w-[80%] rounded-[22px] p-4 text-xs sm:text-sm font-medium leading-relaxed shadow-xs ${
+                    className={`max-w-[90%] sm:max-w-[85%] lg:max-w-[78%] rounded-[22px] p-4 text-xs sm:text-sm font-medium leading-relaxed shadow-xs ${
                       isUser
                         ? 'bg-emerald-600 text-white rounded-tr-xs font-semibold'
                         : 'bg-slate-100 dark:bg-slate-800/90 text-slate-900 dark:text-slate-100 border border-slate-200/80 dark:border-slate-700 rounded-tl-xs'
                     }`}
                   >
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                    <div className="whitespace-pre-wrap break-words">{msg.content}</div>
                     <div
                       className={`mt-2 flex items-center justify-end gap-2 text-[10px] ${
                         isUser ? 'text-white/80 font-bold' : 'text-slate-400 font-medium'

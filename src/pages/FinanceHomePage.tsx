@@ -205,15 +205,11 @@ export const FinanceHomePage: React.FC<FinanceHomePageProps> = ({
         className="p-4 sm:p-5 rounded-[28px] bg-gradient-to-r from-emerald-500/10 via-cyan-500/10 to-slate-900/40 border border-emerald-500/20 flex items-center justify-between gap-3 shadow-xs"
       >
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 mb-0.5">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Command Center</span>
-          </div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight truncate">
             Hello, {displayName}
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
-            Real-time monthly budget & outlays
+            Track your spending, budget, and upcoming commitments.
           </p>
         </div>
 
@@ -247,7 +243,7 @@ export const FinanceHomePage: React.FC<FinanceHomePageProps> = ({
             </div>
             <div>
               <h2 className="text-xs font-black text-white uppercase tracking-wider">
-                Monthly Budget Command
+                MONTHLY BUDGET
               </h2>
               <span className="text-[10px] text-slate-400">
                 {now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
@@ -354,7 +350,7 @@ export const FinanceHomePage: React.FC<FinanceHomePageProps> = ({
         <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider px-1">
           Quick Actions
         </h3>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {/* Action 1: + Expense */}
           <button
             type="button"
@@ -467,22 +463,24 @@ export const FinanceHomePage: React.FC<FinanceHomePageProps> = ({
       </motion.div>
 
       {/* ------------------------------------------------------------- */}
-      {/* 5. Recent Transactions                                       */}
+      {/* 5. Recent Transactions & Upcoming Commitments Grid (Desktop 2-Col) */}
       {/* ------------------------------------------------------------- */}
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between px-1">
-          <h3 className="text-sm font-black text-slate-900 dark:text-white tracking-tight">
-            Recent Transactions
-          </h3>
-          <button
-            type="button"
-            onClick={() => onNavigateToTab('expenses')}
-            className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer min-h-[36px] px-1"
-          >
-            <span>View all</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Recent Transactions */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-sm font-black text-slate-900 dark:text-white tracking-tight">
+              Recent Transactions
+            </h3>
+            <button
+              type="button"
+              onClick={() => onNavigateToTab('expenses')}
+              className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer min-h-[36px] px-1"
+            >
+              <span>View all</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
         {recentTransactions.length > 0 ? (
           <div className="space-y-2">
@@ -608,6 +606,7 @@ export const FinanceHomePage: React.FC<FinanceHomePageProps> = ({
           </div>
         )}
       </div>
+    </div>
 
       {/* ------------------------------------------------------------- */}
       {/* Add Income Modal Overlay                                      */}

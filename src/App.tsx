@@ -12,6 +12,12 @@ import {
   Search,
   BookOpen,
   ArrowDownLeft,
+  Wallet,
+  Calendar,
+  PieChart,
+  Settings,
+  LogOut,
+  Layers,
 } from 'lucide-react';
 import {
   Expense,
@@ -125,6 +131,110 @@ import { ReceiptDetailPage } from './pages/ReceiptDetailPage.js';
 const DATE_RANGE_STORAGE_KEY = 'spendtrack_date_range';
 const ACTIVE_TAB_STORAGE_KEY = 'spendtrack_active_tab';
 
+const VALID_TABS = new Set([
+  'dashboard',
+  'expenses',
+  'planner',
+  'wallet',
+  'ai',
+  'budget',
+  'monthly-items',
+  'items',
+  'analytics',
+  'notebook',
+  'inbox',
+  'notifications',
+  'wealth',
+  'emis',
+  'investments',
+  'savings',
+  'recurring',
+  'categories',
+  'health',
+  'networth',
+  'goals',
+  'aicfo',
+  'portfolio',
+  'gold',
+  'insurance',
+  'documents',
+  'salary',
+  'tax',
+  'ai-executive',
+  'qr-vault',
+  'receipt-scanner',
+  'settings',
+  'family',
+]);
+
+const normalizeRoute = (rawStr?: string | null): string => {
+  if (!rawStr) return 'dashboard';
+  const clean = rawStr.replace(/^#/, '').replace(/^\//, '').trim().toLowerCase();
+
+  // DANGER CHECK: Never treat OAuth parameters, tokens, query parameters, or errors as activeTab routes!
+  if (
+    clean.includes('access_token') ||
+    clean.includes('token_type') ||
+    clean.includes('error') ||
+    clean.includes('=') ||
+    clean.includes('&')
+  ) {
+    return 'dashboard';
+  }
+
+  // Canonical Primary Navigation Mappings
+  if (clean === 'home' || clean === 'dashboard') return 'dashboard';
+  if (clean === 'transactions' || clean === 'expenses') return 'expenses';
+  if (clean === 'plan' || clean === 'planner') return 'planner';
+  if (clean === 'vault' || clean === 'wallet') return 'wallet';
+  if (clean === 'ai' || clean === 'copilot') return 'ai';
+
+  // Check against valid module tabs set
+  if (VALID_TABS.has(clean)) {
+    return clean;
+  }
+
+  // Safe default fallback to Home (dashboard) for any unrecognized route or hash
+  return 'dashboard';
+};
+
+const getModuleTitle = (tab: string): string => {
+  switch (tab) {
+    case 'dashboard':
+      return 'Home';
+    case 'expenses':
+      return 'Transactions Ledger';
+    case 'planner':
+      return 'Monthly Plan & Reminders';
+    case 'wallet':
+      return 'Financial Vault';
+    case 'ai':
+      return 'AI Financial Copilot';
+    case 'budget':
+      return 'Monthly Budget';
+    case 'monthly-items':
+      return 'Monthly Catalog';
+    case 'recurring':
+      return 'Recurring Subscriptions';
+    case 'notebook':
+      return 'Financial Notebook';
+    case 'inbox':
+      return 'Financial Inbox';
+    case 'wealth':
+      return 'Wealth & Portfolio';
+    case 'qr-vault':
+      return 'QR & Payment Vault';
+    case 'documents':
+      return 'Document Vault';
+    case 'family':
+      return 'Family Workspace';
+    case 'settings':
+      return 'Account Settings';
+    default:
+      return tab.replace(/-/g, ' ').toUpperCase();
+  }
+};
+
 const getInitialDateRange = (): DateRange => {
   try {
     const stored = localStorage.getItem(DATE_RANGE_STORAGE_KEY);
@@ -145,27 +255,18 @@ const getInitialDateRange = (): DateRange => {
 
 const getInitialActiveTab = (): string => {
   try {
-    const hash = window.location.hash.replace('#', '').trim();
+    const hash = window.location.hash;
     if (hash) {
-      if (hash === 'home') return 'dashboard';
-      if (hash === 'transactions') return 'expenses';
-      if (hash === 'plan') return 'planner';
-      if (hash === 'vault') return 'wallet';
-      return hash;
+      return normalizeRoute(hash);
     }
-    const pathname = window.location.pathname.replace('/', '').trim();
-    if (pathname) {
-      if (pathname === 'home' || pathname === 'dashboard') return 'dashboard';
-      if (pathname === 'transactions' || pathname === 'expenses') return 'expenses';
-      if (pathname === 'plan' || pathname === 'planner') return 'planner';
-      if (pathname === 'vault' || pathname === 'wallet') return 'wallet';
-      if (pathname === 'ai' || pathname === 'copilot') return 'ai';
-      if (['inbox', 'notifications', 'budget', 'family', 'monthly-items', 'items', 'analytics', 'notebook', 'wealth', 'emis', 'investments', 'savings', 'recurring', 'categories', 'health', 'networth', 'goals', 'aicfo', 'portfolio', 'gold', 'insurance', 'documents', 'salary', 'tax', 'ai-executive', 'qr-vault', 'receipt-scanner', 'settings'].includes(pathname)) {
-        return pathname;
-      }
+    const pathname = window.location.pathname;
+    if (pathname && pathname !== '/') {
+      return normalizeRoute(pathname);
     }
     const stored = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
-    if (stored) return stored;
+    if (stored) {
+      return normalizeRoute(stored);
+    }
   } catch (err) {}
   return 'dashboard';
 };
@@ -183,26 +284,49 @@ export function App() {
   const [isQuickAddSheetOpen, setIsQuickAddSheetOpen] = useState(false);
   const [goals, setGoals] = useState<any[]>([]);
 
-  const handleSelectTab = (tab: string, pushHistory = true) => {
-    setActiveTab(tab);
+  // Collapsible Sidebar State with Persistence
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     try {
-      localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, tab);
-      if (pushHistory && window.location.hash !== `#${tab}`) {
-        window.history.pushState({ tab }, '', `#${tab}`);
+      return localStorage.getItem('spendtrack-sidebar-collapsed') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('spendtrack-sidebar-collapsed', String(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const handleSelectTab = (tab: string, pushHistory = true) => {
+    const normalized = normalizeRoute(tab);
+    setActiveTab(normalized);
+    try {
+      localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, normalized);
+
+      let hashName = normalized;
+      if (normalized === 'dashboard') hashName = 'home';
+      if (normalized === 'expenses') hashName = 'transactions';
+      if (normalized === 'planner') hashName = 'plan';
+      if (normalized === 'wallet') hashName = 'vault';
+
+      if (pushHistory && window.location.hash !== `#${hashName}`) {
+        window.history.pushState({ tab: normalized }, '', `#${hashName}`);
       }
     } catch (err) {}
   };
 
   useEffect(() => {
     const handleLocationChange = () => {
-      const hash = window.location.hash.replace('#', '').trim();
+      const hash = window.location.hash;
       if (hash) {
-        let mapped = hash;
-        if (hash === 'home') mapped = 'dashboard';
-        if (hash === 'transactions') mapped = 'expenses';
-        if (hash === 'plan') mapped = 'planner';
-        if (hash === 'vault') mapped = 'wallet';
-        setActiveTab(mapped);
+        const targetTab = normalizeRoute(hash);
+        setActiveTab(targetTab);
       }
     };
 
@@ -451,6 +575,7 @@ export function App() {
         const oauthUser = await handleOAuthHashCallback();
         if (oauthUser && isMounted) {
           setUser(oauthUser);
+          setActiveTab('dashboard');
           setAuthLoading(false);
           return;
         }
@@ -1499,51 +1624,253 @@ export function App() {
               errorMessage={syncStatus.state === 'error' ? syncStatus.errorMessage : null}
             />
           ) : (
-            <div className="min-h-screen bg-[var(--bg)] flex flex-col font-sans text-[var(--text-primary)] transition-colors duration-200" id="spendtrack-root">
+            <div className="min-h-screen bg-[var(--bg)] flex flex-col lg:flex-row font-sans text-[var(--text-primary)] transition-colors duration-200" id="spendtrack-root">
               {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} durationMs={1200} />}
               <OfflineBanner isOffline={!isOnline} />
 
-      {/* Top Application Header (Google Pay & Apple Wallet Style) */}
-      <header className="sticky top-0 z-40 h-[68px] sm:h-[76px] bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/90 px-3 sm:px-4 flex items-center justify-between shadow-xs transition-colors">
-        <div className="max-w-[430px] sm:max-w-xl md:max-w-4xl w-full mx-auto flex items-center justify-between gap-1.5 sm:gap-2 min-w-0">
-          {/* Left: Logo */}
-          <div className="flex items-center gap-2 shrink-0">
-            <HeaderLogo onClick={() => handleSelectTab('dashboard')} />
-          </div>
+              {/* DESKTOP SIDEBAR NAVIGATION (>= 1024px / lg) */}
+              <aside
+                className={`hidden lg:flex flex-col justify-between ${
+                  isSidebarCollapsed ? 'w-[72px]' : 'w-60 xl:w-64'
+                } bg-slate-900 border-r border-slate-800 p-3 sticky top-0 h-screen select-none shrink-0 z-30 transition-[width] duration-300 ease-in-out`}
+              >
+                {/* Fixed Top Section: Brand & Primary Core Nav */}
+                <div className="space-y-4 shrink-0">
+                  {/* Brand Header — Single Expand/Collapse Toggle Button */}
+                  <div className="px-1 py-1 min-h-[40px]">
+                    <button
+                      type="button"
+                      onClick={toggleSidebar}
+                      aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                      aria-expanded={!isSidebarCollapsed}
+                      title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                      className={`w-full flex items-center ${
+                        isSidebarCollapsed ? 'justify-center py-1' : 'justify-start gap-3 p-1.5'
+                      } rounded-2xl hover:bg-slate-800/60 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/40 select-none group shrink-0 min-h-[44px]`}
+                    >
+                      {isSidebarCollapsed ? (
+                        <SpendTrackLogo size="sm" className="group-hover:scale-105 transition-transform shrink-0" />
+                      ) : (
+                        <>
+                          <SpendTrackLogo size="md" className="group-hover:scale-105 transition-transform shrink-0" />
+                          <div className="flex flex-col text-left min-w-0">
+                            <span className="text-base font-black text-white tracking-tight leading-none group-hover:text-emerald-400 transition-colors truncate">
+                              SpendTrack <span className="text-emerald-400">AI</span>
+                            </span>
+                            <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-400/90 mt-0.5 truncate">
+                              Finance OS
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </button>
+                  </div>
 
-          {/* Center: Month Selector Pill */}
-          <div className="flex-1 justify-center flex min-w-0 px-1">
-            <MonthSelectorPill
-              dateRange={dateRange}
-              onChangeDateRange={handleDateRangeChange}
-            />
-          </div>
+                  {/* Primary Core Navigation */}
+                  <div className="space-y-1">
+                    {!isSidebarCollapsed && (
+                      <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-3 block mb-1">
+                        Main Core
+                      </span>
+                    )}
 
-          {/* Right: Sync Badge, Search, and Google Profile Avatar */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <SyncStatusBadge onOpenConflictModal={() => setIsConflictModalOpen(true)} />
-            <SearchTrigger onOpenSearch={() => setIsSearchOpen(true)} />
-            <button
-              type="button"
-              id="google-profile-header-avatar"
-              onClick={() => setIsProfileSheetOpen(true)}
-              className="w-9 h-9 rounded-full bg-emerald-600 text-white font-black text-xs border-2 border-emerald-400 flex items-center justify-center shrink-0 overflow-hidden shadow-sm cursor-pointer hover:scale-105 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-transform"
-              title="Open profile"
-              aria-label="Open profile"
-            >
-              {(user?.photoUrl || user?.photoURL) ? (
-                <img src={user.photoUrl || user.photoURL} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                user?.name ? user.name.substring(0, 2).toUpperCase() : (user?.displayName ? user.displayName.substring(0, 2).toUpperCase() : (user?.email ? user.email.substring(0, 2).toUpperCase() : 'ST'))
-              )}
-            </button>
-          </div>
-        </div>
-      </header>
+                    {[
+                      { id: 'dashboard', label: 'Home', icon: Home },
+                      { id: 'expenses', label: 'Transactions', icon: Receipt },
+                      { id: 'planner', label: 'Plan & Reminders', icon: Calendar },
+                      { id: 'wallet', label: 'Financial Vault', icon: Wallet },
+                      { id: 'ai', label: 'AI Copilot', icon: Sparkles, badge: 'AI' },
+                    ].map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleSelectTab(item.id)}
+                          title={item.label}
+                          aria-label={item.label}
+                          className={`w-full flex items-center ${
+                            isSidebarCollapsed ? 'justify-center px-0 py-2.5' : 'justify-between px-3 py-2.5'
+                          } rounded-xl font-extrabold text-xs transition-all cursor-pointer ${
+                            isActive
+                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                              : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                          }`}
+                        >
+                          <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'}`}>
+                            <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
+                            {!isSidebarCollapsed && <span>{item.label}</span>}
+                          </div>
+                          {!isSidebarCollapsed && item.badge && (
+                            <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              {item.badge}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-      {/* Main Content Area (Max Width 430px Desktop Shell) */}
-      <main className="flex-1 max-w-[430px] w-full mx-auto px-4 pt-4 pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))]">
-        {activeTab === 'dashboard' && (
+                {/* Middle Workspace Modules (Scrollable if needed, hidden visual scrollbars) */}
+                <div className="flex-1 overflow-y-auto min-h-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-3 space-y-1 border-t border-slate-800/80 my-2">
+                  {!isSidebarCollapsed && (
+                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-3 block mb-1">
+                      WORKSPACE
+                    </span>
+                  )}
+
+                  {[
+                    { id: 'budget', label: 'Monthly Budget', icon: PieChart },
+                    { id: 'monthly-items', label: 'Monthly Catalog', icon: Layers },
+                    { id: 'recurring', label: 'Recurring Subscriptions', icon: BookOpen },
+                    { id: 'notebook', label: 'Financial Notebook', icon: BookOpen },
+                    { id: 'inbox', label: 'Financial Inbox', icon: Bell },
+                    { id: 'wealth', label: 'Wealth & Portfolio', icon: TrendingUp },
+                    { id: 'qr-vault', label: 'QR & Payment Vault', icon: CreditCard },
+                    { id: 'family', label: 'Family Workspace', icon: User },
+                  ].map((mod) => {
+                    const Icon = mod.icon;
+                    const isActive = activeTab === mod.id;
+                    return (
+                      <button
+                        key={mod.id}
+                        type="button"
+                        onClick={() => handleSelectTab(mod.id)}
+                        title={mod.label}
+                        aria-label={mod.label}
+                        className={`w-full flex items-center ${
+                          isSidebarCollapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2'
+                        } rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          isActive
+                            ? 'bg-slate-800 text-emerald-400 font-extrabold'
+                            : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+                        }`}
+                      >
+                        <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
+                        {!isSidebarCollapsed && <span className="truncate">{mod.label}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Bottom Profile & Settings (Fixed) */}
+                <div className="pt-2 border-t border-slate-800 shrink-0 space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTab('settings')}
+                    title="Settings"
+                    aria-label="Settings"
+                    className={`w-full flex items-center ${
+                      isSidebarCollapsed ? 'justify-center px-0 py-2' : 'justify-between px-3 py-2'
+                    } rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      activeTab === 'settings'
+                        ? 'bg-slate-800 text-emerald-400'
+                        : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+                    }`}
+                  >
+                    <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-2.5'}`}>
+                      <Settings className="w-4 h-4 shrink-0" />
+                      {!isSidebarCollapsed && <span>Settings</span>}
+                    </div>
+                  </button>
+
+                  <div className={`p-1.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center ${
+                    isSidebarCollapsed ? 'flex-col gap-2 justify-center' : 'justify-between gap-2'
+                  }`}>
+                    <button
+                      type="button"
+                      onClick={() => setIsProfileSheetOpen(true)}
+                      title="Account profile"
+                      aria-label="Account profile"
+                      className={`flex items-center ${
+                        isSidebarCollapsed ? 'justify-center' : 'gap-2.5 min-w-0 flex-1'
+                      } text-left cursor-pointer group`}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-black text-xs border border-emerald-400 flex items-center justify-center shrink-0 overflow-hidden">
+                        {(user?.photoUrl || user?.photoURL) ? (
+                          <img src={user.photoUrl || user.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                          user?.name ? user.name.substring(0, 2).toUpperCase() : (user?.displayName ? user.displayName.substring(0, 2).toUpperCase() : (user?.email ? user.email.substring(0, 2).toUpperCase() : 'ST'))
+                        )}
+                      </div>
+                      {!isSidebarCollapsed && (
+                        <div className="min-w-0 flex-1">
+                          <span className="text-xs font-bold text-white truncate block group-hover:text-emerald-400 transition-colors">
+                            {user?.displayName || user?.name || 'Member Account'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 truncate block">
+                            {user?.email || 'Logged In'}
+                          </span>
+                        </div>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleSignOut}
+                      title="Sign Out"
+                      aria-label="Sign Out"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 cursor-pointer transition-colors shrink-0"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </aside>
+
+              {/* MAIN WORKSPACE CONTENT CONTAINER */}
+              <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+                {/* Top Application Header */}
+                <header className="sticky top-0 z-40 h-[68px] sm:h-[76px] bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/90 px-4 sm:px-6 flex items-center justify-between shadow-xs transition-colors">
+                  <div className="w-full max-w-7xl mx-auto flex items-center justify-between gap-2 min-w-0">
+                    {/* Left: SpendTrack AI Branding (Consistent across mobile & desktop) */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <HeaderLogo onClick={() => handleSelectTab('dashboard')} />
+                    </div>
+
+                    {/* Center: Month Selector Pill */}
+                    <div className="flex-1 justify-center flex min-w-0 px-2">
+                      <MonthSelectorPill
+                        dateRange={dateRange}
+                        onChangeDateRange={handleDateRangeChange}
+                      />
+                    </div>
+
+                    {/* Right: Actions */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setIsQuickAddSheetOpen(true)}
+                        className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-xs transition-all cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                        <span>Quick Add</span>
+                      </button>
+                      <SyncStatusBadge onOpenConflictModal={() => setIsConflictModalOpen(true)} />
+                      <SearchTrigger onOpenSearch={() => setIsSearchOpen(true)} />
+                      <button
+                        type="button"
+                        id="google-profile-header-avatar"
+                        onClick={() => setIsProfileSheetOpen(true)}
+                        className="w-9 h-9 rounded-full bg-emerald-600 text-white font-black text-xs border-2 border-emerald-400 flex items-center justify-center shrink-0 overflow-hidden shadow-sm cursor-pointer hover:scale-105 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 transition-transform"
+                        title="Open profile"
+                        aria-label="Open profile"
+                      >
+                        {(user?.photoUrl || user?.photoURL) ? (
+                          <img src={user.photoUrl || user.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                          user?.name ? user.name.substring(0, 2).toUpperCase() : (user?.displayName ? user.displayName.substring(0, 2).toUpperCase() : (user?.email ? user.email.substring(0, 2).toUpperCase() : 'ST'))
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </header>
+
+                {/* Main Content Area */}
+                <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 pt-4 pb-[calc(7.5rem+env(safe-area-inset-bottom,0px))] lg:pb-10">
+                  {activeTab === 'dashboard' && (
           <FinanceHomePage
             user={user}
             cashFlow={cashFlow}
@@ -1937,12 +2264,35 @@ export function App() {
           />
         )}
 
-        {!['dashboard', 'inbox', 'notifications', 'budget', 'family', 'expenses', 'monthly-items', 'items', 'analytics', 'notebook', 'planner', 'wealth', 'emis', 'investments', 'savings', 'recurring', 'ai', 'categories', 'health', 'networth', 'goals', 'aicfo', 'portfolio', 'gold', 'insurance', 'documents', 'salary', 'tax', 'ai-executive', 'receipt-scanner', 'settings'].includes(activeTab) && (
-          <EmptyWorkspace
-            title="Workspace Page Not Found"
-            subtitle="The requested tab does not match any active workspace module."
-            onAction={() => setActiveTab('dashboard')}
-            actionLabel="Return to Dashboard"
+        {!VALID_TABS.has(activeTab) && (
+          <FinanceHomePage
+            user={user}
+            cashFlow={cashFlow}
+            upcomingTimeline={upcomingTimeline}
+            expenses={expenses}
+            dateRange={dateRange}
+            userSettings={userSettings}
+            incomes={incomes}
+            emis={emis}
+            investments={investments}
+            savings={savings}
+            onOpenAddExpense={() => {
+              setEditingExpense(null);
+              setInitialMonthlyItem(null);
+              setAddExpenseInitialMode('manual');
+              setIsAddExpenseOpen(true);
+            }}
+            onOpenAddIncome={() => setIsAddIncomeOpen(true)}
+            onNavigateToTab={(tab) => handleSelectTab(tab)}
+            onOpenScanReceipt={() => {
+              setEditingExpense(null);
+              setInitialMonthlyItem(null);
+              setAddExpenseInitialMode('scan');
+              setIsAddExpenseOpen(true);
+            }}
+            onOpenWizard={() => setIsWizardOpen(true)}
+            onOpenOnboarding={() => setIsOnboardingOpen(true)}
+            onAddIncome={handleAddIncome}
           />
         )}
       </main>
@@ -2121,7 +2471,7 @@ export function App() {
       <PWAInstallPrompt />
 
       {/* Floating AI CFO Copilot */}
-      <FloatingAiCopilot />
+      <FloatingAiCopilot activeTab={activeTab} />
 
       {/* 6-Step Setup Wizard Modal */}
       <FinanceOnboardingWizard
@@ -2163,6 +2513,7 @@ export function App() {
           setActiveConflict(null);
         }}
       />
+    </div>
     </div>
           )
         }
