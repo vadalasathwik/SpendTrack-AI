@@ -206,10 +206,11 @@ export const ReceiptScannerPage: React.FC<ReceiptScannerPageProps> = ({
     try {
       await onSaveExpense({
         itemName: title.trim(),
+        merchant: merchant.trim() || title.trim(),
         totalPrice: numAmount,
         category,
         purchaseDate,
-        notes: `Merchant: ${merchant} | Scanned via Gemini 2.5 Flash AI Vision`,
+        notes: `Merchant: ${merchant} | Scanned via Gemini Vision AI`,
         source: 'receipt',
       });
 

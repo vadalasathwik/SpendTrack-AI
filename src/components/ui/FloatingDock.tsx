@@ -19,9 +19,9 @@ export const FloatingDock: React.FC<FloatingDockProps> = ({
 }) => {
   const items = [
     { id: 'dashboard', label: 'Home', icon: Home },
-    { id: 'wallet', label: 'Wallet', icon: Wallet },
-    { id: 'receipts', label: 'Receipts', icon: Receipt },
-    { id: 'planner', label: 'Planner', icon: Calendar },
+    { id: 'expenses', label: 'Transactions', icon: Receipt },
+    { id: 'planner', label: 'Plan', icon: Calendar },
+    { id: 'wallet', label: 'Vault', icon: Wallet },
     { id: 'ai', label: 'AI', icon: Sparkles },
   ];
 

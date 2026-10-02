@@ -1,10 +1,12 @@
 import { SpendTrackApi } from './api.js';
-import { Expense, RecurringExpense } from '../types.js';
+import { Expense, RecurringExpense, CategoryItem } from '../types.js';
 import { formatCurrency } from '../utils/calculations.js';
 
 export interface LocalAiContext {
   expenses: Expense[];
   recurringExpenses: RecurringExpense[];
+  categories?: CategoryItem[];
+  incomes?: any[];
   onRefreshData?: () => void;
 }
 
@@ -16,7 +18,7 @@ export interface LocalAiResponse {
 
 /**
  * Parses user input locally, executes database actions via SpendTrackApi,
- * and formats an intelligent financial copilot response.
+ * and formats an intelligent financial copilot response using actual application data.
  */
 export async function parseAndExecuteLocalAiIntent(
   userQuery: string,
@@ -24,6 +26,25 @@ export async function parseAndExecuteLocalAiIntent(
 ): Promise<LocalAiResponse> {
   const text = userQuery.trim();
   const lower = text.toLowerCase();
+
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  const monthName = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  // Filter current month expenses
+  const monthExpenses = context.expenses.filter((e) => {
+    if (!e.purchaseDate) return false;
+    const d = new Date(e.purchaseDate);
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+  });
+
+  const activeExpenses = monthExpenses.length > 0 ? monthExpenses : context.expenses;
+  const currentMonthSpent = activeExpenses.reduce((sum, e) => sum + e.totalPrice, 0);
+
+  // Calculate actual total category budgets
+  const categoryBudgetsTotal = (context.categories || []).reduce((sum, c) => sum + (c.allocatedBudget || 0), 0);
+  const totalBudget = categoryBudgetsTotal > 0 ? categoryBudgetsTotal : 40000;
+  const remainingBudget = totalBudget - currentMonthSpent;
 
   // -------------------------------------------------------------------
   // INTENT 1: Record Expense (e.g. "I spent ₹240 at Swiggy", "Spent 500 on Uber")
@@ -37,7 +58,6 @@ export async function parseAndExecuteLocalAiIntent(
     lower.includes('paid ₹') ||
     lower.includes('paid rs')
   ) {
-    // Extract numerical amount
     const amountMatch = text.match(/(?:₹|rs\.?|INR)?\s*([\d,]+(?:\.\d+)?)/i);
     const amountStr = amountMatch ? amountMatch[1].replace(/,/g, '') : null;
     const amount = amountStr ? parseFloat(amountStr) : 0;
@@ -48,7 +68,6 @@ export async function parseAndExecuteLocalAiIntent(
       };
     }
 
-    // Extract Merchant / Item Name
     let merchant = 'General Purchase';
     if (lower.includes('at ')) {
       merchant = text.split(/at /i)[1]?.split(/for|on|under/i)[0]?.trim() || merchant;
@@ -58,12 +77,10 @@ export async function parseAndExecuteLocalAiIntent(
       merchant = text.split(/for /i)[1]?.split(/at|on|under/i)[0]?.trim() || merchant;
     }
 
-    // Clean merchant string
     merchant = merchant.replace(/^(the|a|an)\s+/i, '').trim();
     if (merchant.length > 30) merchant = merchant.substring(0, 30);
     merchant = merchant.charAt(0).toUpperCase() + merchant.slice(1);
 
-    // Detect category
     let category = 'Shopping & Retail';
     if (/swiggy|zomato|starbucks|food|restaurant|dine|cafe|pizza|burger/i.test(lower)) {
       category = 'Food & Dining';
@@ -80,6 +97,7 @@ export async function parseAndExecuteLocalAiIntent(
     try {
       await SpendTrackApi.createExpense({
         itemName: merchant,
+        merchant,
         totalPrice: amount,
         category,
         purchaseDate: new Date().toISOString().split('T')[0],
@@ -90,22 +108,21 @@ export async function parseAndExecuteLocalAiIntent(
         context.onRefreshData();
       }
 
-      // Calculate total spending after addition
-      const totalMonthSpending = context.expenses.reduce((sum, e) => sum + e.totalPrice, 0) + amount;
+      const totalUpdatedSpent = currentMonthSpent + amount;
 
       return {
-        message: `✅ **Expense Saved to PostgreSQL**\n\n` +
+        message: `✅ **Expense Recorded to PostgreSQL**\n\n` +
           `• **Merchant/Item**: ${merchant}\n` +
           `• **Amount**: ${formatCurrency(amount)}\n` +
           `• **Category**: ${category}\n` +
           `• **Date**: Today (${new Date().toLocaleDateString('en-IN')})\n\n` +
-          `📊 *Total monthly spending updated to ${formatCurrency(totalMonthSpending)}.*`,
+          `📊 *Total monthly spending updated to ${formatCurrency(totalUpdatedSpent)}.*`,
         actionExecuted: true,
         dataUpdated: true,
       };
     } catch (err: any) {
       return {
-        message: `❌ Failed to write expense to PostgreSQL: ${err.message || 'Database connection error'}`,
+        message: `❌ Failed to save expense: ${err.message || 'Database connection error'}`,
       };
     }
   }
@@ -150,7 +167,7 @@ export async function parseAndExecuteLocalAiIntent(
           `• **Source**: ${sourceName}\n` +
           `• **Amount Added**: ${formatCurrency(amount)}\n` +
           `• **Date**: ${new Date().toLocaleDateString('en-IN')}\n\n` +
-          `📈 *Your free cash flow buffer has been recalculated.*`,
+          `📈 *Your cash flow buffer has been updated.*`,
         actionExecuted: true,
         dataUpdated: true,
       };
@@ -162,167 +179,237 @@ export async function parseAndExecuteLocalAiIntent(
   }
 
   // -------------------------------------------------------------------
-  // INTENT 3: Show Month's Spending (e.g. "Show this month's spending")
+  // PROMPT 1: How much did I spend this month?
   // -------------------------------------------------------------------
   if (
-    lower.includes('this month\'s spending') ||
-    lower.includes('this month spending') ||
-    lower.includes('monthly spending') ||
-    lower.includes('how much spending') ||
+    lower.includes('how much did i spend this month') ||
     lower.includes('how much spent') ||
-    lower.includes('show spending')
+    lower.includes('this month spending') ||
+    lower.includes('this month\'s spending') ||
+    lower.includes('monthly spending') ||
+    lower.includes('how much did i spend')
   ) {
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
+    if (activeExpenses.length === 0) {
+      return {
+        message: `📊 **Monthly Spending Summary (${monthName})**\n\nYou haven't recorded any expenses for ${monthName} yet. Use **+ Add Expense** or ask me to record one!`,
+        actionExecuted: true,
+      };
+    }
 
-    const monthExpenses = context.expenses.filter((e) => {
-      const d = new Date(e.purchaseDate);
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-    });
-
-    const totalSpent = monthExpenses.reduce((sum, e) => sum + e.totalPrice, 0);
-
-    // Group by category
     const catTotals: Record<string, number> = {};
-    monthExpenses.forEach((e) => {
+    activeExpenses.forEach((e) => {
       catTotals[e.category] = (catTotals[e.category] || 0) + e.totalPrice;
     });
 
     const sortedCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
-
-    let categoryBreakdown = '';
-    if (sortedCats.length > 0) {
-      categoryBreakdown = sortedCats
-        .map(([cat, val]) => `• **${cat}**: ${formatCurrency(val)}`)
-        .join('\n');
-    } else {
-      categoryBreakdown = '• No categorized transactions recorded yet this month.';
-    }
+    const categoryBreakdown = sortedCats
+      .map(([cat, val]) => `• **${cat}**: ${formatCurrency(val)}`)
+      .join('\n');
 
     return {
-      message: `📊 **Monthly Spending Summary (${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })})**\n\n` +
-        `• **Total Spent**: ${formatCurrency(totalSpent)}\n` +
-        `• **Transactions**: ${monthExpenses.length} items recorded\n\n` +
+      message: `📊 **Monthly Spending Summary (${monthName})**\n\n` +
+        `• **Total Spent**: ${formatCurrency(currentMonthSpent)}\n` +
+        `• **Total Transactions**: ${activeExpenses.length} items recorded\n\n` +
         `**Category Breakdown:**\n${categoryBreakdown}`,
       actionExecuted: true,
     };
   }
 
   // -------------------------------------------------------------------
-  // INTENT 4: How Much Can I Save? (Free Cash Flow & SIP Advice)
+  // PROMPT 2: Where am I spending the most?
   // -------------------------------------------------------------------
   if (
-    lower.includes('how much can i save') ||
-    lower.includes('can i save') ||
-    lower.includes('savings potential') ||
-    lower.includes('save money') ||
-    lower.includes('saving target')
+    lower.includes('where am i spending the most') ||
+    lower.includes('spending the most') ||
+    lower.includes('most spending') ||
+    lower.includes('top category') ||
+    lower.includes('highest spending') ||
+    lower.includes('where do i spend')
   ) {
-    try {
-      const cashflow = await SpendTrackApi.getCfoCashflow().catch(() => null);
-      const totalIncome = cashflow?.income || 140000;
-      const totalLiving = context.expenses.reduce((sum, e) => sum + e.totalPrice, 0);
-      const totalEmis = context.recurringExpenses.reduce((sum, r) => sum + r.amount, 0);
-      const totalOutflow = totalLiving + totalEmis;
-      const freeCash = Math.max(0, totalIncome - totalOutflow);
-      const safeSip = Math.round(freeCash * 0.45);
-      const emergencyAllocation = Math.round(freeCash * 0.3);
-
+    if (activeExpenses.length === 0) {
       return {
-        message: `💡 **AI Savings Potential Analysis**\n\n` +
-          `• **Total Monthly Inflow**: ${formatCurrency(totalIncome)}\n` +
-          `• **Living Expenses + EMIs**: ${formatCurrency(totalOutflow)}\n` +
-          `• **Available Free Cash Buffer**: ${formatCurrency(freeCash)}\n\n` +
-          `**Recommended Smart Allocation:**\n` +
-          `1. 📈 **Index / Equity SIP (45%)**: ${formatCurrency(safeSip)} / month\n` +
-          `2. 🛡️ **Emergency Liquid Reserve (30%)**: ${formatCurrency(emergencyAllocation)} / month\n` +
-          `3. 🎯 **Flexible Lifestyle Buffer (25%)**: ${formatCurrency(freeCash - safeSip - emergencyAllocation)} / month`,
+        message: `📊 **Highest Spending Breakdown**\n\nNo transactions have been recorded yet for ${monthName}.`,
         actionExecuted: true,
       };
-    } catch (e) {
-      return {
-        message: `💡 Based on your current income buffer, allocating **40% of your free cash** into index funds or Gold SIPs will build long-term financial security.`,
-      };
     }
+
+    const catTotals: Record<string, number> = {};
+    activeExpenses.forEach((e) => {
+      catTotals[e.category] = (catTotals[e.category] || 0) + e.totalPrice;
+    });
+
+    const sortedCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+    const [topCat, topVal] = sortedCats[0];
+    const topPct = Math.round((topVal / currentMonthSpent) * 100);
+
+    const breakdownStr = sortedCats
+      .map(([cat, val]) => `• **${cat}**: ${formatCurrency(val)} (${Math.round((val / currentMonthSpent) * 100)}%)`)
+      .join('\n');
+
+    return {
+      message: `🏷️ **Highest Spending Categories (${monthName})**\n\n` +
+        `Your top spending category is **${topCat}** at **${formatCurrency(topVal)}** (${topPct}% of your total spending).\n\n` +
+        `**All Categories:**\n${breakdownStr}`,
+      actionExecuted: true,
+    };
   }
 
   // -------------------------------------------------------------------
-  // INTENT 5: When is my next EMI? (EMIs & Reminders Query)
+  // PROMPT 3: How much budget do I have left?
   // -------------------------------------------------------------------
   if (
-    lower.includes('next emi') ||
-    lower.includes('emi date') ||
-    lower.includes('when is my emi') ||
-    lower.includes('emi due') ||
-    lower.includes('upcoming emi') ||
-    lower.includes('loan due')
+    lower.includes('how much budget do i have left') ||
+    lower.includes('budget left') ||
+    lower.includes('remaining budget') ||
+    lower.includes('budget remaining') ||
+    lower.includes('how much budget')
   ) {
-    try {
-      const emis = await SpendTrackApi.getEmis().catch(() => []);
-      if (emis.length > 0) {
-        const totalEmiAmount = emis.reduce((sum: number, item: any) => sum + (item.monthlyEmi || item.amount || 0), 0);
-        const listStr = emis
-          .map(
-            (item: any) =>
-              `• **${item.loanName || item.title || 'Loan EMI'}**: ${formatCurrency(item.monthlyEmi || item.amount || 0)} (Due: Day ${item.dueDate || '5'} of month)`
-          )
-          .join('\n');
+    const pctRemaining = Math.max(0, Math.round((remainingBudget / totalBudget) * 100));
 
-        return {
-          message: `📅 **Upcoming EMI Commitments**\n\n` +
-            `${listStr}\n\n` +
-            `• **Total Monthly EMI Outflow**: ${formatCurrency(totalEmiAmount)}\n` +
-            `• **Advice**: Keep ${formatCurrency(totalEmiAmount)} in your primary salary bank account by the 4th of every month to prevent auto-debit bounce fees.`,
-          actionExecuted: true,
-        };
-      } else if (context.recurringExpenses.length > 0) {
-        const totalEmiAmount = context.recurringExpenses.reduce((sum, r) => sum + r.amount, 0);
-        const listStr = context.recurringExpenses
-          .map((r) => `• **${r.name}**: ${formatCurrency(r.amount)} (Due: ${r.dueDate}th of month)`)
-          .join('\n');
+    return {
+      message: `💰 **Remaining Budget Status (${monthName})**\n\n` +
+        `• **Monthly Allocated Budget**: ${formatCurrency(totalBudget)}\n` +
+        `• **Spent So Far**: ${formatCurrency(currentMonthSpent)}\n` +
+        `• **Remaining Budget**: **${formatCurrency(remainingBudget)}** (${pctRemaining}% remaining)\n\n` +
+        (remainingBudget >= 0
+          ? `🟢 You are within your budget limit!`
+          : `🔴 Caution: You have exceeded your monthly allocated budget by ${formatCurrency(Math.abs(remainingBudget))}.`),
+      actionExecuted: true,
+    };
+  }
 
-        return {
-          message: `📅 **Active Recurring EMI Commitments**\n\n` +
-            `${listStr}\n\n` +
-            `• **Total EMI Outflow**: ${formatCurrency(totalEmiAmount)}`,
-          actionExecuted: true,
-        };
-      } else {
-        return {
-          message: `✨ **No Active EMIs Found**\n\nYou currently have zero pending EMI liabilities recorded in PostgreSQL! You can add recurring commitments in the Planner tab anytime.`,
-          actionExecuted: true,
-        };
-      }
-    } catch (err) {
+  // -------------------------------------------------------------------
+  // PROMPT 4: What bills are coming next?
+  // -------------------------------------------------------------------
+  if (
+    lower.includes('what bills are coming next') ||
+    lower.includes('upcoming bills') ||
+    lower.includes('bills next') ||
+    lower.includes('bills coming') ||
+    lower.includes('next bill') ||
+    lower.includes('next emi') ||
+    lower.includes('upcoming emi')
+  ) {
+    if (context.recurringExpenses.length > 0) {
+      const getDueVal = (r: any) => {
+        const val = r.dueDay || r.dueDate;
+        return typeof val === 'number' ? val : (parseInt(String(val), 10) || 31);
+      };
+      const sortedBills = [...context.recurringExpenses].sort((a, b) => getDueVal(a) - getDueVal(b));
+      const totalOutflow = sortedBills.reduce((sum, r) => sum + r.amount, 0);
+
+      const billListStr = sortedBills
+        .map((r) => {
+          const title = r.name || r.title || 'Recurring Bill';
+          const dueText = r.dueDay ? `Day ${r.dueDay} of month` : (r.dueDate ? `Due ${r.dueDate}` : 'Monthly');
+          const catName = typeof r.category === 'object' ? (r.category as any)?.name : (r.category || 'Bills');
+          return `• **${title}**: ${formatCurrency(r.amount)} (${dueText}) [${catName}]`;
+        })
+        .join('\n');
+
       return {
-        message: `📅 Your upcoming EMIs are scheduled around the 5th of each month. Total estimated commitment: ${formatCurrency(35000)}.`,
+        message: `📅 **Upcoming Bills & Recurring Commitments**\n\n` +
+          `${billListStr}\n\n` +
+          `• **Total Monthly Outflow**: ${formatCurrency(totalOutflow)}`,
+        actionExecuted: true,
+      };
+    } else {
+      return {
+        message: `📅 **Upcoming Bills & Commitments**\n\nYou currently have zero recurring bills or EMIs recorded in PostgreSQL! You can add recurring commitments in the Planner tab.`,
+        actionExecuted: true,
       };
     }
   }
 
   // -------------------------------------------------------------------
-  // FALLBACK: General Affordability / Context Query
+  // PROMPT 5: Show my recent expenses.
   // -------------------------------------------------------------------
-  if (lower.includes('afford') || lower.includes('can i buy')) {
-    const matchAmount = text.match(/\d+/);
-    const amount = matchAmount ? Number(matchAmount[0]) : 10000;
-    try {
-      const result = await SpendTrackApi.checkAffordability(amount);
-      return { message: result.message };
-    } catch (e) {
+  if (
+    lower.includes('show my recent expenses') ||
+    lower.includes('recent expenses') ||
+    lower.includes('recent transactions') ||
+    lower.includes('latest expenses') ||
+    lower.includes('last expenses')
+  ) {
+    if (context.expenses.length === 0) {
       return {
-        message: `🔍 Evaluating purchase affordability for ${formatCurrency(amount)}... Based on your cash flow buffer, this purchase is safe.`,
+        message: `🧾 **Recent Transactions**\n\nNo expense transactions found in database. Record your first expense to track spending!`,
+        actionExecuted: true,
+      };
+    }
+
+    const sortedExpenses = [...context.expenses].sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
+    const recent = sortedExpenses.slice(0, 5);
+
+    const listStr = recent
+      .map((e, idx) => `${idx + 1}. **${e.merchant || e.itemName}** — ${formatCurrency(e.totalPrice)} (${e.category}, ${e.purchaseDate})`)
+      .join('\n');
+
+    return {
+      message: `🧾 **Recent Transactions**\n\nHere are your ${recent.length} most recent expenses:\n\n${listStr}`,
+      actionExecuted: true,
+    };
+  }
+
+  // -------------------------------------------------------------------
+  // PROMPT 6: Can I afford this expense?
+  // -------------------------------------------------------------------
+  if (
+    lower.includes('can i afford') ||
+    lower.includes('afford this expense') ||
+    lower.includes('affordability') ||
+    lower.includes('can i buy')
+  ) {
+    const amountMatch = text.match(/(?:₹|rs\.?|INR)?\s*([\d,]+(?:\.\d+)?)/i);
+    const amountStr = amountMatch ? amountMatch[1].replace(/,/g, '') : null;
+    const amount = amountStr ? parseFloat(amountStr) : 0;
+
+    if (!amount || isNaN(amount)) {
+      return {
+        message: `🛍️ **Affordability Analysis**\n\n` +
+          `Please specify an amount to check, for example:\n` +
+          `• *"Can I afford ₹5,000?"*\n` +
+          `• *"Can I afford ₹12,000 for a smartphone?"*\n\n` +
+          `• **Current Remaining Monthly Budget**: ${formatCurrency(remainingBudget)}`,
+      };
+    }
+
+    const remainingAfter = remainingBudget - amount;
+
+    if (amount <= remainingBudget) {
+      return {
+        message: `✅ **Affordability Verdict: YES**\n\n` +
+          `You can afford this expense of **${formatCurrency(amount)}**!\n\n` +
+          `• **Current Remaining Budget**: ${formatCurrency(remainingBudget)}\n` +
+          `• **Remaining After Purchase**: **${formatCurrency(remainingAfter)}**\n\n` +
+          `🟢 This purchase stays within your allocated budget for ${monthName}.`,
+        actionExecuted: true,
+      };
+    } else {
+      const deficit = amount - remainingBudget;
+      return {
+        message: `⚠️ **Affordability Verdict: CAUTION**\n\n` +
+          `An expense of **${formatCurrency(amount)}** exceeds your remaining budget of **${formatCurrency(remainingBudget)}** by **${formatCurrency(deficit)}**.\n\n` +
+          `• **Current Remaining Budget**: ${formatCurrency(remainingBudget)}\n` +
+          `• **Budget Deficit if Purchased**: -${formatCurrency(deficit)}\n\n` +
+          `🔴 Purchasing this will overspend your budget for ${monthName}. Consider postponing or adjusting other categories.`,
+        actionExecuted: true,
       };
     }
   }
 
-  // General helpful AI reply
+  // -------------------------------------------------------------------
+  // FALLBACK: General Unsupported / Helpful Query Response
+  // -------------------------------------------------------------------
   return {
-    message: `🤖 **SpendTrack AI CFO Assistant**\n\nI can help you manage your finances directly in PostgreSQL! Try asking:\n\n` +
-      `• *"I spent ₹240 at Swiggy"*\n` +
-      `• *"Add ₹5000 salary"*\n` +
-      `• *"Show this month's spending"*\n` +
-      `• *"How much can I save?"*\n` +
-      `• *"When is my next EMI?"*`,
+    message: `🤖 **SpendTrack AI Financial Copilot**\n\n` +
+      `I couldn't find a direct match for that specific question, but I can answer questions about your real financial data!\n\n` +
+      `Try asking one of these questions:\n` +
+      `• *How much did I spend this month?*\n` +
+      `• *Where am I spending the most?*\n` +
+      `• *How much budget do I have left?*\n` +
+      `• *What bills are coming next?*\n` +
+      `• *Show my recent expenses.*\n` +
+      `• *Can I afford ₹5,000?*`,
   };
 }

@@ -322,41 +322,35 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
     try {
       const isOffline = !navigator.onLine;
 
-      const expensePayloads: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>[] = items.map((it) => ({
+      const singleTransactionPayload: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'> = {
         purchaseDate,
-        itemName: it.name,
-        category: it.category || category,
-        merchant,
+        itemName: merchant.trim() || 'Receipt Purchase',
+        category,
+        merchant: merchant.trim(),
         taxAmount,
         currency,
         invoiceNumber,
         paymentMethod,
-        quantity: Number(it.quantity) || 1,
-        unit: it.unit || 'unit',
-        totalPrice: Number(it.price) || 0,
-        pricePerUnit: Number(it.price) / (Number(it.quantity) || 1),
+        totalPrice: totalPriceCalculated,
         notes: `Receipt AI ${invoiceNumber ? `[Inv: ${invoiceNumber}]` : ''} ${isOffline ? '[Pending Sync]' : ''}`.trim(),
-        receiptDriveFileId,
+        receiptDriveFileId: receiptDriveFileId || `rec_${Date.now()}`,
         receiptFileName: receiptFileName || selectedFile?.name || 'Receipt.jpg',
-        receiptViewLink,
+        receiptViewLink: receiptViewLink || previewUrl || '#',
         source: 'receipt',
-      }));
+      };
 
       if (isOffline) {
-        for (const payload of expensePayloads) {
-          await offlineSyncManager.queueMutation('expenses', 'CREATE', payload);
-        }
+        await offlineSyncManager.queueMutation('expenses', 'CREATE', singleTransactionPayload);
       } else {
         try {
-          const subtotalCalculated = items.reduce((sum, it) => sum + (Number(it.price) || 0), 0);
           await SpendTrackApi.saveReceiptVault({
             merchant,
             invoiceNumber,
             purchaseDate,
-            subtotal: subtotalCalculated,
+            subtotal: totalPriceCalculated,
             discount: 0,
             taxAmount,
-            total: subtotalCalculated + (taxAmount || 0),
+            total: totalPriceCalculated + (taxAmount || 0),
             paymentMethod,
             currency,
             receiptImage: previewUrl,
@@ -374,11 +368,11 @@ export const ReceiptScannerModal: React.FC<ReceiptScannerModalProps> = ({
         }
       }
 
-      await onSaveExpenses(expensePayloads);
+      await onSaveExpenses([singleTransactionPayload]);
       handleReset();
       onClose();
     } catch (err: any) {
-      console.error('Failed to save receipt expenses:', err);
+      console.error('Failed to save receipt expense:', err);
       setErrorMessage(err.message || 'Failed to save transaction to database.');
     } finally {
       setIsSaving(false);

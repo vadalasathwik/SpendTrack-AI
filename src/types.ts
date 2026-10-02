@@ -61,6 +61,7 @@ export interface CategoryItem {
   icon?: string;
   userId?: string;
   createdAt?: string;
+  allocatedBudget?: number;
 }
 
 export interface MonthlyItem {

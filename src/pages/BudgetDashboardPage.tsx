@@ -1,22 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Wallet,
-  TrendingDown,
-  PiggyBank,
   Edit3,
   Calendar,
-  RefreshCw,
-  AlertTriangle,
   X,
   PieChart,
-  Sparkles,
-  Sliders,
-  DollarSign,
-  CheckCircle2,
+  Plus,
+  ShoppingBag,
+  Utensils,
+  Fuel,
+  FileText,
+  CreditCard,
+  Award,
+  ShieldCheck,
+  Check,
+  Tag,
 } from 'lucide-react';
 import { SpendTrackApi } from '../services/api.js';
-import { BudgetRing } from '../components/ui/BudgetRing.js';
-import { GlassCard } from '../components/ui/GlassCard.js';
+import { formatCurrency } from '../utils/calculations.js';
+import { Expense, UserSettings } from '../types.js';
 
 interface BudgetSummary {
   budget: number;
@@ -30,7 +32,18 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-export const BudgetDashboardPage: React.FC = () => {
+interface BudgetDashboardPageProps {
+  expenses?: Expense[];
+  userSettings?: UserSettings;
+  onOpenAddExpense?: () => void;
+  onOpenOnboarding?: () => void;
+}
+
+export const BudgetDashboardPage: React.FC<BudgetDashboardPageProps> = ({
+  expenses = [],
+  userSettings,
+  onOpenAddExpense,
+}) => {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState<number>(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());
@@ -41,67 +54,39 @@ export const BudgetDashboardPage: React.FC = () => {
     remaining: 0,
     percentage: 0,
   });
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [envelopeData, setEnvelopeData] = useState<any>(null);
+  const [, setCategoryBudgets] = useState<any[]>([]);
 
-  // Intelligent Budget Engine Income inputs
-  const [salaryIncome, setSalaryIncome] = useState('0');
-  const [bonusIncome, setBonusIncome] = useState('0');
-  const [rentalIncome, setRentalIncome] = useState('0');
-  const [sideIncome, setSideIncome] = useState('0');
-
-  // AI Recommended Allocation Overrides
-  const [livingPercent, setLivingPercent] = useState(35);
-  const [emiPercent, setEmiPercent] = useState(25);
-  const [invPercent, setInvPercent] = useState(20);
-  const [savingsPercent, setSavingsPercent] = useState(15);
-  const [lifestylePercent, setLifestylePercent] = useState(5);
-
-  // Edit Budget Modal state
+  // Set Budget Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
   const [budgetInput, setBudgetInput] = useState<string>('');
   const [isSavingBudget, setIsSavingBudget] = useState<boolean>(false);
 
-  const totalIncome =
-    (parseFloat(salaryIncome) || 0) +
-    (parseFloat(bonusIncome) || 0) +
-    (parseFloat(rentalIncome) || 0) +
-    (parseFloat(sideIncome) || 0);
-
-  const [envelopeData, setEnvelopeData] = useState<any>(null);
-
   const fetchSummary = async () => {
-    setLoading(true);
-    setError(null);
     try {
-      const data = await SpendTrackApi.getBudgetSummary(selectedMonth, selectedYear);
-      if (data) {
-        setSummary(data);
-      }
-      const env = await SpendTrackApi.getEnvelopes(selectedMonth, selectedYear);
-      setEnvelopeData(env);
+      const [summaryRes, envRes, catBudgetsRes] = await Promise.all([
+        SpendTrackApi.getBudgetSummary(selectedMonth, selectedYear).catch(() => null),
+        SpendTrackApi.getEnvelopes(selectedMonth, selectedYear).catch(() => null),
+        SpendTrackApi.getCategoryBudgets(selectedMonth, selectedYear).catch(() => []),
+      ]);
 
-      const incomes = await SpendTrackApi.getIncomes().catch(() => []);
-      if (Array.isArray(incomes) && incomes.length > 0) {
-        const sal = incomes.find((i: any) => i.title.toLowerCase().includes('salary'));
-        const ren = incomes.find((i: any) => i.title.toLowerCase().includes('rental'));
-        const bon = incomes.find((i: any) => i.title.toLowerCase().includes('bonus'));
-        const sid = incomes.find((i: any) => i.title.toLowerCase().includes('side') || i.title.toLowerCase().includes('passive'));
-        if (sal) setSalaryIncome(String(sal.amount));
-        if (ren) setRentalIncome(String(ren.amount));
-        if (bon) setBonusIncome(String(bon.amount));
-        if (sid) setSideIncome(String(sid.amount));
+      if (summaryRes) {
+        setSummary(summaryRes);
+      }
+      if (envRes) {
+        setEnvelopeData(envRes);
+      }
+      if (Array.isArray(catBudgetsRes)) {
+        setCategoryBudgets(catBudgetsRes);
       }
     } catch (err: any) {
       console.error('Failed to fetch budget summary:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchSummary();
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, expenses.length]);
 
   const handleSaveBudget = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,470 +105,414 @@ export const BudgetDashboardPage: React.FC = () => {
     }
   };
 
-  const formattedMonthYear = `${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`;
+  // Real-time client expenses calculation for selected month
+  const clientMonthExpenses = useMemo(() => {
+    return expenses.filter((exp) => {
+      const d = new Date(exp.spentAt || exp.purchaseDate || exp.createdAt || '');
+      return !isNaN(d.getTime()) && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
+    });
+  }, [expenses, selectedMonth, selectedYear]);
 
-  // Base monthly budget for targets
-  const targetMonthlyBudget = summary.budget > 0 ? summary.budget : 0;
+  const clientTotalSpent = useMemo(() => {
+    return clientMonthExpenses.reduce(
+      (sum, e) => sum + (Number(e.totalPrice) || Number(e.amount) || 0),
+      0
+    );
+  }, [clientMonthExpenses]);
 
-  const plannedLiving = Math.round((targetMonthlyBudget * livingPercent) / 100);
-  const plannedEmi = Math.round((targetMonthlyBudget * emiPercent) / 100);
-  const plannedInv = Math.round((targetMonthlyBudget * invPercent) / 100);
-  const plannedSavings = Math.round((targetMonthlyBudget * savingsPercent) / 100);
-  const plannedLifestyle = Math.round((targetMonthlyBudget * lifestylePercent) / 100);
+  // Effective budget metrics
+  const effectiveBudget = summary.budget > 0 ? summary.budget : (Number(userSettings?.monthlyBudget) || 0);
+  const effectiveSpent = Math.max(summary.spent, clientTotalSpent);
+  const effectiveRemaining = effectiveBudget > 0 ? effectiveBudget - effectiveSpent : 0;
+  const effectivePercentage = effectiveBudget > 0 ? Math.min(100, Math.round((effectiveSpent / effectiveBudget) * 100)) : 0;
 
-  // Real Actual Spent per category derived from database envelope records
-  const envelopes: any[] = envelopeData?.envelopes || [];
-  const getEnvSpent = (names: string[]) => {
-    return envelopes
-      .filter((e: any) => names.includes(e.name))
-      .reduce((sum: number, e: any) => sum + (Number(e.spent) || 0), 0);
+  const monthName = MONTH_NAMES[selectedMonth - 1];
+
+  // Helper for category display names
+  const cleanCategoryName = (rawName: string) => {
+    if (rawName === 'Groceries & Food') return 'Groceries';
+    if (rawName === 'Fuel & Transport') return 'Fuel';
+    if (rawName === 'Shopping & Lifestyle') return 'Shopping';
+    if (rawName === 'Utility Bills & Internet') return 'Bills & Utilities';
+    if (rawName === 'EMI & Loan Obligations') return 'Loan EMIs';
+    if (rawName === 'Gold & Metal Accumulation') return 'Gold & Metal';
+    if (rawName === 'Emergency Liquidity Buffer') return 'Emergency Buffer';
+    if (rawName === 'Entertainment & Dining Out') return 'Dining & Entertainment';
+    return rawName;
   };
 
-  const livingActualSpent = getEnvSpent(['Groceries & Food', 'Fuel & Transport', 'Utility Bills & Internet']);
-  const emiActualSpent = getEnvSpent(['EMI & Loan Obligations']);
-  const invActualSpent = getEnvSpent(['Gold & Metal Accumulation']);
-  const savingsActualSpent = getEnvSpent(['Emergency Liquidity Buffer']);
-  const lifestyleActualSpent = getEnvSpent(['Shopping & Lifestyle', 'Entertainment & Dining Out']);
+  // Helper for category icons
+  const getCategoryIcon = (name: string) => {
+    const lower = name.toLowerCase();
+    if (lower.includes('groc') || lower.includes('food')) return <ShoppingBag className="w-5 h-5 text-emerald-400" />;
+    if (lower.includes('fuel') || lower.includes('transport')) return <Fuel className="w-5 h-5 text-amber-400" />;
+    if (lower.includes('shop')) return <ShoppingBag className="w-5 h-5 text-purple-400" />;
+    if (lower.includes('bill') || lower.includes('util')) return <FileText className="w-5 h-5 text-blue-400" />;
+    if (lower.includes('emi') || lower.includes('loan')) return <CreditCard className="w-5 h-5 text-rose-400" />;
+    if (lower.includes('gold') || lower.includes('metal')) return <Award className="w-5 h-5 text-yellow-400" />;
+    if (lower.includes('emer') || lower.includes('buffer')) return <ShieldCheck className="w-5 h-5 text-cyan-400" />;
+    if (lower.includes('din') || lower.includes('enter')) return <Utensils className="w-5 h-5 text-pink-400" />;
+    return <Tag className="w-5 h-5 text-emerald-400" />;
+  };
 
-  // Dynamic AI Budget Optimizer recommendations
-  const overspentEnv = envelopes.find((e: any) => e.allocated > 0 && e.spent > e.allocated);
-  const surplusEnv =
-    envelopes.find((e: any) => e.allocated - e.spent > 0 && e.name.includes('Emergency')) ||
-    envelopes.find((e: any) => e.allocated - e.spent > 0 && e.name !== overspentEnv?.name);
+  // Process envelope data
+  const rawEnvelopes: any[] = envelopeData?.envelopes || [];
+  const processedCategoryProgress = useMemo(() => {
+    if (rawEnvelopes.length > 0) {
+      return rawEnvelopes.map((env: any) => {
+        const displayName = cleanCategoryName(env.name);
 
-  let shiftText = "All envelopes are within allocated limits this month.";
-  if (overspentEnv) {
-    const overspendAmt = Math.round(overspentEnv.spent - overspentEnv.allocated);
-    const fromName = surplusEnv ? surplusEnv.name : "Emergency Liquidity Buffer";
-    shiftText = `Move ₹${overspendAmt.toLocaleString('en-IN')} from ${fromName} to ${overspentEnv.name} this month.`;
-  } else if (summary.budget === 0) {
-    shiftText = `No budget target set for ${formattedMonthYear}. Set a target to enable envelope shift optimization.`;
-  }
+        const clientCatSpent = clientMonthExpenses
+          .filter((exp) => {
+            const cat = (exp.category || '').toLowerCase();
+            const item = (exp.itemName || exp.merchant || '').toLowerCase();
+            const displayNameLower = displayName.toLowerCase();
+            return cat.includes(displayNameLower) || item.includes(displayNameLower);
+          })
+          .reduce((sum, e) => sum + (Number(e.totalPrice) || Number(e.amount) || 0), 0);
 
-  let safeDiscretionaryText = "";
-  if (summary.budget > 0) {
-    if (summary.remaining > 0) {
-      safeDiscretionaryText = `You have ₹${summary.remaining.toLocaleString('en-IN')} unallocated cash buffer remaining for non-essential purchases.`;
-    } else {
-      safeDiscretionaryText = "No discretionary spend buffer remaining for this month.";
+        const spent = Math.max(Number(env.spent) || 0, clientCatSpent);
+        const allocated = Number(env.allocated) || 0;
+        const remaining = allocated - spent;
+        const progress = allocated > 0 ? Math.min(100, Math.round((spent / allocated) * 100)) : (spent > 0 ? 100 : 0);
+
+        return {
+          id: env.id || env.name,
+          rawName: env.name,
+          displayName,
+          spent,
+          allocated,
+          remaining,
+          progress,
+        };
+      });
     }
-  } else {
-    safeDiscretionaryText = "Not enough transaction or budget history yet.";
-  }
 
-  const goldEnv = envelopes.find((e: any) => e.name === 'Gold & Metal Accumulation');
-  const goldCap = goldEnv
-    ? Math.max(0, goldEnv.allocated - goldEnv.spent)
-    : 0;
+    const defaults = [
+      { rawName: 'Groceries & Food', displayName: 'Groceries', allocated: 7000 },
+      { rawName: 'Fuel & Transport', displayName: 'Fuel', allocated: 4000 },
+      { rawName: 'Shopping & Lifestyle', displayName: 'Shopping', allocated: 3000 },
+      { rawName: 'Utility Bills & Internet', displayName: 'Bills & Utilities', allocated: 3500 },
+      { rawName: 'Entertainment & Dining Out', displayName: 'Dining & Entertainment', allocated: 2500 },
+    ];
 
-  let goldCapacityText = "";
-  if (summary.budget > 0) {
-    if (goldCap > 0) {
-      goldCapacityText = `You have ₹${goldCap.toLocaleString('en-IN')} of available Gold allocation remaining this month.`;
-    } else {
-      goldCapacityText = "No Gold allocation is currently available this month.";
-    }
-  } else {
-    goldCapacityText = "No monthly budget is configured for this month.";
-  }
+    return defaults.map((d) => {
+      const clientCatSpent = clientMonthExpenses
+        .filter((exp) => {
+          const cat = (exp.category || '').toLowerCase();
+          const item = (exp.itemName || exp.merchant || '').toLowerCase();
+          const dLower = d.displayName.toLowerCase();
+          return cat.includes(dLower) || item.includes(dLower);
+        })
+        .reduce((sum, e) => sum + (Number(e.totalPrice) || Number(e.amount) || 0), 0);
+
+      const spent = clientCatSpent;
+      const allocated = d.allocated;
+      const remaining = allocated - spent;
+      const progress = allocated > 0 ? Math.min(100, Math.round((spent / allocated) * 100)) : 0;
+
+      return {
+        id: d.displayName,
+        rawName: d.rawName,
+        displayName: d.displayName,
+        spent,
+        allocated,
+        remaining,
+        progress,
+      };
+    });
+  }, [rawEnvelopes, clientMonthExpenses]);
 
   return (
-    <div className="space-y-6 pb-28 max-w-[1440px] mx-auto animate-in fade-in duration-300">
-      {/* Hero Header Card */}
-      <GlassCard padding="p-6 sm:p-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
-              <PieChart className="w-7 h-7 stroke-[2]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-black text-white tracking-tight">Intelligent Budget Engine</h1>
-                <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase tracking-widest">
-                  v4.0 AI Allocation
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 font-medium mt-1">
-                PostgreSQL budget tracking, AI recommended allocations, and burn-rate intelligence
-              </p>
-            </div>
+    <div className="space-y-6 pb-28 max-w-2xl mx-auto animate-in fade-in duration-200">
+      {/* Top Header & Month Filter */}
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 mb-0.5">
+            <PieChart className="w-3.5 h-3.5" />
+            <span>Budget Control</span>
           </div>
-
-          <div className="flex items-center gap-2.5 flex-wrap self-start md:self-auto">
-            <div className="flex items-center gap-2 bg-slate-900/80 border border-white/10 rounded-2xl px-3 py-1.5 text-xs font-bold text-white">
-              <Calendar className="w-4 h-4 text-emerald-400" />
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                className="bg-transparent text-white focus:outline-none cursor-pointer font-bold"
-              >
-                {MONTH_NAMES.map((name, idx) => (
-                  <option key={name} value={idx + 1} className="bg-slate-900 text-white">
-                    {name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(Number(e.target.value))}
-                className="bg-transparent text-white focus:outline-none cursor-pointer font-bold"
-              >
-                {[2024, 2025, 2026, 2027].map((y) => (
-                  <option key={y} value={y} className="bg-slate-900 text-white">
-                    {y}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <button
-              onClick={() => setIsEditModalOpen(true)}
-              className="px-4 py-2 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition-all cursor-pointer active:scale-95"
-            >
-              <Edit3 className="w-4 h-4" />
-              <span>Set Target</span>
-            </button>
-          </div>
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+            Monthly Budget
+          </h1>
         </div>
 
-        {/* Budget Ring & Progress */}
-        <div className="pt-6">
-          <BudgetRing
-            percentage={summary.percentage}
-            spent={summary.spent}
-            budget={summary.budget}
-            remaining={summary.remaining}
-          />
+        {/* Month Selector Pills */}
+        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-2xl px-3 py-1.5 text-xs font-bold text-slate-900 dark:text-white shadow-xs">
+          <Calendar className="w-4 h-4 text-emerald-500" />
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(Number(e.target.value))}
+            className="bg-transparent text-slate-900 dark:text-white focus:outline-none cursor-pointer font-bold"
+          >
+            {MONTH_NAMES.map((name, idx) => (
+              <option key={name} value={idx + 1} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                {name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            className="bg-transparent text-slate-900 dark:text-white focus:outline-none cursor-pointer font-bold"
+          >
+            {[2024, 2025, 2026, 2027].map((y) => (
+              <option key={y} value={y} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
+                {y}
+              </option>
+            ))}
+          </select>
         </div>
-      </GlassCard>
-
-      {/* SECTION 1: Income Inflow Engine */}
-      <GlassCard padding="p-6">
-        <h3 className="text-base font-black text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-          <DollarSign className="w-4.5 h-4.5 text-emerald-400" />
-          Income Sources & Inflow Breakdown
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-300 mb-1.5">Primary Salary (₹)</label>
-            <input
-              type="number"
-              value={salaryIncome}
-              onChange={(e) => setSalaryIncome(e.target.value)}
-              className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-white/10 text-xs font-bold text-white focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-300 mb-1.5">Bonus / Incentives (₹)</label>
-            <input
-              type="number"
-              value={bonusIncome}
-              onChange={(e) => setBonusIncome(e.target.value)}
-              className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-white/10 text-xs font-bold text-white focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-300 mb-1.5">Rental Income (₹)</label>
-            <input
-              type="number"
-              value={rentalIncome}
-              onChange={(e) => setRentalIncome(e.target.value)}
-              className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-white/10 text-xs font-bold text-white focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-300 mb-1.5">Side Inflow (₹)</label>
-            <input
-              type="number"
-              value={sideIncome}
-              onChange={(e) => setSideIncome(e.target.value)}
-              className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-white/10 text-xs font-bold text-white focus:outline-none focus:border-emerald-500"
-            />
-          </div>
-        </div>
-
-        <div className="mt-4 p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 flex items-center justify-between">
-          <span className="text-xs font-extrabold text-slate-300">Total Monthly Verified Inflow:</span>
-          <span className="text-lg font-black text-emerald-400 font-mono">₹{totalIncome.toLocaleString('en-IN')}</span>
-        </div>
-      </GlassCard>
-
-      {/* ENVELOPE BUDGETING SYSTEM */}
-      <GlassCard padding="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
-              <Wallet className="w-4.5 h-4.5 text-indigo-400" />
-              Envelope Budgeting System ({envelopeData?.envelopes?.length || 8} Envelopes)
-            </h3>
-            <p className="text-xs text-slate-400">Strict allocation boundaries with carry-forward support</p>
-          </div>
-          <span className="text-xs font-bold text-indigo-400">
-            Remaining Total: ₹{envelopeData?.summary?.totalRemaining?.toLocaleString('en-IN') || 0}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {envelopeData?.envelopes?.map((env: any) => (
-            <div key={env.id} className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-white truncate">{env.name}</span>
-                {env.carryForward && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold">CARRY</span>
-                )}
-              </div>
-              <div className="flex items-end justify-between">
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Spent / Allocated</span>
-                  <span className="text-sm font-black text-white">
-                    ₹{env.spent?.toLocaleString('en-IN')} / ₹{env.allocated?.toLocaleString('en-IN')}
-                  </span>
-                </div>
-                <span className={`text-xs font-black ${env.progress > 90 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                  {env.progress}%
-                </span>
-              </div>
-              {/* Progress bar */}
-              <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    env.progress > 90 ? 'bg-rose-500' : env.progress > 70 ? 'bg-amber-500' : 'bg-emerald-500'
-                  }`}
-                  style={{ width: `${Math.min(100, env.progress)}%` }}
-                ></div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </GlassCard>
-
-      {/* SMART SPENDING RULES & AI BUDGET OPTIMIZER */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Smart Spending Rules */}
-        <GlassCard padding="p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-              <Sliders className="w-4 h-4 text-purple-400" /> Smart Spending Automation Rules
-            </h3>
-            <span className="text-[10px] text-slate-400">Merchant → Category/Envelope</span>
-          </div>
-          <div className="space-y-2 text-xs">
-            <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
-              <span>Swiggy / Zomato</span>
-              <span className="font-bold text-emerald-400">→ Food & Dining Envelope</span>
-            </div>
-            <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
-              <span>HP / IndianOil</span>
-              <span className="font-bold text-amber-400">→ Fuel & Transport Envelope</span>
-            </div>
-            <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
-              <span>HDFC EMI / SBI EMI</span>
-              <span className="font-bold text-purple-400">→ EMI & Loan Envelope</span>
-            </div>
-            <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
-              <span>MMTC-PAMP / Tanishq</span>
-              <span className="font-bold text-yellow-400">→ Gold & Metal Envelope</span>
-            </div>
-          </div>
-        </GlassCard>
-
-        {/* AI Budget Optimizer */}
-        <GlassCard padding="p-5" className="border-l-4 border-l-violet-500">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-violet-400" /> AI Budget Optimizer
-            </h3>
-            <span className="text-[10px] font-bold text-emerald-400">LIVE OPTIMIZATION</span>
-          </div>
-          <div className="space-y-2 text-xs text-slate-300">
-            <p className="p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20">
-              💡 <span className="font-bold text-white">Suggested Envelope Shift:</span> {shiftText}
-            </p>
-            <p className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-              ⚡ <span className="font-bold text-white">Safe Discretionary Spend:</span> {safeDiscretionaryText}
-            </p>
-            <p className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
-              🏆 <span className="font-bold text-white">Gold Capacity:</span> {goldCapacityText}
-            </p>
-          </div>
-        </GlassCard>
       </div>
 
-      {/* SECTION 2: AI Recommended Allocations & Variance Table */}
-      <GlassCard padding="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
-            <Sparkles className="w-4.5 h-4.5 text-violet-400" />
-            AI Recommended Allocations vs Actual
-          </h3>
-          <span className="text-[10px] font-extrabold px-3 py-1 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30 uppercase tracking-widest">
-            50/30/20 Rule + AI
-          </span>
+      {/* ------------------------------------------------------------- */}
+      {/* 1. Primary Summary Card                                        */}
+      {/* ------------------------------------------------------------- */}
+      <div className="p-5 sm:p-6 rounded-[28px] bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-slate-800 text-white shadow-xl space-y-5 relative overflow-hidden">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-black uppercase tracking-wider text-emerald-400">
+              {monthName} Budget
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5 font-medium">
+              Overall monthly allocation & spending status
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setBudgetInput(effectiveBudget > 0 ? String(effectiveBudget) : '');
+              setIsEditModalOpen(true);
+            }}
+            className="px-3.5 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+            <span>{effectiveBudget > 0 ? 'Edit Target' : 'Set Target'}</span>
+          </button>
         </div>
 
-        <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-white/10 text-slate-400 uppercase tracking-wider font-extrabold">
-                <th className="py-3 px-3">Category</th>
-                <th className="py-3 px-3">AI Suggested %</th>
-                <th className="py-3 px-3">Planned Target</th>
-                <th className="py-3 px-3">Actual Spent</th>
-                <th className="py-3 px-3">Difference</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5 font-semibold text-slate-200">
-              <tr>
-                <td className="py-3 px-3 font-bold text-white">Living Expenses</td>
-                <td className="py-3 px-3">
-                  <input
-                    type="number"
-                    value={livingPercent}
-                    onChange={(e) => setLivingPercent(Number(e.target.value))}
-                    className="w-16 px-2 py-1 rounded-lg bg-slate-900 border border-white/10 text-white font-bold"
-                  /> %
-                </td>
-                <td className="py-3 px-3 font-mono">₹{plannedLiving.toLocaleString('en-IN')}</td>
-                <td className="py-3 px-3 font-mono text-rose-400">₹{livingActualSpent.toLocaleString('en-IN')}</td>
-                <td className="py-3 px-3 font-mono">
-                  {plannedLiving - livingActualSpent >= 0 ? (
-                    <span className="text-emerald-400">+₹{(plannedLiving - livingActualSpent).toLocaleString('en-IN')}</span>
-                  ) : (
-                    <span className="text-rose-400">-₹{Math.abs(plannedLiving - livingActualSpent).toLocaleString('en-IN')}</span>
-                  )}
-                </td>
-              </tr>
+        {/* 3 Core KPI Metrics Grid */}
+        <div className="grid grid-cols-3 gap-2.5 p-4 rounded-2xl bg-slate-950/80 border border-slate-800/90 text-center">
+          {/* KPI 1: October Budget */}
+          <div className="min-w-0">
+            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block truncate">
+              {monthName} Budget
+            </span>
+            <p className="text-base sm:text-lg font-black text-white tracking-tight truncate mt-1 font-mono">
+              {effectiveBudget > 0 ? formatCurrency(effectiveBudget) : '₹0'}
+            </p>
+          </div>
 
-              <tr>
-                <td className="py-3 px-3 font-bold text-white">Loan EMIs</td>
-                <td className="py-3 px-3">
-                  <input
-                    type="number"
-                    value={emiPercent}
-                    onChange={(e) => setEmiPercent(Number(e.target.value))}
-                    className="w-16 px-2 py-1 rounded-lg bg-slate-900 border border-white/10 text-white font-bold"
-                  /> %
-                </td>
-                <td className="py-3 px-3 font-mono">₹{plannedEmi.toLocaleString('en-IN')}</td>
-                <td className="py-3 px-3 font-mono text-purple-400">₹{emiActualSpent.toLocaleString('en-IN')}</td>
-                <td className="py-3 px-3 font-mono">
-                  {plannedEmi - emiActualSpent >= 0 ? (
-                    <span className="text-emerald-400">+₹{(plannedEmi - emiActualSpent).toLocaleString('en-IN')}</span>
-                  ) : (
-                    <span className="text-rose-400">-₹{Math.abs(plannedEmi - emiActualSpent).toLocaleString('en-IN')}</span>
-                  )}
-                </td>
-              </tr>
+          {/* KPI 2: Spent */}
+          <div className="min-w-0 border-x border-slate-800/90 px-1">
+            <span className="text-[10px] font-extrabold text-rose-400 uppercase tracking-wider block truncate">
+              Spent
+            </span>
+            <p className="text-base sm:text-lg font-black text-rose-300 tracking-tight truncate mt-1 font-mono">
+              {formatCurrency(effectiveSpent)}
+            </p>
+          </div>
 
-              <tr>
-                <td className="py-3 px-3 font-bold text-white">Investments & SIPs</td>
-                <td className="py-3 px-3">
-                  <input
-                    type="number"
-                    value={invPercent}
-                    onChange={(e) => setInvPercent(Number(e.target.value))}
-                    className="w-16 px-2 py-1 rounded-lg bg-slate-900 border border-white/10 text-white font-bold"
-                  /> %
-                </td>
-                <td className="py-3 px-3 font-mono">₹{plannedInv.toLocaleString('en-IN')}</td>
-                <td className="py-3 px-3 font-mono text-blue-400">₹{invActualSpent.toLocaleString('en-IN')}</td>
-                <td className="py-3 px-3 font-mono">
-                  {plannedInv - invActualSpent >= 0 ? (
-                    <span className="text-emerald-400">+₹{(plannedInv - invActualSpent).toLocaleString('en-IN')}</span>
-                  ) : (
-                    <span className="text-rose-400">-₹{Math.abs(plannedInv - invActualSpent).toLocaleString('en-IN')}</span>
-                  )}
-                </td>
-              </tr>
-
-              <tr>
-                <td className="py-3 px-3 font-bold text-white">Emergency Savings</td>
-                <td className="py-3 px-3">
-                  <input
-                    type="number"
-                    value={savingsPercent}
-                    onChange={(e) => setSavingsPercent(Number(e.target.value))}
-                    className="w-16 px-2 py-1 rounded-lg bg-slate-900 border border-white/10 text-white font-bold"
-                  /> %
-                </td>
-                <td className="py-3 px-3 font-mono">₹{plannedSavings.toLocaleString('en-IN')}</td>
-                <td className="py-3 px-3 font-mono text-amber-400">₹{savingsActualSpent.toLocaleString('en-IN')}</td>
-                <td className="py-3 px-3 font-mono">
-                  {plannedSavings - savingsActualSpent >= 0 ? (
-                    <span className="text-emerald-400">+₹{(plannedSavings - savingsActualSpent).toLocaleString('en-IN')}</span>
-                  ) : (
-                    <span className="text-rose-400">-₹{Math.abs(plannedSavings - savingsActualSpent).toLocaleString('en-IN')}</span>
-                  )}
-                </td>
-              </tr>
-
-              <tr>
-                <td className="py-3 px-3 font-bold text-white">Lifestyle & Discretionary</td>
-                <td className="py-3 px-3">
-                  <input
-                    type="number"
-                    value={lifestylePercent}
-                    onChange={(e) => setLifestylePercent(Number(e.target.value))}
-                    className="w-16 px-2 py-1 rounded-lg bg-slate-900 border border-white/10 text-white font-bold"
-                  /> %
-                </td>
-                <td className="py-3 px-3 font-mono">₹{plannedLifestyle.toLocaleString('en-IN')}</td>
-                <td className="py-3 px-3 font-mono text-rose-400">₹{lifestyleActualSpent.toLocaleString('en-IN')}</td>
-                <td className="py-3 px-3 font-mono">
-                  {plannedLifestyle - lifestyleActualSpent >= 0 ? (
-                    <span className="text-emerald-400">+₹{(plannedLifestyle - lifestyleActualSpent).toLocaleString('en-IN')}</span>
-                  ) : (
-                    <span className="text-rose-400">-₹{Math.abs(plannedLifestyle - lifestyleActualSpent).toLocaleString('en-IN')}</span>
-                  )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          {/* KPI 3: Remaining */}
+          <div className="min-w-0">
+            <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-wider block truncate">
+              Remaining
+            </span>
+            <p
+              className={`text-base sm:text-lg font-black tracking-tight truncate mt-1 font-mono ${
+                effectiveRemaining < 0 ? 'text-rose-400' : 'text-emerald-300'
+              }`}
+            >
+              {formatCurrency(effectiveRemaining)}
+            </p>
+          </div>
         </div>
-      </GlassCard>
 
-      {/* Edit Budget Modal */}
+        {/* Progress Bar & Percentage */}
+        <div className="space-y-2 pt-1">
+          <div className="flex items-center justify-between text-xs font-bold">
+            <span className="text-slate-300">Overall Usage</span>
+            <span
+              className={`font-mono px-2 py-0.5 rounded-full border text-[11px] ${
+                effectivePercentage >= 100
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                  : effectivePercentage >= 80
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+              }`}
+            >
+              {effectivePercentage}% Used
+            </span>
+          </div>
+
+          <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                effectivePercentage >= 100
+                  ? 'bg-gradient-to-r from-rose-500 to-rose-400 shadow-rose-500/50'
+                  : effectivePercentage >= 80
+                  ? 'bg-gradient-to-r from-amber-500 to-amber-400 shadow-amber-500/50'
+                  : 'bg-gradient-to-r from-emerald-500 to-cyan-400 shadow-emerald-500/50'
+              }`}
+              style={{ width: `${Math.min(100, effectivePercentage)}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ------------------------------------------------------------- */}
+      {/* 2. Category / Envelope Progress List                           */}
+      {/* ------------------------------------------------------------- */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <div>
+            <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-emerald-500" />
+              Category Allocations & Progress
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Live breakdown of spent vs allocated amounts by category
+            </p>
+          </div>
+          {onOpenAddExpense && (
+            <button
+              type="button"
+              onClick={onOpenAddExpense}
+              className="px-3 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Expense</span>
+            </button>
+          )}
+        </div>
+
+        {/* List of Category Progress Cards */}
+        <div className="space-y-2.5">
+          {processedCategoryProgress.map((item) => {
+            const isOverspent = item.remaining < 0;
+            return (
+              <div
+                key={item.id}
+                className="p-4 rounded-[22px] bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 shadow-xs hover:border-emerald-500/40 transition-all space-y-2.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                      {getCategoryIcon(item.displayName)}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-black text-slate-900 dark:text-white tracking-tight truncate">
+                        {item.displayName}
+                      </h3>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold truncate">
+                        {item.allocated > 0
+                          ? isOverspent
+                            ? `Over budget by ${formatCurrency(Math.abs(item.remaining))}`
+                            : `${formatCurrency(item.remaining)} remaining`
+                          : 'No category limit set'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Spending vs Allocated Ratio (e.g. ₹5,200 / ₹7,000) */}
+                  <div className="text-right shrink-0">
+                    <div className="text-sm sm:text-base font-black text-slate-900 dark:text-white font-mono tracking-tight">
+                      {formatCurrency(item.spent)}{' '}
+                      <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">
+                        / {item.allocated > 0 ? formatCurrency(item.allocated) : '∞'}
+                      </span>
+                    </div>
+                    <span
+                      className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full font-mono ${
+                        item.progress >= 100
+                          ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                          : item.progress >= 80
+                          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                          : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                      }`}
+                    >
+                      {item.progress}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-200/60 dark:border-slate-700/60">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${
+                      item.progress >= 100
+                        ? 'bg-rose-500'
+                        : item.progress >= 80
+                        ? 'bg-amber-500'
+                        : 'bg-emerald-500'
+                    }`}
+                    style={{ width: `${Math.min(100, item.progress)}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ------------------------------------------------------------- */}
+      {/* 3. Edit Overall Budget Limit Modal                            */}
+      {/* ------------------------------------------------------------- */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150">
-          <div className="fixed inset-0" onClick={() => setIsEditModalOpen(false)} aria-hidden="true" />
-          <div className="relative bg-[#0D1527] border border-white/10 w-full max-w-md rounded-[32px] p-6 space-y-4 shadow-2xl z-10">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <h3 className="text-base font-black text-white">Set Overall Budget Limit</h3>
-              <button onClick={() => setIsEditModalOpen(false)} className="p-1 rounded-xl text-slate-400 hover:text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150">
+          <div
+            className="fixed inset-0"
+            onClick={() => setIsEditModalOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-sm rounded-[24px] p-5 space-y-4 shadow-2xl z-10 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-base font-black text-slate-900 dark:text-white">
+                Set {monthName} Budget Target
+              </h3>
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleSaveBudget} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">Monthly Budget Target (₹)</label>
-                <input
-                  type="number"
-                  value={budgetInput}
-                  onChange={(e) => setBudgetInput(e.target.value)}
-                  placeholder="e.g. 90000"
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-white/10 text-white text-sm font-bold focus:outline-none focus:border-emerald-500"
-                />
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Monthly Target Amount (₹)
+                </label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm pointer-events-none select-none">₹</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    required
+                    value={budgetInput}
+                    onChange={(e) => setBudgetInput(e.target.value)}
+                    placeholder="40000"
+                    className="w-full pl-8 pr-3.5 py-2.5 text-base font-black border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-400 hover:text-white"
+                  className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors min-h-[40px]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingBudget}
-                  className="px-5 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black shadow-lg shadow-emerald-500/20"
+                  className="px-5 py-2 text-xs font-extrabold text-slate-950 bg-emerald-500 hover:bg-emerald-400 rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 min-h-[40px]"
                 >
-                  {isSavingBudget ? 'Saving...' : 'Save Target'}
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>{isSavingBudget ? 'Saving...' : 'Save Target'}</span>
                 </button>
               </div>
             </form>

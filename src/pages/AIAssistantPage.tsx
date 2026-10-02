@@ -1,61 +1,90 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Sparkles,
   Send,
   Copy,
   Check,
-  Plus,
-  MessageSquare,
+  RotateCcw,
   User as UserIcon,
   ShieldCheck,
-  Bot,
-  Target,
-  CreditCard,
-  TrendingUp,
-  Wallet,
   Activity,
-  Award,
+  PieChart,
+  Wallet,
+  Calendar,
+  Receipt,
+  CheckCircle2,
+  Loader2,
+  HelpCircle,
 } from 'lucide-react';
 import { Expense, RecurringExpense, CategoryItem, DateRange } from '../types.js';
 import { AIChatMessage } from '../services/aiService.js';
 import { parseAndExecuteLocalAiIntent } from '../services/localAiParser.js';
+import { formatCurrency } from '../utils/calculations.js';
 
 interface AIAssistantPageProps {
   expenses: Expense[];
   recurringExpenses: RecurringExpense[];
   categories?: CategoryItem[];
+  incomes?: any[];
   dateRange?: DateRange;
   initialQuestion?: string | null;
   onClearInitialQuestion?: () => void;
   onRefreshData?: () => void;
 }
 
-const QUICK_PROMPTS = [
-  'I spent ₹240 at Swiggy',
-  'Add ₹5000 salary',
-  'Show this month\'s spending',
-  'How much can I save?',
-  'When is my next EMI?',
-];
-
-const AI_COACHES = [
-  { id: 'swiggy', name: 'Record Swiggy Spend', icon: Wallet, prompt: 'I spent ₹240 at Swiggy' },
-  { id: 'salary', name: 'Add Salary Income', icon: TrendingUp, prompt: 'Add ₹5000 salary' },
-  { id: 'monthly', name: 'Monthly Spending Summary', icon: Activity, prompt: 'Show this month\'s spending' },
-  { id: 'savings', name: 'Calculate Savings Buffer', icon: Award, prompt: 'How much can I save?' },
-  { id: 'emi', name: 'Upcoming EMI Dates', icon: CreditCard, prompt: 'When is my next EMI?' },
+const SUGGESTED_PROMPTS = [
+  {
+    id: 'monthly_spend',
+    text: 'How much did I spend this month?',
+    icon: Activity,
+    badge: 'Spending',
+  },
+  {
+    id: 'top_categories',
+    text: 'Where am I spending the most?',
+    icon: PieChart,
+    badge: 'Categories',
+  },
+  {
+    id: 'budget_left',
+    text: 'How much budget do I have left?',
+    icon: Wallet,
+    badge: 'Budget',
+  },
+  {
+    id: 'upcoming_bills',
+    text: 'What bills are coming next?',
+    icon: Calendar,
+    badge: 'Bills',
+  },
+  {
+    id: 'recent_expenses',
+    text: 'Show my recent expenses.',
+    icon: Receipt,
+    badge: 'Transactions',
+  },
+  {
+    id: 'affordability',
+    text: 'Can I afford this expense?',
+    icon: CheckCircle2,
+    badge: 'Affordability',
+  },
 ];
 
 const DEFAULT_WELCOME_MESSAGE: AIChatMessage = {
   id: 'welcome-msg',
   role: 'assistant',
-  content: `Hello! I'm your **SpendTrack Local AI CFO**.\n\nI can execute database operations, parse expenses/incomes, and analyze your PostgreSQL metrics locally without external API dependencies.\n\nTry clicking any quick prompt below or type your question:`,
+  content: `Hello! I'm your **AI Financial Copilot**.\n\nAsk me questions about your monthly spending, top categories, remaining budget, upcoming bills, recent expenses, or purchase affordability.\n\nClick any suggested question above or type your natural-language question below!`,
   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
 };
 
 export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
   expenses = [],
   recurringExpenses = [],
+  categories = [],
+  incomes = [],
+  initialQuestion,
+  onClearInitialQuestion,
   onRefreshData,
 }) => {
   const [messages, setMessages] = useState<AIChatMessage[]>([DEFAULT_WELCOME_MESSAGE]);
@@ -63,19 +92,42 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Financial Context summary
-  const totalLivingExpenses = expenses.reduce((sum, e) => sum + e.totalPrice, 0);
-  const totalEmis = recurringExpenses.reduce((sum, r) => sum + r.amount, 0);
-  const totalIncome = 140000;
-  const freeCash = Math.max(0, totalIncome - (totalLivingExpenses + totalEmis));
-  const emiRatio = Math.round((totalEmis / totalIncome) * 100);
-  const savingRate = Math.round((freeCash / totalIncome) * 100);
-
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Real-time financial calculations
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+
+  const currentMonthExpenses = useMemo(() => {
+    return expenses.filter((e) => {
+      if (!e.purchaseDate) return false;
+      const d = new Date(e.purchaseDate);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+  }, [expenses, currentMonth, currentYear]);
+
+  const activeExpensesList = currentMonthExpenses.length > 0 ? currentMonthExpenses : expenses;
+  const currentMonthSpent = useMemo(() => {
+    return activeExpensesList.reduce((sum, e) => sum + (e.totalPrice || 0), 0);
+  }, [activeExpensesList]);
+
+  const totalCategoryBudget = useMemo(() => {
+    const sum = categories.reduce((acc, c) => acc + (c.allocatedBudget || 0), 0);
+    return sum > 0 ? sum : 40000;
+  }, [categories]);
+
+  const remainingBudget = totalCategoryBudget - currentMonthSpent;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    if (initialQuestion) {
+      handleSendMessage(initialQuestion);
+      if (onClearInitialQuestion) onClearInitialQuestion();
+    }
+  }, [initialQuestion]);
 
   const handleSendMessage = async (userPromptText?: string) => {
     const textToSend = userPromptText || input;
@@ -96,6 +148,8 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
       const result = await parseAndExecuteLocalAiIntent(textToSend, {
         expenses,
         recurringExpenses,
+        categories,
+        incomes,
         onRefreshData,
       });
 
@@ -129,182 +183,213 @@ export const AIAssistantPage: React.FC<AIAssistantPageProps> = ({
   };
 
   return (
-    <div className="h-[calc(100vh-140px)] min-h-[600px] max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-4 pb-20 animate-in fade-in duration-300">
-      {/* PANEL 1: Left Panel - AI Quick Intents & Sessions (3 cols) */}
-      <div className="hidden lg:flex lg:col-span-3 glass-panel rounded-[32px] p-4 flex-col justify-between overflow-y-auto custom-scrollbar shadow-2xl space-y-4">
-        <div className="space-y-4">
-          <button
-            onClick={() => setMessages([DEFAULT_WELCOME_MESSAGE])}
-            className="w-full py-3 px-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>New AI CFO Session</span>
-          </button>
-
-          <div className="space-y-2">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 px-2">
-              Quick AI Actions
-            </span>
-            <div className="space-y-1.5">
-              {AI_COACHES.map((coach) => {
-                const Icon = coach.icon;
-                return (
-                  <button
-                    key={coach.id}
-                    onClick={() => handleSendMessage(coach.prompt)}
-                    className="w-full p-3 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-white/5 hover:border-violet-500/30 text-left transition-all cursor-pointer flex items-center gap-2.5 group"
-                  >
-                    <div className="w-7 h-7 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-400 flex items-center justify-center shrink-0">
-                      <Icon className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="text-xs font-bold text-slate-300 group-hover:text-white truncate">
-                      {coach.name}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+    <div className="space-y-5 max-w-[1440px] mx-auto pb-24 text-slate-900 dark:text-white" id="ai-financial-copilot-page">
+      {/* ------------------------------------------------------------- */}
+      {/* Top Header                                                    */}
+      {/* ------------------------------------------------------------- */}
+      <div className="bg-white dark:bg-slate-900 p-6 rounded-[28px] border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-[18px] bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-200/60 dark:border-emerald-800/60">
+            <Sparkles className="w-6 h-6 stroke-[2.2]" />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+              AI Financial Copilot
+            </h1>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
+              "Ask questions about your finances."
+            </p>
           </div>
         </div>
 
-        <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 text-[11px] text-slate-400 space-y-1">
-          <span className="font-black text-white block">Local AI Intent Engine</span>
-          <p>Direct PostgreSQL API execution & zero API keys required.</p>
-        </div>
+        <button
+          type="button"
+          onClick={() => setMessages([DEFAULT_WELCOME_MESSAGE])}
+          className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all cursor-pointer self-start sm:self-center flex items-center gap-1.5"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          <span>New Chat</span>
+        </button>
       </div>
 
-      {/* PANEL 2: Center Panel - Conversation View (6 cols) */}
-      <div className="lg:col-span-6 glass-panel rounded-[32px] p-4 sm:p-6 flex flex-col justify-between shadow-2xl overflow-hidden relative">
-        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
-          {messages.map((msg) => {
-            const isUser = msg.role === 'user';
+      {/* ------------------------------------------------------------- */}
+      {/* Suggested Prompts Grid                                        */}
+      {/* ------------------------------------------------------------- */}
+      <div className="bg-white dark:bg-slate-900 p-5 rounded-[28px] border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+            <HelpCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>Suggested Questions</span>
+          </h2>
+          <span className="text-[11px] font-bold text-slate-400">Click to ask AI</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          {SUGGESTED_PROMPTS.map((prompt) => {
+            const Icon = prompt.icon;
             return (
-              <div key={msg.id} className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
-                {!isUser && (
-                  <div className="w-8 h-8 rounded-xl bg-violet-500/20 border border-violet-500/30 text-violet-400 flex items-center justify-center shrink-0">
-                    <Sparkles className="w-4 h-4" />
-                  </div>
-                )}
-
-                <div
-                  className={`max-w-[85%] rounded-[24px] p-4 text-xs sm:text-sm font-medium leading-relaxed shadow-lg ${
-                    isUser
-                      ? 'bg-emerald-500 text-slate-950 rounded-tr-xs font-semibold'
-                      : 'bg-slate-900/90 text-slate-100 border border-white/10 rounded-tl-xs'
-                  }`}
-                >
-                  <div className="whitespace-pre-wrap">{msg.content}</div>
-                  <div
-                    className={`mt-2 flex items-center justify-end gap-2 text-[10px] ${
-                      isUser ? 'text-slate-900/70 font-bold' : 'text-slate-500'
-                    }`}
-                  >
-                    <span>{msg.timestamp}</span>
-                    {!isUser && (
-                      <button
-                        onClick={() => handleCopyMessage(msg.id, msg.content)}
-                        className="hover:text-white transition-colors"
-                      >
-                        {copiedId === msg.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                      </button>
-                    )}
-                  </div>
+              <button
+                type="button"
+                key={prompt.id}
+                onClick={() => handleSendMessage(prompt.text)}
+                className="p-3.5 rounded-[20px] bg-slate-50 dark:bg-slate-800/60 hover:bg-emerald-50/60 dark:hover:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 hover:border-emerald-500/50 text-left transition-all cursor-pointer flex items-center gap-3 group active:scale-98"
+              >
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                  <Icon className="w-4 h-4 stroke-[2.5]" />
                 </div>
-
-                {isUser && (
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
-                    <UserIcon className="w-4 h-4" />
-                  </div>
-                )}
-              </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 block truncate">
+                    {prompt.text}
+                  </span>
+                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+                    {prompt.badge}
+                  </span>
+                </div>
+              </button>
             );
           })}
-
-          {isLoading && (
-            <div className="flex items-center gap-2 text-violet-400 text-xs font-bold animate-pulse p-2">
-              <Sparkles className="w-4 h-4 animate-spin" />
-              <span>AI CFO is processing query & updating PostgreSQL...</span>
-            </div>
-          )}
-
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Quick Prompts & Input */}
-        <div className="mt-4 space-y-3 pt-3 border-t border-white/10">
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-1">
-            {QUICK_PROMPTS.map((prompt) => (
-              <button
-                key={prompt}
-                onClick={() => handleSendMessage(prompt)}
-                className="px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-white/10 hover:border-emerald-500/40 text-[11px] font-bold text-slate-200 hover:text-white transition-all whitespace-nowrap cursor-pointer shadow-sm"
-              >
-                💡 {prompt}
-              </button>
-            ))}
-          </div>
-
-          <div className="relative flex items-center">
-            <input
-              type="text"
-              placeholder="Ask AI Copilot (e.g., 'I spent ₹240 at Swiggy' or 'Add ₹5000 salary')"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-              className="w-full pl-4 pr-12 py-3.5 rounded-2xl bg-slate-900 border border-white/10 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 font-medium"
-            />
-            <button
-              onClick={() => handleSendMessage()}
-              disabled={!input.trim() || isLoading}
-              className="absolute right-2.5 w-8 h-8 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center disabled:opacity-40 transition-all hover:scale-105 active:scale-95 cursor-pointer"
-            >
-              <Send className="w-4 h-4 stroke-[2.5]" />
-            </button>
-          </div>
         </div>
       </div>
 
-      {/* PANEL 3: Right Panel - Live Financial Context (3 cols) */}
-      <div className="hidden lg:flex lg:col-span-3 glass-panel rounded-[32px] p-5 flex-col justify-between shadow-2xl overflow-y-auto custom-scrollbar space-y-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-black text-white uppercase tracking-wider mb-4">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Live Financial Context</span>
+      {/* ------------------------------------------------------------- */}
+      {/* Main Conversation & Financial Summary Grid                    */}
+      {/* ------------------------------------------------------------- */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Chat Area (8 Cols) */}
+        <div className="lg:col-span-8 bg-white dark:bg-slate-900 rounded-[28px] border border-slate-200/80 dark:border-slate-800 shadow-xs p-4 sm:p-6 flex flex-col justify-between min-h-[480px] h-[calc(100vh-360px)]">
+          {/* Messages list */}
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
+            {messages.map((msg) => {
+              const isUser = msg.role === 'user';
+              return (
+                <div key={msg.id} className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
+                  {!isUser && (
+                    <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                  )}
+
+                  <div
+                    className={`max-w-[88%] sm:max-w-[80%] rounded-[22px] p-4 text-xs sm:text-sm font-medium leading-relaxed shadow-xs ${
+                      isUser
+                        ? 'bg-emerald-600 text-white rounded-tr-xs font-semibold'
+                        : 'bg-slate-100 dark:bg-slate-800/90 text-slate-900 dark:text-slate-100 border border-slate-200/80 dark:border-slate-700 rounded-tl-xs'
+                    }`}
+                  >
+                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                    <div
+                      className={`mt-2 flex items-center justify-end gap-2 text-[10px] ${
+                        isUser ? 'text-white/80 font-bold' : 'text-slate-400 font-medium'
+                      }`}
+                    >
+                      <span>{msg.timestamp}</span>
+                      {!isUser && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyMessage(msg.id, msg.content)}
+                          className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors p-0.5 cursor-pointer"
+                        >
+                          {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {isUser && (
+                    <div className="w-8 h-8 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center shrink-0 mt-0.5 font-bold">
+                      <UserIcon className="w-4 h-4" />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Loading Indicator */}
+            {isLoading && (
+              <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-bold animate-pulse">
+                <Loader2 className="w-4 h-4 animate-spin text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>AI Financial Copilot is analyzing your data...</span>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
           </div>
 
-          <div className="space-y-3">
-            <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Income Inflow</span>
-              <span className="text-base font-black text-emerald-400 font-mono">₹{totalIncome.toLocaleString('en-IN')}</span>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Living Expenses</span>
-              <span className="text-base font-black text-rose-400 font-mono">₹{totalLivingExpenses.toLocaleString('en-IN')}</span>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Free Cash</span>
-              <span className="text-base font-black text-blue-400 font-mono">₹{freeCash.toLocaleString('en-IN')}</span>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">EMI Burden Ratio</span>
-              <span className="text-base font-black text-purple-400 font-mono">{emiRatio}%</span>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Saving Velocity</span>
-              <span className="text-base font-black text-amber-400 font-mono">{savingRate}%</span>
+          {/* Natural Language Input */}
+          <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <div className="relative flex items-center">
+              <input
+                type="text"
+                placeholder="Ask questions about your finances..."
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                className="w-full pl-4 pr-12 py-3.5 rounded-[18px] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+              />
+              <button
+                type="button"
+                onClick={() => handleSendMessage()}
+                disabled={!input.trim() || isLoading}
+                className="absolute right-2 w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center disabled:opacity-40 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-xs"
+              >
+                <Send className="w-4 h-4 stroke-[2.5]" />
+              </button>
             </div>
           </div>
         </div>
 
-        <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold">
-          ✓ Realtime PostgreSQL Connected
+        {/* Live Context Summary Side Panel (4 Cols) */}
+        <div className="lg:col-span-4 space-y-4">
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-[28px] border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
+            <div className="flex items-center gap-2 text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Live Application Context</span>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3.5 rounded-[18px] bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 space-y-1">
+                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                  Current Month Spent
+                </span>
+                <span className="text-base font-black text-rose-600 dark:text-rose-400 font-mono">
+                  {formatCurrency(currentMonthSpent)}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-[18px] bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 space-y-1">
+                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                  Remaining Monthly Budget
+                </span>
+                <span className={`text-base font-black font-mono ${remainingBudget >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                  {formatCurrency(remainingBudget)}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-[18px] bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 space-y-1">
+                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                  Recorded Expenses
+                </span>
+                <span className="text-base font-black text-slate-900 dark:text-white font-mono">
+                  {expenses.length} transactions
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-[18px] bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 space-y-1">
+                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
+                  Recurring Commitments
+                </span>
+                <span className="text-base font-black text-purple-600 dark:text-purple-400 font-mono">
+                  {recurringExpenses.length} active bills
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
+              ✓ Connected to Real User Data
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 };
-

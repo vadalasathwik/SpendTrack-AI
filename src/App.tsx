@@ -11,6 +11,7 @@ import {
   User,
   Search,
   BookOpen,
+  ArrowDownLeft,
 } from 'lucide-react';
 import {
   Expense,
@@ -65,15 +66,16 @@ import { MenuTrigger } from './components/ui/MenuTrigger.js';
 import { MonthSelectorPill } from './components/ui/MonthSelectorPill.js';
 import { FloatingDock } from './components/ui/FloatingDock.js';
 import { BottomSheet } from './components/ui/BottomSheet.js';
-import { EmptyWorkspace } from './components/ui/EmptyWorkspace.js';
-import { ToastProvider } from './context/ToastContext.js';
+import { ToastProvider, useToast } from './context/ToastContext.js';
 import { ToastContainer } from './components/ui/ToastContainer.js';
+import { AddIncomeModal } from './components/AddIncomeModal.js';
 import { ConflictResolutionModal } from './components/ConflictResolutionModal.js';
 import { offlineSyncManager } from './services/offlineSyncManager.js';
 import { getCachedItems, saveAllCachedItems, OfflineMutation } from './services/offlineStore.js';
 import { getStoredThemeMode, applyThemeMode } from './utils/theme.js';
 import { OfflineBanner, SyncSuccessToast } from './components/ui/ErrorUI.js';
 import { OfflineFallbackPage } from './pages/OfflineFallbackPage.js';
+import { EmptyWorkspace } from './components/ui/EmptyWorkspace.js';
 
 
 // Pages
@@ -141,8 +143,27 @@ const getInitialDateRange = (): DateRange => {
   return getDateRangeFromPreset('currentMonth');
 };
 
-const getInitialActiveTab = (): any => {
+const getInitialActiveTab = (): string => {
   try {
+    const hash = window.location.hash.replace('#', '').trim();
+    if (hash) {
+      if (hash === 'home') return 'dashboard';
+      if (hash === 'transactions') return 'expenses';
+      if (hash === 'plan') return 'planner';
+      if (hash === 'vault') return 'wallet';
+      return hash;
+    }
+    const pathname = window.location.pathname.replace('/', '').trim();
+    if (pathname) {
+      if (pathname === 'home' || pathname === 'dashboard') return 'dashboard';
+      if (pathname === 'transactions' || pathname === 'expenses') return 'expenses';
+      if (pathname === 'plan' || pathname === 'planner') return 'planner';
+      if (pathname === 'vault' || pathname === 'wallet') return 'wallet';
+      if (pathname === 'ai' || pathname === 'copilot') return 'ai';
+      if (['inbox', 'notifications', 'budget', 'family', 'monthly-items', 'items', 'analytics', 'notebook', 'wealth', 'emis', 'investments', 'savings', 'recurring', 'categories', 'health', 'networth', 'goals', 'aicfo', 'portfolio', 'gold', 'insurance', 'documents', 'salary', 'tax', 'ai-executive', 'qr-vault', 'receipt-scanner', 'settings'].includes(pathname)) {
+        return pathname;
+      }
+    }
     const stored = localStorage.getItem(ACTIVE_TAB_STORAGE_KEY);
     if (stored) return stored;
   } catch (err) {}
@@ -150,20 +171,48 @@ const getInitialActiveTab = (): any => {
 };
 
 export function App() {
+  const { showSuccess, showError } = useToast();
+
   // Navigation State
   const [activeTab, setActiveTab] = useState<string>(getInitialActiveTab());
   const [selectedReceiptId, setSelectedReceiptId] = useState<string | null>(null);
+  const [lastSavedExpenseId, setLastSavedExpenseId] = useState<string | null>(null);
+  const [isAddIncomeOpen, setIsAddIncomeOpen] = useState(false);
   const [isMoreDrawerOpen, setIsMoreDrawerOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isQuickAddSheetOpen, setIsQuickAddSheetOpen] = useState(false);
   const [goals, setGoals] = useState<any[]>([]);
 
-  const handleSelectTab = (tab: string) => {
-    setActiveTab(tab as any);
+  const handleSelectTab = (tab: string, pushHistory = true) => {
+    setActiveTab(tab);
     try {
       localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, tab);
+      if (pushHistory && window.location.hash !== `#${tab}`) {
+        window.history.pushState({ tab }, '', `#${tab}`);
+      }
     } catch (err) {}
   };
+
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const hash = window.location.hash.replace('#', '').trim();
+      if (hash) {
+        let mapped = hash;
+        if (hash === 'home') mapped = 'dashboard';
+        if (hash === 'transactions') mapped = 'expenses';
+        if (hash === 'plan') mapped = 'planner';
+        if (hash === 'vault') mapped = 'wallet';
+        setActiveTab(mapped);
+      }
+    };
+
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
+  }, []);
 
   // Theme State with Persistence
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
@@ -273,6 +322,7 @@ export function App() {
 
   // Modals & Assistant State
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [addExpenseInitialMode, setAddExpenseInitialMode] = useState<'manual' | 'scan'>('manual');
   const [autoOpenRecurringModal, setAutoOpenRecurringModal] = useState(false);
   const [isScanReceiptOpen, setIsScanReceiptOpen] = useState(false);
   const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
@@ -761,6 +811,7 @@ export function App() {
   const handleSaveExpense = async (expenseData: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>) => {
     setSyncStatus({ state: 'saving' });
     try {
+      let savedId = '';
       if (editingExpense) {
         const { result } = await offlineSyncManager.executeMutation<Expense>(
           'expenses',
@@ -770,6 +821,8 @@ export function App() {
           () => SpendTrackApi.updateExpense(editingExpense.id, expenseData)
         );
         setExpenses((prev) => prev.map((e) => (e.id === editingExpense.id ? result : e)));
+        savedId = result.id;
+        showSuccess('Expense Updated!', `Updated "${expenseData.itemName}" (₹${expenseData.totalPrice})`);
       } else {
         const tempId = `exp_${Date.now()}`;
         const { result } = await offlineSyncManager.executeMutation<Expense>(
@@ -780,10 +833,15 @@ export function App() {
           () => SpendTrackApi.createExpense(expenseData)
         );
         setExpenses((prev) => [result, ...prev]);
+        savedId = result.id;
+        showSuccess('Expense Saved!', `Recorded "${expenseData.itemName}" (₹${expenseData.totalPrice})`);
       }
+      setLastSavedExpenseId(savedId);
+      setActiveTab('expenses');
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
       setSyncStatus({ state: 'error', errorMessage: err.message });
+      showError('Failed to Save Expense', err.message || 'Saving error');
       throw err;
     }
   };
@@ -806,9 +864,15 @@ export function App() {
         createdItems.push(result);
       }
       setExpenses((prev) => [...createdItems, ...prev]);
+      if (createdItems.length > 0) {
+        setLastSavedExpenseId(createdItems[0].id);
+        showSuccess('Receipt Scanned!', `Recorded ${createdItems.length} expenses`);
+        setActiveTab('expenses');
+      }
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
       setSyncStatus({ state: 'error', errorMessage: err.message });
+      showError('Failed to Save Scanned Expenses', err.message || 'Saving error');
       throw err;
     }
   };
@@ -824,9 +888,11 @@ export function App() {
         () => SpendTrackApi.deleteExpense(expense.id)
       );
       setExpenses((prev) => prev.filter((e) => e.id !== expense.id));
+      showSuccess('Expense Deleted', `Removed "${expense.itemName}"`);
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
       setSyncStatus({ state: 'error', errorMessage: err.message });
+      showError('Failed to Delete Expense', err.message || 'Delete error');
       throw err;
     }
   };
@@ -837,9 +903,11 @@ export function App() {
     try {
       const created = await SpendTrackApi.createCategory(data);
       setCategories((prev) => [...prev.filter((c) => c.name !== created.name), created]);
+      showSuccess('Category Created!', `Added "${created.name}"`);
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
       setSyncStatus({ state: 'error', errorMessage: err.message });
+      showError('Failed to Create Category', err.message);
       throw err;
     }
   };
@@ -974,7 +1042,7 @@ export function App() {
   };
 
   // Notebook & Planner Handlers
-  const handleAddIncome = async (data: { title: string; amount: number }) => {
+  const handleAddIncome = async (data: { title: string; amount: number; date?: string; paymentMethod?: string; notes?: string }) => {
     setSyncStatus({ state: 'saving' });
     try {
       const tempId = `inc_${Date.now()}`;
@@ -985,12 +1053,16 @@ export function App() {
         tempId,
         () => SpendTrackApi.createIncome(data)
       );
-      setIncomes((prev) => [...prev, result]);
+      setIncomes((prev) => [result, ...prev]);
       const summary = await SpendTrackApi.getPlannerSummary().catch(() => ({ income: 0, emi: 0, investments: 0, savings: 0, living: 0, buffer: 0 }));
       setPlannerSummary(summary);
+      showSuccess('Income Recorded!', `Saved "${data.title}" (+₹${data.amount})`);
+      setLastSavedExpenseId(result?.id || tempId);
+      setActiveTab('expenses');
       setSyncStatus({ state: 'saved', lastSyncedAt: new Date() });
     } catch (err: any) {
       setSyncStatus({ state: 'error', errorMessage: err.message });
+      showError('Failed to Save Income', err.message || 'Saving error');
       throw err;
     }
   };
@@ -1486,23 +1558,34 @@ export function App() {
             onOpenAddExpense={() => {
               setEditingExpense(null);
               setInitialMonthlyItem(null);
+              setAddExpenseInitialMode('manual');
               setIsAddExpenseOpen(true);
             }}
+            onOpenAddIncome={() => setIsAddIncomeOpen(true)}
             onNavigateToTab={(tab) => setActiveTab(tab as any)}
-            onOpenScanReceipt={() => setIsScanReceiptOpen(true)}
+            onOpenScanReceipt={() => {
+              setEditingExpense(null);
+              setInitialMonthlyItem(null);
+              setAddExpenseInitialMode('scan');
+              setIsAddExpenseOpen(true);
+            }}
             onOpenWizard={() => setIsWizardOpen(true)}
             onOpenOnboarding={() => setIsOnboardingOpen(true)}
+            onAddIncome={handleAddIncome}
           />
         )}
 
         {activeTab === 'wallet' && (
-          <WalletPage expenses={expenses} userSettings={userSettings} />
+          <WalletPage />
         )}
 
         {activeTab === 'receipts' && !selectedReceiptId && (
           <ReceiptVaultPage
             onSelectReceipt={(id) => setSelectedReceiptId(id)}
-            onOpenScanner={() => setIsScanReceiptOpen(true)}
+            onOpenScanner={() => {
+              setAddExpenseInitialMode('scan');
+              setIsAddExpenseOpen(true);
+            }}
           />
         )}
 
@@ -1536,7 +1619,15 @@ export function App() {
         )}
 
         {activeTab === 'budget' && (
-          <BudgetDashboardPage />
+          <BudgetDashboardPage
+            expenses={expenses}
+            userSettings={userSettings}
+            onOpenAddExpense={() => {
+              setEditingExpense(null);
+              setInitialMonthlyItem(null);
+              setIsAddExpenseOpen(true);
+            }}
+          />
         )}
 
         {activeTab === 'family' && (
@@ -1546,8 +1637,10 @@ export function App() {
         {activeTab === 'expenses' && (
           <ExpensesPage
             expenses={expenses}
+            incomes={incomes}
             categories={categories}
             dateRange={dateRange}
+            lastSavedExpenseId={lastSavedExpenseId}
             onOpenAddExpense={() => {
               setEditingExpense(null);
               setInitialMonthlyItem(null);
@@ -1885,7 +1978,19 @@ export function App() {
           <button
             onClick={() => {
               setIsQuickAddSheetOpen(false);
-              setIsScanReceiptOpen(true);
+              setIsAddIncomeOpen(true);
+            }}
+            className="p-4 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 hover:border-cyan-500 text-cyan-400 font-extrabold text-xs flex flex-col items-center justify-center gap-2 cursor-pointer transition-all hover:scale-105 active:scale-95"
+          >
+            <ArrowDownLeft className="w-6 h-6 text-cyan-400" />
+            <span>Add Income</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setIsQuickAddSheetOpen(false);
+              setAddExpenseInitialMode('scan');
+              setIsAddExpenseOpen(true);
             }}
             className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20 hover:border-purple-500 text-purple-400 font-extrabold text-xs flex flex-col items-center justify-center gap-2 cursor-pointer transition-all hover:scale-105 active:scale-95"
           >
@@ -1944,10 +2049,20 @@ export function App() {
           setIsAddExpenseOpen(false);
           setEditingExpense(null);
           setInitialMonthlyItem(null);
+          setAddExpenseInitialMode('manual');
         }}
         onSave={handleSaveExpense}
         categories={categories}
         editExpense={editingExpense}
+        initialMode={addExpenseInitialMode}
+        expenses={expenses}
+      />
+
+      {/* Add Income Modal */}
+      <AddIncomeModal
+        isOpen={isAddIncomeOpen}
+        onClose={() => setIsAddIncomeOpen(false)}
+        onSave={handleAddIncome}
       />
 
       {/* Workspace Provisioning Progress Modal */}
